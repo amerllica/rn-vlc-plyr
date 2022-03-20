@@ -1,21 +1,23 @@
 # react-native-ir-player
 
-React Native IR Player (Video Player) based on VLC
+React Native VLC Player (Video/Audio Player) based on VLC
 
 ## Installation
 
 ```sh
-npm install react-native-ir-player
+npm install rn-vlc-plyr
 ```
 
 ## Usage
 
 ```js
-import IrPlayer from "react-native-ir-player";
+import VideoPlayer from "rn-vlc-plyr";
 
 // ...
 
-const result = await IrPlayer.multiply(3, 7);
+const VideoComponent = () => (
+  <VideoPlayer...
+);
 ```
 
 ## Contributing
