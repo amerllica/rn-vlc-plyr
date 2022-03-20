@@ -1,7 +1,7 @@
 {
-  "name": "react-native-ir-player",
-  "version": "0.1.0",
-  "description": "React Native IR Player (Video Player) based on VLC",
+  "name": "rn-vlc-plyr",
+  "version": "0.1.1",
+  "description": "React Native VLC Player (Video/Audio Player) based on VLC",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
   "types": "lib/typescript/src/index.d.ts",
@@ -34,13 +34,13 @@
     "ios",
     "android"
   ],
-  "repository": "https://github.com/iran-react-community/react-native-ir-player",
-  "author": "amerllica <amerllica@gmail.com> (https://github.com/iran-react-community)",
+  "repository": "https://github.com/amerllica/rn-vlc-plyr",
+  "author": "amerllica <amerllica@gmail.com> (https://github.com/amerllica)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/iran-react-community/react-native-ir-player/issues"
+    "url": "https://github.com/amerllica/rn-vlc-plyr/issues"
   },
-  "homepage": "https://github.com/iran-react-community/react-native-ir-player#readme",
+  "homepage": "https://github.com/amerllica/rn-vlc-plyr#readme",
   "devDependencies": {
     "@commitlint/config-conventional": "^8.3.4",
     "@react-native-community/bob": "^0.16.2",
@@ -119,7 +119,10 @@
       ]
     }
   },
-  "eslintIgnore": ["node_modules/", "lib/"],
+  "eslintIgnore": [
+    "node_modules/",
+    "lib/"
+  ],
   "prettier": {
     "quoteProps": "consistent",
     "singleQuote": true,
@@ -130,6 +133,10 @@
   "@react-native-community/bob": {
     "source": "src",
     "output": "lib",
-    "targets": ["commonjs", "module", "typescript"]
+    "targets": [
+      "commonjs",
+      "module",
+      "typescript"
+    ]
   }
 }
