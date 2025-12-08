@@ -8,6 +8,7 @@ PODS:
   - hermes-engine (0.81.1):
     - hermes-engine/Pre-built (= 0.81.1)
   - hermes-engine/Pre-built (0.81.1)
+  - MobileVLCKit (3.7.0)
   - RCT-Folly (2024.11.18.00):
     - boost
     - DoubleConversion
@@ -2260,6 +2261,7 @@ PODS:
     - fmt
     - glog
     - hermes-engine
+    - MobileVLCKit (~> 3.7.0)
     - RCT-Folly
     - RCT-Folly/Fabric
     - RCTRequired
@@ -2362,6 +2364,7 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
+    - MobileVLCKit
     - SocketRocket
 
 EXTERNAL SOURCES:
@@ -2519,6 +2522,7 @@ SPEC CHECKSUMS:
   fmt: a40bb5bd0294ea969aaaba240a927bd33d878cdd
   glog: 5683914934d5b6e4240e497e0f4a3b42d1854183
   hermes-engine: 4f8246b1f6d79f625e0d99472d1f3a71da4d28ca
+  MobileVLCKit: 9adfebbd93b9feb8eeff06b0c6a3739356b6f5cd
   RCT-Folly: 846fda9475e61ec7bcbf8a3fe81edfcaeb090669
   RCTDeprecation: c4b9e2fd0ab200e3af72b013ed6113187c607077
   RCTRequired: e97dd5dafc1db8094e63bc5031e0371f092ae92a
@@ -2582,7 +2586,7 @@ SPEC CHECKSUMS:
   ReactAppDependencyProvider: 3eb9096cb139eb433965693bbe541d96eb3d3ec9
   ReactCodegen: 4d203eddf6f977caa324640a20f92e70408d648b
   ReactCommon: ce5d4226dfaf9d5dacbef57b4528819e39d3a120
-  RnVlcPlyr: dfc0b157f98f12c07201d8ab999df7923669a2dc
+  RnVlcPlyr: a761e09e3cce5cba497088d9b9989c111521c0f0
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: 11c9686a21e2cd82a094a723649d9f4507200fb0
 

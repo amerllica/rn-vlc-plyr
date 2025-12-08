@@ -16,5 +16,8 @@ Pod::Spec.new do |s|
   s.source_files = "ios/**/*.{h,m,mm,swift,cpp}"
   s.private_header_files = "ios/**/*.h"
 
+  s.dependency "MobileVLCKit", "~> 3.7.0"
+  s.swift_version = "6.1"
+
   install_modules_dependencies(s)
 end
