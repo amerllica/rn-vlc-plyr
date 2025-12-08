@@ -10,8 +10,7 @@ import com.facebook.react.viewmanagers.RnVlcPlyrViewManagerInterface
 import com.facebook.react.viewmanagers.RnVlcPlyrViewManagerDelegate
 
 @ReactModule(name = RnVlcPlyrViewManager.NAME)
-class RnVlcPlyrViewManager : SimpleViewManager<RnVlcPlyrView>(),
-  RnVlcPlyrViewManagerInterface<RnVlcPlyrView> {
+class RnVlcPlyrViewManager : SimpleViewManager<RnVlcPlyrView>(), RnVlcPlyrViewManagerInterface<RnVlcPlyrView> {
   private val mDelegate: ViewManagerDelegate<RnVlcPlyrView>
 
   init {
@@ -30,9 +29,14 @@ class RnVlcPlyrViewManager : SimpleViewManager<RnVlcPlyrView>(),
     return RnVlcPlyrView(context)
   }
 
-  @ReactProp(name = "color")
-  override fun setColor(view: RnVlcPlyrView?, color: String?) {
-    view?.setBackgroundColor(Color.parseColor(color))
+  @ReactProp(name = "url")
+  override fun setUrl(view: RnVlcPlyrView, url: String?) {
+    view.setUrl(url)
+  }
+
+  override fun onDropViewInstance(view: RnVlcPlyrView) {
+    super.onDropViewInstance(view)
+    view.cleanup()
   }
 
   companion object {

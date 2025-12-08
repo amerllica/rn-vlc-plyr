@@ -1,7 +1,7 @@
 import { codegenNativeComponent, type ViewProps } from 'react-native';
 
 interface NativeProps extends ViewProps {
-  color?: string;
+  url?: string;
 }
 
 export default codegenNativeComponent<NativeProps>('RnVlcPlyrView');
