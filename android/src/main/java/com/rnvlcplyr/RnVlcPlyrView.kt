@@ -48,6 +48,22 @@ class RnVlcPlyrView : FrameLayout {
         }
     }
 
+    fun play() {
+        if (mediaPlayer?.isPlaying == false) {
+            mediaPlayer?.play()
+        }
+    }
+
+    fun pause() {
+        if (mediaPlayer?.isPlaying == true) {
+            mediaPlayer?.pause()
+        }
+    }
+
+    fun stop() {
+        mediaPlayer?.stop()
+    }
+
     fun cleanup() {
         mediaPlayer?.release()
         libVlc?.release()

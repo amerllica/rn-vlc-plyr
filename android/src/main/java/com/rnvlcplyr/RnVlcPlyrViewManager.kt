@@ -34,6 +34,18 @@ class RnVlcPlyrViewManager : SimpleViewManager<RnVlcPlyrView>(), RnVlcPlyrViewMa
     view.setUrl(url)
   }
 
+  override fun play(view: RnVlcPlyrView) {
+    view.play()
+  }
+
+  override fun pause(view: RnVlcPlyrView) {
+    view.pause()
+  }
+
+  override fun stop(view: RnVlcPlyrView) {
+    view.stop()
+  }
+
   override fun onDropViewInstance(view: RnVlcPlyrView) {
     super.onDropViewInstance(view)
     view.cleanup()
