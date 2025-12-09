@@ -1,19 +1,30 @@
 import { useRef, useImperativeHandle } from 'react';
 import RnVlcPlyrView, { Commands } from './RnVlcPlyrViewNativeComponent';
+import type {
+  NativeProps,
+  PlayerStateType,
+} from './RnVlcPlyrViewNativeComponent';
 import type * as React from 'react';
-import type { ViewProps } from 'react-native';
+import type { ViewProps, NativeSyntheticEvent } from 'react-native';
 
 type VLCPlayerRef = React.ElementRef<typeof RnVlcPlyrView>;
+type VoidFunction = () => void;
 
 export interface RnVlcPlyrHandlers {
-  play: () => void;
-  pause: () => void;
-  stop: () => void;
+  play: VoidFunction;
+  pause: VoidFunction;
+  stop: VoidFunction;
+  presentFullscreen: VoidFunction;
+  dismissFullscreen: VoidFunction;
+  seek: (time: number) => void;
+  setVolume: (volume: number) => void;
 }
 
-export interface RnVlcPlyrProps extends ViewProps {
-  url?: string;
+export interface RnVlcPlyrProps
+  extends Omit<NativeProps, 'onStateChange'>,
+    ViewProps {
   ref?: React.Ref<RnVlcPlyrHandlers>;
+  onStateChange?: (e: NativeSyntheticEvent<{ state: PlayerStateType }>) => void;
 }
 
 const RnVlcPlyr: React.FC<RnVlcPlyrProps> = ({ ref, ...rest }) => {
@@ -35,6 +46,26 @@ const RnVlcPlyr: React.FC<RnVlcPlyrProps> = ({ ref, ...rest }) => {
       stop: () => {
         if (nativeRef.current) {
           Commands.stop(nativeRef.current);
+        }
+      },
+      presentFullscreen: () => {
+        if (nativeRef.current) {
+          Commands.presentFullscreen(nativeRef.current);
+        }
+      },
+      dismissFullscreen: () => {
+        if (nativeRef.current) {
+          Commands.dismissFullscreen(nativeRef.current);
+        }
+      },
+      seek: (time) => {
+        if (nativeRef.current) {
+          Commands.seek(nativeRef.current, time);
+        }
+      },
+      setVolume: (volume) => {
+        if (nativeRef.current) {
+          Commands.setVolume(nativeRef.current, volume);
         }
       },
     }),
