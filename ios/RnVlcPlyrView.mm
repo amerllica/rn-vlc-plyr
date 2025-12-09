@@ -11,6 +11,9 @@
 @protocol VLCViewProtocol <NSObject>
 
 - (void)setUrl:(NSString *)url;
+- (void)play;
+- (void)pause;
+- (void)stop;
 
 @end
 
@@ -36,24 +39,24 @@ using namespace facebook::react;
   if (self = [super initWithFrame:frame]) {
     static const auto defaultProps = std::make_shared<const RnVlcPlyrViewProps>();
     _props = defaultProps;
-    
+
     Class vlcViewClass = NSClassFromString(@"RnVlcPlyr.VlcPlyrView");
-    
+
     if (vlcViewClass) {
         id <VLCViewProtocol> playerViewInstance = [[vlcViewClass alloc] initWithFrame:self.bounds];
-        
+
         self.vlcPlayerView = (__kindof UIView<VLCViewProtocol> *)playerViewInstance;
 
         self.vlcPlayerView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         self.contentView = self.vlcPlayerView;
-        
+
     } else {
         UIView *fallbackView = [[UIView alloc] init];
         fallbackView.backgroundColor = [UIColor redColor];
         fallbackView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        
+
         self.contentView = fallbackView;
-        
+
         NSLog(@"[RnVlcPlyr] ERROR: Could not find Swift class RnVlcPlyr.VlcPlyrView. Using Red Fallback.");
     }
   }
@@ -68,11 +71,26 @@ using namespace facebook::react;
 
     if (oldViewProps.url != newViewProps.url) {
         NSString *urlToConvert = [[NSString alloc] initWithUTF8String: newViewProps.url.c_str()];
-        
-        [self.vlcPlayerView performSelector:@selector(setUrl:) withObject:urlToConvert];
+
+        [self.vlcPlayerView setUrl:urlToConvert];
     }
 
     [super updateProps:props oldProps:oldProps];
+}
+
+- (void)handleCommand:(NSString *)commandName args:(NSArray<id<NSObject>> *)args
+{
+    if (!self.vlcPlayerView) {
+        return;
+    }
+
+    if ([commandName isEqualToString:@"play"]) {
+        [self.vlcPlayerView play];
+    } else if ([commandName isEqualToString:@"pause"]) {
+        [self.vlcPlayerView pause];
+    } else if ([commandName isEqualToString:@"stop"]) {
+        [self.vlcPlayerView stop];
+    }
 }
 
 Class<RCTComponentViewProtocol> RnVlcPlyrViewCls(void)
