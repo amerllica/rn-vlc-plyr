@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { View, StyleSheet, Button } from 'react-native';
 import { RnVlcPlyr, type RnVlcPlyrHandlers } from 'rn-vlc-plyr';
 
@@ -18,6 +18,16 @@ export default function App() {
     videoRef.current?.stop();
   };
 
+  const [isMuted, setMuted] = useState(false);
+  const [isLooped, setLooped] = useState(false);
+
+  const toggleMuted = () => {
+    setMuted((m) => !m);
+  };
+  const toggleLooped = () => {
+    setLooped((l) => !l);
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.playBar}>
@@ -25,7 +35,19 @@ export default function App() {
         <Button title="play" onPress={handlePlay} />
         <Button title="stop" onPress={handleStop} />
       </View>
-      <RnVlcPlyr ref={videoRef} url={oldRatioVideoLink} style={styles.box} />
+      <View style={styles.playBar}>
+        <Button title="mute" onPress={toggleMuted} />
+        <Button title="loop" onPress={toggleLooped} />
+      </View>
+      <RnVlcPlyr
+        ref={videoRef}
+        style={styles.box}
+        // library props
+        url={oldRatioVideoLink}
+        muted={isMuted}
+        autoPlay={true}
+        loop={isLooped}
+      />
     </View>
   );
 }
