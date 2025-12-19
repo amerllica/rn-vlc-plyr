@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { View, StyleSheet, Button } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { Button } from './components';
 import { RnVlcPlyr, type RnVlcPlyrHandlers } from 'rn-vlc-plyr';
 
 const oldRatioVideoLink = 'http://10.208.219.215:8793/oldRatio.mp4';
@@ -31,13 +32,13 @@ export default function App() {
   return (
     <View style={styles.container}>
       <View style={styles.playBar}>
-        <Button title="pause" onPress={handlePause} />
-        <Button title="play" onPress={handlePlay} />
-        <Button title="stop" onPress={handleStop} />
+        <Button label="pause" onPress={handlePause} />
+        <Button label="play" onPress={handlePlay} />
+        <Button label="stop" onPress={handleStop} />
       </View>
       <View style={styles.playBar}>
-        <Button title="mute" onPress={toggleMuted} />
-        <Button title="loop" onPress={toggleLooped} />
+        <Button label="mute" onPress={toggleMuted} />
+        <Button label="loop" onPress={toggleLooped} />
       </View>
       <RnVlcPlyr
         ref={videoRef}
@@ -45,7 +46,7 @@ export default function App() {
         // library props
         url={oldRatioVideoLink}
         muted={isMuted}
-        autoPlay={true}
+        autoPlay={false}
         loop={isLooped}
       />
     </View>
