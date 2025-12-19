@@ -202,4 +202,9 @@ jobs:
         run: yarn prepare
 
       - name: Release package to npm (OIDC)
-        run: npm publish
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/*-beta* ]]; then
+            npm publish --tag beta
+          else
+            npm publish
+          fi
