@@ -56,7 +56,8 @@
   },
   "homepage": "https://github.com/amerllica/rn-vlc-plyr#readme",
   "publishConfig": {
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   },
   "devDependencies": {
     "@commitlint/config-conventional": "^19.8.1",
@@ -141,6 +142,7 @@
       "tagName": "v${version}"
     },
     "npm": {
+      "ignoreVersion": false,
       "publish": true,
       "skipChecks": true
     },

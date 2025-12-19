@@ -180,7 +180,7 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     permissions:
-      contents: write
+      contents: read
       id-token: write
 
     steps:
@@ -203,5 +203,6 @@ jobs:
 
       - name: Release package
         run: |
+          npm install
           npm ci
           npx release-it --ci
