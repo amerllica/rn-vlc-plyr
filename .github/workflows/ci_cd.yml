@@ -16,10 +16,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  id-token: write
-  contents: read
-
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -181,6 +177,12 @@ jobs:
       - build-ios
 
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    permissions:
+      contents: write
+      id-token: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -200,4 +202,6 @@ jobs:
         run: yarn prepare
 
       - name: Release package
-        run: yarn release
+        run: |
+          npm ci
+          npx release-it --ci
