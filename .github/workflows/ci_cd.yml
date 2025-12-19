@@ -201,8 +201,5 @@ jobs:
       - name: Build package
         run: yarn prepare
 
-      - name: Release package
-        run: |
-          npm install
-          npm ci
-          npx release-it --ci
+      - name: Release package to npm (OIDC)
+        run: npm publish
