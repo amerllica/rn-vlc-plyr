@@ -199,7 +199,5 @@ jobs:
       - name: Build package
         run: yarn prepare
 
-      - run: npm ci
-      - run: npm run build --if-present
-      - run: npm test
-      - run: npm publish
+      - name: Release package
+        run: yarn release
