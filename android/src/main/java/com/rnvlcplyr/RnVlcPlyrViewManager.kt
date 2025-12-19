@@ -34,6 +34,22 @@ class RnVlcPlyrViewManager : SimpleViewManager<RnVlcPlyrView>(), RnVlcPlyrViewMa
     view.setUrl(url)
   }
 
+  @ReactProp(name = "autoPlay", defaultBoolean = true)
+  override fun setAutoPlay(view: RnVlcPlyrView, autoPlay: Boolean) {
+      view.setAutoPlay(autoPlay)
+  }
+
+  @ReactProp(name = "loop", defaultBoolean = false)
+  override fun setLoop(view: RnVlcPlyrView, loop: Boolean) {
+      view.setLoop(loop)
+  }
+
+  @ReactProp(name = "muted", defaultBoolean = false)
+  override fun setMuted(view: RnVlcPlyrView, muted: Boolean) {
+      view.setMuted(muted)
+  }
+
+
   override fun play(view: RnVlcPlyrView) {
     view.play()
   }
@@ -44,6 +60,22 @@ class RnVlcPlyrViewManager : SimpleViewManager<RnVlcPlyrView>(), RnVlcPlyrViewMa
 
   override fun stop(view: RnVlcPlyrView) {
     view.stop()
+  }
+
+  override fun presentFullscreen(view: RnVlcPlyrView) {
+      // empty temporary
+  }
+
+  override fun dismissFullscreen(view: RnVlcPlyrView) {
+      // empty temporary
+  }
+
+  override fun seek(view: RnVlcPlyrView, time: Double) {
+      view.seek(time)
+  }
+
+  override fun setVolume(view: RnVlcPlyrView, volume: Double) {
+      view.setVolume(volume)
   }
 
   override fun onDropViewInstance(view: RnVlcPlyrView) {
