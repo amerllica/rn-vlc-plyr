@@ -20,6 +20,7 @@
 - (void)play;
 - (void)pause;
 - (void)stop;
+- (void)seek:(double)time;
 
 @end
 
@@ -108,6 +109,11 @@ using namespace facebook::react;
     [self.vlcPlayerView pause];
   } else if ([commandName isEqualToString:@"stop"]) {
     [self.vlcPlayerView stop];
+  } else if ([commandName isEqualToString:@"seek"]) {
+    if (args.count > 0 && [args[0] isKindOfClass:[NSNumber class]]) {
+      double time = [(NSNumber *)args[0] doubleValue];
+      [self.vlcPlayerView seek:time];
+    }
   }
 }
 

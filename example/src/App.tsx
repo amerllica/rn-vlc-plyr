@@ -18,6 +18,9 @@ export default function App() {
   const handleStop = () => {
     videoRef.current?.stop();
   };
+  const jumpTo10s = () => {
+    videoRef.current?.seek(10_000);
+  };
 
   const [isMuted, setMuted] = useState(false);
   const [isLooped, setLooped] = useState(false);
@@ -39,6 +42,7 @@ export default function App() {
       <View style={styles.playBar}>
         <Button label="mute" onPress={toggleMuted} />
         <Button label="loop" onPress={toggleLooped} />
+        <Button label="seek_10" onPress={jumpTo10s} />
       </View>
       <RnVlcPlyr
         ref={videoRef}
