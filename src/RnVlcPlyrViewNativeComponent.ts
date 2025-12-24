@@ -47,7 +47,7 @@ export interface NativeCommands {
   stop: (viewRef: React.ElementRef<RnVlcPlyrViewType>) => void;
   seek: (
     viewRef: React.ElementRef<RnVlcPlyrViewType>,
-    time: CodegenTypes.Double
+    timeMs: CodegenTypes.Double
   ) => void;
   setVolume: (
     viewRef: React.ElementRef<RnVlcPlyrViewType>,
