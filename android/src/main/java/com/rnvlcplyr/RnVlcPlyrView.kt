@@ -161,6 +161,7 @@ class RnVlcPlyrView : FrameLayout {
 
     fun seek(timeMs: Double) {
         if (timeMs < 0) return
+
         mediaPlayer?.let {
             it.time = timeMs.toLong()
         }

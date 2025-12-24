@@ -4,6 +4,7 @@ import type {
   NativeProps,
   PlayerStateType,
 } from './RnVlcPlyrViewNativeComponent';
+import { clamp } from './toolkit';
 import type * as React from 'react';
 import type { ViewProps, NativeSyntheticEvent } from 'react-native';
 
@@ -46,9 +47,11 @@ const RnVlcPlyr: React.FC<RnVlcPlyrProps> = ({ ref, ...rest }) => {
           Commands.stop(nativeRef.current);
         }
       },
-      seek: (time) => {
+      seek: (timeMs) => {
         if (nativeRef.current) {
-          Commands.seek(nativeRef.current, time);
+          const safeTimeMs = clamp(0, timeMs, Number.MAX_SAFE_INTEGER);
+
+          Commands.seek(nativeRef.current, safeTimeMs);
         }
       },
       setVolume: (volume) => {

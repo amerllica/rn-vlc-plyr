@@ -118,7 +118,6 @@ final class VlcPlyrView: UIView, VLCMediaPlayerDelegate {
     player?.stop()
   }
 
-  // time in milliseconds
   @objc func seek(_ timeMs: Double) {
     guard let player = player,
           timeMs.isFinite,
