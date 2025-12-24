@@ -45,8 +45,6 @@ export interface NativeCommands {
   play: (viewRef: React.ElementRef<RnVlcPlyrViewType>) => void;
   pause: (viewRef: React.ElementRef<RnVlcPlyrViewType>) => void;
   stop: (viewRef: React.ElementRef<RnVlcPlyrViewType>) => void;
-  presentFullscreen: (viewRef: React.ElementRef<RnVlcPlyrViewType>) => void;
-  dismissFullscreen: (viewRef: React.ElementRef<RnVlcPlyrViewType>) => void;
   seek: (
     viewRef: React.ElementRef<RnVlcPlyrViewType>,
     time: CodegenTypes.Double
@@ -58,15 +56,7 @@ export interface NativeCommands {
 }
 
 export const Commands = codegenNativeCommands<NativeCommands>({
-  supportedCommands: [
-    'play',
-    'pause',
-    'stop',
-    'presentFullscreen',
-    'dismissFullscreen',
-    'seek',
-    'setVolume',
-  ],
+  supportedCommands: ['play', 'pause', 'stop', 'seek', 'setVolume'],
 });
 
 export default codegenNativeComponent<NativeProps>('RnVlcPlyrView');

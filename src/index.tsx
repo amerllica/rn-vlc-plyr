@@ -14,8 +14,6 @@ export interface RnVlcPlyrHandlers {
   play: VoidFunction;
   pause: VoidFunction;
   stop: VoidFunction;
-  presentFullscreen: VoidFunction;
-  dismissFullscreen: VoidFunction;
   seek: (time: number) => void;
   setVolume: (volume: number) => void;
 }
@@ -46,16 +44,6 @@ const RnVlcPlyr: React.FC<RnVlcPlyrProps> = ({ ref, ...rest }) => {
       stop: () => {
         if (nativeRef.current) {
           Commands.stop(nativeRef.current);
-        }
-      },
-      presentFullscreen: () => {
-        if (nativeRef.current) {
-          Commands.presentFullscreen(nativeRef.current);
-        }
-      },
-      dismissFullscreen: () => {
-        if (nativeRef.current) {
-          Commands.dismissFullscreen(nativeRef.current);
         }
       },
       seek: (time) => {
