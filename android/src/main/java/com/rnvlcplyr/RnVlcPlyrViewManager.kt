@@ -62,16 +62,8 @@ class RnVlcPlyrViewManager : SimpleViewManager<RnVlcPlyrView>(), RnVlcPlyrViewMa
     view.stop()
   }
 
-  override fun presentFullscreen(view: RnVlcPlyrView) {
-      // empty temporary
-  }
-
-  override fun dismissFullscreen(view: RnVlcPlyrView) {
-      // empty temporary
-  }
-
-  override fun seek(view: RnVlcPlyrView, time: Double) {
-      view.seek(time)
+  override fun seek(view: RnVlcPlyrView, timeMs: Double) {
+      view.seek(timeMs)
   }
 
   override fun setVolume(view: RnVlcPlyrView, volume: Double) {

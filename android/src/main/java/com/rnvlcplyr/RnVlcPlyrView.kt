@@ -159,9 +159,10 @@ class RnVlcPlyrView : FrameLayout {
         }
     }
 
-    fun seek(time: Double) {
+    fun seek(timeMs: Double) {
+        if (timeMs < 0) return
         mediaPlayer?.let {
-            it.time = time.toLong()
+            it.time = timeMs.toLong()
         }
     }
 
