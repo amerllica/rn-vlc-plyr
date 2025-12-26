@@ -169,7 +169,7 @@ class RnVlcPlyrView : FrameLayout {
 
     fun setVolume(volume: Double) {
         mediaPlayer?.let {
-            val vol = (volume * 100).toInt().coerceIn(0, 100)
+            val vol = volume.toInt().coerceIn(0, 100)
             it?.volume = vol
 
             if (vol > 0) {
