@@ -56,7 +56,9 @@ const RnVlcPlyr: React.FC<RnVlcPlyrProps> = ({ ref, ...rest }) => {
       },
       setVolume: (volume) => {
         if (nativeRef.current) {
-          Commands.setVolume(nativeRef.current, volume);
+          const safeVolume = clamp(0, volume, 100);
+
+          Commands.setVolume(nativeRef.current, safeVolume);
         }
       },
     }),

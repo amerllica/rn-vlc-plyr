@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, TextInput } from 'react-native';
 import { Button } from './components';
 import { RnVlcPlyr, type RnVlcPlyrHandlers } from 'rn-vlc-plyr';
 
-const oldRatioVideoLink = 'http://10.208.219.215:8793/oldRatio.mp4';
-// const newRatioVideoLink = 'http://10.208.219.215:8793/newRatio.mp4';
+const oldRatioVideoLink = 'http://10.86.205.215:8793/oldRatio.mp4';
+// const newRatioVideoLink = 'http://10.86.205.215:8793/newRatio.mp4';
 
 export default function App() {
   const videoRef = useRef<RnVlcPlyrHandlers>(null);
@@ -32,6 +32,12 @@ export default function App() {
     setLooped((l) => !l);
   };
 
+  const [volume, setVolume] = useState(0);
+
+  const handleVolume = () => {
+    videoRef.current?.setVolume(volume);
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.playBar}>
@@ -43,6 +49,17 @@ export default function App() {
         <Button label="mute" onPress={toggleMuted} />
         <Button label="loop" onPress={toggleLooped} />
         <Button label="seek_10" onPress={jumpTo10s} />
+      </View>
+      <View style={styles.playBar}>
+        <TextInput
+          style={styles.textInput}
+          keyboardType="number-pad"
+          value={volume.toString()}
+          onChangeText={(v) => {
+            setVolume(Number(v));
+          }}
+        />
+        <Button label="set volume" onPress={handleVolume} />
       </View>
       <RnVlcPlyr
         ref={videoRef}
@@ -73,5 +90,13 @@ const styles = StyleSheet.create({
   box: {
     width: '100%',
     height: 500,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#000',
+    borderRadius: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    minWidth: 40,
   },
 });
