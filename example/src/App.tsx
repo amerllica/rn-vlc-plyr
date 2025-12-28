@@ -69,6 +69,10 @@ export default function App() {
         muted={isMuted}
         autoPlay={false}
         loop={isLooped}
+        // events
+        onError={(e) => {
+          console.log('error: ', e.nativeEvent);
+        }}
       />
     </View>
   );

@@ -20,10 +20,13 @@ export interface RnVlcPlyrHandlers {
 }
 
 export interface RnVlcPlyrProps
-  extends Omit<NativeProps, 'onStateChange'>,
+  extends Omit<NativeProps, 'onStateChange' | 'onError'>,
     ViewProps {
   ref?: React.Ref<RnVlcPlyrHandlers>;
   onStateChange?: (e: NativeSyntheticEvent<{ state: PlayerStateType }>) => void;
+  onError?: (
+    e: NativeSyntheticEvent<{ message: string; code: number }>
+  ) => void;
 }
 
 const RnVlcPlyr: React.FC<RnVlcPlyrProps> = ({ ref, ...rest }) => {
