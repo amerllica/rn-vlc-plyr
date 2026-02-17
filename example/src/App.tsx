@@ -1,13 +1,14 @@
 import { useRef, useState } from 'react';
-import { View, StyleSheet, TextInput } from 'react-native';
+import { View, StyleSheet, TextInput, Text } from 'react-native';
 import { Button } from './components';
 import { RnVlcPlyr, type RnVlcPlyrHandlers } from 'rn-vlc-plyr';
 
-const oldRatioVideoLink = 'http://10.86.205.215:8793/oldRatio.mp4';
+const oldRatioVideoLink = 'http://10.45.171.215:8793/oldRatio.mp4';
 // const newRatioVideoLink = 'http://10.86.205.215:8793/newRatio.mp4';
 
 export default function App() {
   const videoRef = useRef<RnVlcPlyrHandlers>(null);
+  const [err, setErr] = useState<string>('');
 
   const handlePause = () => {
     videoRef.current?.pause();
@@ -61,6 +62,7 @@ export default function App() {
         />
         <Button label="set volume" onPress={handleVolume} />
       </View>
+      <Text style={styles.err}>{err}</Text>
       <RnVlcPlyr
         ref={videoRef}
         style={styles.box}
@@ -72,6 +74,7 @@ export default function App() {
         // events
         onError={(e) => {
           console.log('error: ', e.nativeEvent);
+          setErr(e.nativeEvent.message);
         }}
       />
     </View>
@@ -102,5 +105,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     minWidth: 40,
+  },
+  err: {
+    color: '#f00',
   },
 });
