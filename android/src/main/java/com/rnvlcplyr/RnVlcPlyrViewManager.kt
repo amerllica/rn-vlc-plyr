@@ -1,6 +1,5 @@
 package com.rnvlcplyr
 
-import android.graphics.Color
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.uimanager.SimpleViewManager
 import com.facebook.react.uimanager.ThemedReactContext
@@ -25,7 +24,7 @@ class RnVlcPlyrViewManager : SimpleViewManager<RnVlcPlyrView>(), RnVlcPlyrViewMa
     return NAME
   }
 
-  public override fun createViewInstance(context: ThemedReactContext): RnVlcPlyrView {
+  override fun createViewInstance(context: ThemedReactContext): RnVlcPlyrView {
     return RnVlcPlyrView(context)
   }
 
@@ -47,6 +46,12 @@ class RnVlcPlyrViewManager : SimpleViewManager<RnVlcPlyrView>(), RnVlcPlyrViewMa
   @ReactProp(name = "muted", defaultBoolean = false)
   override fun setMuted(view: RnVlcPlyrView, muted: Boolean) {
       view.setMuted(muted)
+  }
+
+  override fun getExportedCustomDirectEventTypeConstants(): MutableMap<String, Any> {
+    return (super.getExportedCustomDirectEventTypeConstants() ?: mutableMapOf()).apply {
+      put("topError", mapOf("registrationName" to "onError"))
+    }
   }
 
 
@@ -77,5 +82,6 @@ class RnVlcPlyrViewManager : SimpleViewManager<RnVlcPlyrView>(), RnVlcPlyrViewMa
 
   companion object {
     const val NAME = "RnVlcPlyrView"
+    private const val TAG = "RnVlcPlyrViewManager"
   }
 }
