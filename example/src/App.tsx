@@ -34,6 +34,7 @@ export default function App() {
   };
 
   const [volume, setVolume] = useState(0);
+  const [volumeCount, setVolumeCount] = useState(0);
 
   const handleVolume = () => {
     videoRef.current?.setVolume(volume);
@@ -52,6 +53,7 @@ export default function App() {
         <Button label="seek_10" onPress={jumpTo10s} />
       </View>
       <View style={styles.playBar}>
+        <Text>{volumeCount}</Text>
         <TextInput
           style={styles.textInput}
           keyboardType="number-pad"
@@ -75,6 +77,10 @@ export default function App() {
         onError={(e) => {
           console.log('error: ', e.nativeEvent);
           setErr(e.nativeEvent.message);
+        }}
+        onVolumeChange={(e) => {
+          console.log('change-volume: ', e.nativeEvent);
+          setVolumeCount((v) => v + 1);
         }}
       />
     </View>
