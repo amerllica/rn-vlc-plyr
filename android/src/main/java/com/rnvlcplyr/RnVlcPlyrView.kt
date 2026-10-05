@@ -1,9 +1,15 @@
 package com.rnvlcplyr
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.media.AudioManager
+import android.net.Uri
+import android.os.Build
 import android.util.AttributeSet
-import android.widget.FrameLayout
 import android.util.Log
+import android.widget.FrameLayout
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactContext
 import com.facebook.react.bridge.WritableMap
@@ -14,7 +20,6 @@ import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.util.VLCVideoLayout
-import android.net.Uri
 
 class RnVlcPlyrView : FrameLayout {
 
@@ -25,6 +30,8 @@ class RnVlcPlyrView : FrameLayout {
   private var lastVolumeBeforeMute = 100
   private var isEnded = false
   private var hasReportedError = false
+  private var volumeReceiver: BroadcastReceiver? = null
+  private var lastEmittedVolume: Double = -1.0
 
   private var url: String? = null
   private var autoPlay: Boolean = true
@@ -53,6 +60,7 @@ class RnVlcPlyrView : FrameLayout {
     mediaPlayer?.attachViews(videoLayout!!, null, false, false)
 
     setupEventListener()
+    registerVolumeReceiver(context)
   }
 
   private fun setupEventListener() {
@@ -227,8 +235,55 @@ class RnVlcPlyrView : FrameLayout {
     }
   }
 
+  private fun registerVolumeReceiver(ctx: Context) {
+    val audioManager = ctx.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+    val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+
+    // ContentObserver on Settings.System is unreliable in Android 8+ because AudioService
+    // no longer writes every volume change there. VOLUME_CHANGED_ACTION is the broadcast
+    // AudioService fires synchronously on every hardware or software volume event.
+    volumeReceiver = object : BroadcastReceiver() {
+      override fun onReceive(context: Context?, intent: Intent?) {
+        // When nothing is playing, hardware buttons change STREAM_RING (not STREAM_MUSIC),
+        // so filtering by STREAM_MUSIC would silently block all events during idle state.
+        // Instead, on every volume broadcast we read the current STREAM_MUSIC level;
+        // lastEmittedVolume guards against spurious re-emission when only STREAM_RING changed.
+        val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        val volumePercent = if (maxVolume > 0) (currentVolume.toDouble() / maxVolume.toDouble()) * 100.0 else 0.0
+        if (volumePercent != lastEmittedVolume) {
+          lastEmittedVolume = volumePercent
+          emitVolumeChange(volumePercent)
+        }
+      }
+    }
+
+    val filter = IntentFilter("android.media.VOLUME_CHANGED_ACTION")
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      ctx.registerReceiver(volumeReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+    } else {
+      @Suppress("UnspecifiedRegisterReceiverFlag")
+      ctx.registerReceiver(volumeReceiver, filter)
+    }
+  }
+
+  private fun emitVolumeChange(volume: Double) {
+    val reactContext = context as? ReactContext ?: return
+    val eventDispatcher = UIManagerHelper.getEventDispatcherForReactTag(reactContext, id) ?: return
+    eventDispatcher.dispatchEvent(
+      OnVolumeChangeEvent(
+        UIManagerHelper.getSurfaceId(this),
+        id,
+        volume
+      )
+    )
+  }
+
   fun cleanup() {
     removeCallbacks(null)
+    volumeReceiver?.let {
+      try { context.unregisterReceiver(it) } catch (_: IllegalArgumentException) {}
+    }
+    volumeReceiver = null
     mediaPlayer?.setEventListener(null)
     mediaPlayer?.detachViews()
     mediaPlayer?.release()
@@ -267,5 +322,30 @@ internal class OnErrorEvent(
 
   private companion object {
     private const val EVENT_NAME = "topError"
+  }
+}
+
+internal class OnVolumeChangeEvent(
+  surfaceId: Int,
+  viewId: Int,
+  private val volume: Double
+) : Event<OnVolumeChangeEvent>(surfaceId, viewId) {
+
+  @Deprecated(
+    "Use the constructor with surfaceId, viewId, and volume parameters.",
+    replaceWith = ReplaceWith("OnVolumeChangeEvent(surfaceId, viewId, volume)")
+  )
+  constructor(viewId: Int, volume: Double) : this(ViewUtil.NO_SURFACE_ID, viewId, volume)
+
+  override fun getEventName(): String = EVENT_NAME
+
+  override fun getEventData(): WritableMap =
+    Arguments.createMap().apply {
+      putInt("target", viewTag)
+      putDouble("volume", volume)
+    }
+
+  private companion object {
+    private const val EVENT_NAME = "topVolumeChange"
   }
 }

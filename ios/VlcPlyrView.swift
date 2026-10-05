@@ -1,8 +1,10 @@
 import UIKit
+import MediaPlayer
 import MobileVLCKit
 
 @objc protocol VlcPlyrViewDelegate: AnyObject {
   func vlcPlyrView(_ view: VlcPlyrView, didEncounterError message: String, code: Int)
+  @objc optional func vlcPlyrView(_ view: VlcPlyrView, didChangeVolume volume: Double)
 }
 
 @objc(VlcPlyrView)
@@ -11,6 +13,8 @@ final class VlcPlyrView: UIView, VLCMediaPlayerDelegate {
   private var player: VLCMediaPlayer?
   private var media: VLCMedia?
   private var hasReportedError: Bool = false
+  private var mpVolumeView: MPVolumeView?
+  private var volumeSlider: UISlider?
   @objc weak var errorDelegate: VlcPlyrViewDelegate?
 
   @objc var url: String? {
@@ -68,6 +72,30 @@ final class VlcPlyrView: UIView, VLCMediaPlayerDelegate {
     player = VLCMediaPlayer()
     player?.drawable = self
     player?.delegate = self
+
+    setupVolumeObserver()
+  }
+
+  private func setupVolumeObserver() {
+    // AVAudioSession KVO cannot be used here: MobileVLCKit calls setActive(false) on
+    // the shared (process-wide) session when playback stops, which kills all KVO
+    // notifications regardless of what category we configure.
+    //
+    // MPVolumeView's internal UISlider fires valueChanged directly from the hardware
+    // volume buttons, completely independent of AVAudioSession state. This is the
+    // same mechanism used by react-native-video and other iOS media libraries.
+    let volumeView = MPVolumeView(frame: CGRect(x: -1000, y: -1000, width: 1, height: 1))
+    volumeView.showsVolumeSlider = true
+    addSubview(volumeView)
+    mpVolumeView = volumeView
+
+    volumeSlider = volumeView.subviews.compactMap { $0 as? UISlider }.first
+    volumeSlider?.addTarget(self, action: #selector(volumeSliderChanged(_:)), for: .valueChanged)
+  }
+
+  @objc private func volumeSliderChanged(_ slider: UISlider) {
+    let volumePercent = Double(slider.value) * 100.0
+    errorDelegate?.vlcPlyrView?(self, didChangeVolume: volumePercent)
   }
 
   private func prepareMedia(startingTime: Double? = nil) {
@@ -200,6 +228,10 @@ final class VlcPlyrView: UIView, VLCMediaPlayerDelegate {
 
   @MainActor
   @objc func cleanup() {
+    volumeSlider?.removeTarget(self, action: #selector(volumeSliderChanged(_:)), for: .valueChanged)
+    volumeSlider = nil
+    mpVolumeView?.removeFromSuperview()
+    mpVolumeView = nil
     player?.stop()
     player = nil
     media = nil

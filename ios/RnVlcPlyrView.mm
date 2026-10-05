@@ -94,6 +94,19 @@ using namespace facebook::react;
   }
 }
 
+- (void)vlcPlyrView:(VlcPlyrView *)view didChangeVolume:(double)volume
+{
+  if (_eventEmitter) {
+    auto eventEmitter = std::static_pointer_cast<RnVlcPlyrViewEventEmitter const>(_eventEmitter);
+    
+    RnVlcPlyrViewEventEmitter::OnVolumeChange data = {
+      .volume = volume
+    };
+    
+    eventEmitter->onVolumeChange(data);
+  }
+}
+
 - (void)updateProps:(Props::Shared const &)props oldProps:(Props::Shared const &)oldProps
 {
   const auto &oldViewProps = *std::static_pointer_cast<RnVlcPlyrViewProps const>(_props);

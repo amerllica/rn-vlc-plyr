@@ -51,6 +51,7 @@ class RnVlcPlyrViewManager : SimpleViewManager<RnVlcPlyrView>(), RnVlcPlyrViewMa
   override fun getExportedCustomDirectEventTypeConstants(): MutableMap<String, Any> {
     return (super.getExportedCustomDirectEventTypeConstants() ?: mutableMapOf()).apply {
       put("topError", mapOf("registrationName" to "onError"))
+      put("topVolumeChange", mapOf("registrationName" to "onVolumeChange"))
     }
   }
 
