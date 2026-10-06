@@ -1,0 +1,40 @@
+{
+  "name": "rn-vlc-plyr-example-expo",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start --dev-client --port 8082",
+    "ios": "expo run:ios --port 8082",
+    "android": "expo run:android --port 8082",
+    "prebuild": "expo prebuild",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@react-native-community/slider": "^5.2.1",
+    "expo": "~57.0.27",
+    "expo-dev-client": "~57.0.19",
+    "expo-system-ui": "~57.0.4",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-nitro-modules": "^0.37.1",
+    "react-native-safe-area-context": "^5.10.1",
+    "react-native-svg": "^15.15.5",
+    "rn-vlc-plyr": "workspace:*",
+    "rn-vlc-plyr-example-shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "react-native-monorepo-config": "^0.4.0",
+    "typescript": "~6.0.3"
+  },
+  "expo": {
+    "install": {
+      "exclude": [
+        "@react-native-community/slider",
+        "react-native-safe-area-context",
+        "react-native-svg"
+      ]
+    }
+  }
+}

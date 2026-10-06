@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "rn-vlc-plyr",
+    "slug": "rn-vlc-plyr-example-expo",
+    "scheme": "rnvlcplyr",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B0B0F",
+    "ios": {
+      "bundleIdentifier": "rnvlcplyr.example.expo",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "rnvlcplyr.example.expo",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B0B0F",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": ["expo-dev-client"]
+  }
+}
