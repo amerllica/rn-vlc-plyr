@@ -1,0 +1,22 @@
+{
+  "name": "rn-vlc-plyr-example-shared",
+  "version": "0.0.1",
+  "private": true,
+  "main": "src/index.tsx",
+  "react-native": "src/index.tsx",
+  "types": "src/index.tsx",
+  "peerDependencies": {
+    "@react-native-community/slider": "^5.2.1",
+    "react": "*",
+    "react-native": "*",
+    "react-native-safe-area-context": "^5.10.1",
+    "react-native-svg": "^15.15.5",
+    "rn-vlc-plyr": "*"
+  },
+  "devDependencies": {
+    "@react-native-community/slider": "^5.2.1",
+    "react-native-safe-area-context": "^5.10.1",
+    "react-native-svg": "^15.15.5",
+    "rn-vlc-plyr": "workspace:*"
+  }
+}
