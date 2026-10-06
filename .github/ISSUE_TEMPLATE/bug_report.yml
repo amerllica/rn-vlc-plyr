@@ -39,6 +39,31 @@ body:
       placeholder: "x.x.x"
     validations:
       required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - iOS
+        - Android
+        - Both
+    validations:
+      required: true
+  - type: dropdown
+    id: host
+    attributes:
+      label: Host app
+      options:
+        - Bare React Native
+        - Expo (prebuild / dev client)
+    validations:
+      required: true
+  - type: input
+    id: media
+    attributes:
+      label: Media
+      description: Container and codec, or a public URL that reproduces the problem.
+      placeholder: "MKV, H.265 + DTS, https://..."
   - type: textarea
     id: react-native-info
     attributes:

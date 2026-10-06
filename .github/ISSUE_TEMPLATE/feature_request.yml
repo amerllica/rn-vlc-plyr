@@ -1,0 +1,24 @@
+name: 💡 Feature request
+description: Propose a new capability for the player.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What can you not do today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed API
+      description: How would you like to call it from JavaScript? It must behave the same on iOS and Android.
+      render: tsx
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Workarounds you tried.
