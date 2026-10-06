@@ -8,16 +8,26 @@
     "androidCxxLibName": "rnvlcplyr"
   },
   "autolinking": {
-    "RnVlcPlyr": {
+    "VlcPlayer": {
       "ios": {
         "language": "swift",
-        "implementationClassName": "HybridRnVlcPlyr"
+        "implementationClassName": "HybridVlcPlayer"
       },
       "android": {
         "language": "kotlin",
-        "implementationClassName": "HybridRnVlcPlyr"
+        "implementationClassName": "HybridVlcPlayer"
+      }
+    },
+    "VlcPlayerView": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "HybridVlcPlayerView"
+      },
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridVlcPlayerView"
       }
     }
   },
-  "ignorePaths": ["node_modules"]
+  "ignorePaths": ["node_modules", "example", "example-expo", "example-shared"]
 }
