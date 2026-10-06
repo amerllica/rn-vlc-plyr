@@ -45,13 +45,12 @@ export const MEDIA: MediaItem[] = [
     badges: [container('MKV'), codec('H.264'), MULTI_AUDIO, SUBTITLES],
   },
   {
-    id: 'apple-hls-advanced',
-    title: 'Apple HLS advanced',
-    description:
-      'Adaptive bip-bop stream with alternate audio renditions and WebVTT subtitles.',
+    id: 'apple-hls',
+    title: 'Apple HLS',
+    description: 'Apple bip-bop adaptive HTTP Live Streaming test stream.',
     format: 'HLS',
-    uri: 'https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_hls/master.m3u8',
-    badges: [container('HLS'), codec('H.264'), MULTI_AUDIO, SUBTITLES],
+    uri: 'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8',
+    badges: [container('HLS'), codec('H.264')],
   },
   {
     id: 'bbb-mkv',
