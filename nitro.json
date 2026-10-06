@@ -1,0 +1,23 @@
+{
+  "cxxNamespace": ["rnvlcplyr"],
+  "ios": {
+    "iosModuleName": "RnVlcPlyr"
+  },
+  "android": {
+    "androidNamespace": ["rnvlcplyr"],
+    "androidCxxLibName": "rnvlcplyr"
+  },
+  "autolinking": {
+    "RnVlcPlyr": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "HybridRnVlcPlyr"
+      },
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridRnVlcPlyr"
+      }
+    }
+  },
+  "ignorePaths": ["node_modules"]
+}

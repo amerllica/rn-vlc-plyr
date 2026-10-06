@@ -1,0 +1,1 @@
+export { RnVlcPlyrView } from './RnVlcPlyrView';
