@@ -1,10 +1,14 @@
 import { View, StyleSheet } from 'react-native';
-import { RnVlcPlyrView } from 'rn-vlc-plyr';
+import { VlcPlayerView, useVlcPlayer } from 'rn-vlc-plyr';
+
+const SAMPLE =
+  'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_1MB.mp4';
 
 export default function App() {
+  const player = useVlcPlayer(SAMPLE);
   return (
     <View style={styles.container}>
-      <RnVlcPlyrView color="#32a852" style={styles.box} />
+      <VlcPlayerView player={player} style={styles.video} />
     </View>
   );
 }
@@ -12,12 +16,11 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#000',
   },
-  box: {
-    width: 60,
-    height: 60,
-    marginVertical: 20,
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
   },
 });

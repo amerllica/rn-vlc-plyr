@@ -10,6 +10,7 @@
       "types": "./lib/typescript/src/index.d.ts",
       "default": "./lib/module/index.js"
     },
+    "./nitrogen/generated/shared/json/*.json": "./nitrogen/generated/shared/json/*.json",
     "./package.json": "./package.json"
   },
   "files": [
