@@ -30,6 +30,7 @@ Native clamps every input. The getter returns the clamped value immediately afte
 
 | Input | Rule |
 |---|---|
+| `NaN` | ignored by every setter and by `seek`/`seekBy`; the previous value stays |
 | rounding | JavaScript `Math.round` semantics: `floor(x + 0.5)`, so −0.5 becomes 0 |
 | `volume` | round to integer, clamp 0–100. Engine gain 100 = 0 dB on both OSes |
 | `rate` | clamp 0.25–4 |
@@ -83,7 +84,7 @@ Status values: `idle`, `opening`, `buffering`, `playing`, `paused`, `stopped`, `
 |---|---|
 | `play()` | no source → no-op. `ended` or `stopped` → restart from 0. `error` → reload the source and play. Otherwise resume |
 | `pause()` | only when `playing` or `buffering`; otherwise no-op |
-| `stop()` | engine stop, `currentTime` 0, status `stopped`. No-op when `idle` |
+| `stop()` | engine stop, `currentTime` 0, status `stopped`. Works from every status except `idle`, including `ended` and `error` |
 | `seek(ms)` | no-op unless `isSeekable`. In `ended` or `stopped`: restart playback, then seek. Emits one `timeUpdate` right after the seek with the target time |
 | `setAudioTrack(id)` / `setSubtitleTrack(id)` | `-1` disables. Unknown id → no-op. A real change emits `tracksChange` |
 | `addSubtitle(uri, select)` | no source → throws `Error('addSubtitle requires a source')` (Nitro prefixes synchronous errors with `VlcPlayer.addSubtitle(...): `). Otherwise adds a subtitle slave; the new track arrives through `tracksChange`. `select` true selects it once it appears |
@@ -122,8 +123,10 @@ Nitro delivers callbacks on the JS thread.
 - `isSeekable` = engine seekable flag.
 - `isLive` = `duration == 0 && !isSeekable`, evaluated once the source is `playing`; `false` before.
   VLC 3 reports live HLS as seekable with a length, so live HLS reads as not live on both OSes.
-- Engine seekable and length updates are accepted only while the status is `opening`, `buffering`,
-  `playing` or `paused`.
+- Engine seekable and length updates are accepted only after the current source has reached
+  `playing` once, and only while the status is `buffering`, `playing` or `paused`. While opening,
+  VLC still reports the previous media's values. The values are kept on `stop()`, so seeking after
+  `stop()` still works.
 - Track lists exclude the engine's "Disable" pseudo-track (id −1). Track ids are engine ids.
   Track names are the engine names; an empty name becomes `Track <id>`.
 - Selected ids are the engine's current ids, `-1` when none.
