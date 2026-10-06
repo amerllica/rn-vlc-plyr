@@ -30,6 +30,23 @@ def reactNativeArchitectures() {
   return value ? value.split(",") : ["armeabi-v7a", "x86", "x86_64", "arm64-v8a"]
 }
 
+def cxxSharedLibrary = "**/libc++_shared.so"
+def sharedReactNativeLibraries = [
+  "**/libfbjni.so",
+  "**/libjsi.so",
+  "**/libfolly_json.so",
+  "**/libfolly_runtime.so",
+  "**/libglog.so",
+  "**/libhermes.so",
+  "**/libhermes-executor-debug.so",
+  "**/libhermes_executor.so",
+  "**/libreactnative.so",
+  "**/libreactnativejni.so",
+  "**/libturbomodulejsijni.so",
+  "**/libreact_nativemodule_core.so",
+  "**/libjscexecutor.so"
+]
+
 apply plugin: "com.android.library"
 
 if (project.extensions.findByName("kotlin") == null) {
@@ -40,6 +57,10 @@ apply from: '../nitrogen/generated/android/rnvlcplyr+autolinking.gradle'
 
 apply plugin: "com.facebook.react"
 
+react {
+  jsRootDir = file("../src/")
+}
+
 android {
   namespace "com.margelo.nitro.rnvlcplyr"
 
@@ -47,6 +68,7 @@ android {
 
   defaultConfig {
     minSdkVersion getExtOrDefault("minSdkVersion")
+    testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
     externalNativeBuild {
       cmake {
@@ -85,22 +107,7 @@ android {
     }
 
     jniLibs {
-      excludes += [
-        "**/libc++_shared.so",
-        "**/libfbjni.so",
-        "**/libjsi.so",
-        "**/libfolly_json.so",
-        "**/libfolly_runtime.so",
-        "**/libglog.so",
-        "**/libhermes.so",
-        "**/libhermes-executor-debug.so",
-        "**/libhermes_executor.so",
-        "**/libreactnative.so",
-        "**/libreactnativejni.so",
-        "**/libturbomodulejsijni.so",
-        "**/libreact_nativemodule_core.so",
-        "**/libjscexecutor.so"
-      ]
+      excludes += sharedReactNativeLibraries + [cxxSharedLibrary]
     }
   }
 
@@ -114,7 +121,22 @@ android {
   }
 }
 
+androidComponents {
+  onVariants(selector().all()) { variant ->
+    def testJniLibs = variant.androidTest?.packaging?.jniLibs
+    testJniLibs?.excludes?.set(sharedReactNativeLibraries)
+    testJniLibs?.pickFirsts?.add(cxxSharedLibrary)
+  }
+}
+
 dependencies {
   implementation "com.facebook.react:react-android"
   implementation project(":react-native-nitro-modules")
+  implementation "org.videolan.android:libvlc-all:3.7.7"
+
+  testImplementation "junit:junit:4.13.2"
+
+  androidTestImplementation "androidx.test:runner:1.6.2"
+  androidTestImplementation "androidx.test:core:1.6.1"
+  androidTestImplementation "androidx.test.ext:junit:1.2.1"
 }

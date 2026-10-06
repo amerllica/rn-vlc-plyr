@@ -5,25 +5,19 @@ import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.module.model.ReactModuleInfoProvider
 import com.facebook.react.uimanager.ViewManager
-
-import com.margelo.nitro.rnvlcplyr.views.HybridRnVlcPlyrManager
+import com.margelo.nitro.rnvlcplyr.views.HybridVlcPlayerViewManager
 
 class RnVlcPlyrPackage : BaseReactPackage() {
-    override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? {
-        return null
-    }
+  override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? = null
 
-    override fun getReactModuleInfoProvider(): ReactModuleInfoProvider {
-        return ReactModuleInfoProvider { HashMap() }
-    }
+  override fun getReactModuleInfoProvider(): ReactModuleInfoProvider = ReactModuleInfoProvider { HashMap() }
 
-    override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> {
-        return listOf(HybridRnVlcPlyrManager())
-    }
+  override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> =
+    listOf(HybridVlcPlayerViewManager())
 
-    companion object {
-        init {
-            System.loadLibrary("rnvlcplyr")
-        }
+  companion object {
+    init {
+      System.loadLibrary("rnvlcplyr")
     }
+  }
 }
