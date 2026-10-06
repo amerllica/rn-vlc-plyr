@@ -9,7 +9,13 @@ We want this community to be friendly and respectful to each other. Please follo
 This project is a monorepo managed using [Yarn workspaces](https://yarnpkg.com/features/workspaces). It contains the following packages:
 
 - The library package in the root directory.
-- An example app in the `example/` directory.
+- `example/`: the bare React Native example app (latest React Native).
+- `example-expo/`: the Expo example app (development build, prebuild).
+- `example-shared/`: the demo UI that both example apps render.
+
+Native changes must keep iOS and Android identical. The rules live in
+[`docs/player-contract.md`](docs/player-contract.md); update it in the same pull request when
+behaviour changes, and add native tests on both platforms.
 
 To get started with the project, make sure you have the correct version of [Node.js](https://nodejs.org/) installed. See the [`.nvmrc`](./.nvmrc) file for the version used in this project.
 
@@ -72,6 +78,28 @@ Running "RnVlcPlyrExample" with {"fabric":true,"initialProps":{"concurrentRoot":
 
 Note the `"fabric":true` and `"concurrentRoot":true` properties.
 
+To run the Expo example app:
+
+```sh
+yarn example:expo prebuild
+yarn example:expo ios
+yarn example:expo android
+```
+
+Native builds need two environment settings on macOS:
+
+```sh
+export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+export JAVA_HOME=/path/to/jdk-21
+```
+
+Run the native tests:
+
+```sh
+cd example/android && ./gradlew :rn-vlc-plyr:testDebugUnitTest :rn-vlc-plyr:connectedDebugAndroidTest
+xcodebuild test -workspace example/ios/RnVlcPlyrExample.xcworkspace -scheme RnVlcPlyr-Unit-Tests -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+```
+
 Make sure your code passes TypeScript:
 
 ```sh
@@ -115,14 +143,24 @@ Our pre-commit hooks verify that your commit message matches this format when co
 
 The `package.json` file contains various scripts for common tasks:
 
-- `yarn`: setup project by installing dependencies.
+- `yarn`: set up the project by installing dependencies.
+- `yarn nitrogen`: regenerate the Nitro bindings after changing a `*.nitro.ts` file.
 - `yarn typecheck`: type-check files with TypeScript.
-  - `yarn lint`: lint files with [ESLint](https://eslint.org/).
-    - `yarn test`: run unit tests with [Jest](https://jestjs.io/).
-  - `yarn example start`: start the Metro server for the example app.
-- `yarn example android`: run the example app on Android.
-- `yarn example ios`: run the example app on iOS.
-  
+- `yarn lint`: lint files with [ESLint](https://eslint.org/).
+- `yarn test`: run unit tests with [Jest](https://jestjs.io/).
+- `yarn example start`: start Metro for the bare example app.
+- `yarn example android` / `yarn example ios`: run the bare example app.
+- `yarn example:expo android` / `yarn example:expo ios`: run the Expo example app.
+
+### Publishing
+
+Releases are published by GitHub Actions, never from a laptop:
+
+1. Set `version` in `package.json` (for example `1.0.0` or `1.0.0-beta.1`) and commit it on `main`.
+2. Tag the commit with the same version and push the tag: `git tag v1.0.0 && git push origin v1.0.0`.
+3. The workflow runs every check, then publishes to npm with provenance through trusted publishing.
+   Versions with `-beta.N` go to the `beta` dist-tag and become a GitHub pre-release.
+
 ### Sending a pull request
 
 > **Working on your first pull request?** You can learn how from this _free_ series: [How to Contribute to an Open Source Project on GitHub](https://app.egghead.io/playlists/how-to-contribute-to-an-open-source-project-on-github).
