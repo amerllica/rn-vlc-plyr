@@ -36,6 +36,8 @@
   ],
   "scripts": {
     "example": "yarn workspace rn-vlc-plyr-example",
+    "example:expo": "yarn workspace rn-vlc-plyr-example-expo",
+    "example:shared": "yarn workspace rn-vlc-plyr-example-shared",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
     "prepare": "bob build",
     "nitrogen": "nitrogen",
@@ -103,7 +105,9 @@
     "react-native-nitro-modules": ">=0.37.0"
   },
   "workspaces": [
-    "example"
+    "example",
+    "example-shared",
+    "example-expo"
   ],
   "packageManager": "yarn@4.11.0",
   "react-native-builder-bob": {
@@ -149,6 +153,13 @@
     },
     "modulePathIgnorePatterns": [
       "<rootDir>/example/node_modules",
+      "<rootDir>/example-expo/",
+      "<rootDir>/lib/"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "<rootDir>/example/",
+      "<rootDir>/example-expo/",
       "<rootDir>/lib/"
     ]
   },
