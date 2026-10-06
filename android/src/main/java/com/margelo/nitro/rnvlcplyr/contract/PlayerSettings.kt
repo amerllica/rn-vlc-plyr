@@ -14,18 +14,22 @@ class PlayerSettings {
     private set
 
   fun setRate(value: Double) {
+    if (value.isNaN()) return
     rate = VlcContract.clampRate(value)
   }
 
   fun setTimeUpdateInterval(value: Double) {
+    if (value.isNaN()) return
     timeUpdateIntervalMs = VlcContract.clampTimeUpdateInterval(value)
   }
 
   fun setSubtitleDelay(value: Double) {
+    if (value.isNaN()) return
     subtitleDelayMs = VlcContract.clampDelay(value)
   }
 
   fun setAudioDelay(value: Double) {
+    if (value.isNaN()) return
     audioDelayMs = VlcContract.clampDelay(value)
   }
 }

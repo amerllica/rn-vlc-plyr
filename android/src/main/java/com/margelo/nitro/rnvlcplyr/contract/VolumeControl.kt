@@ -15,6 +15,7 @@ class VolumeControl {
     get() = VlcVolumeInfo(volume.toDouble(), muted)
 
   fun setVolume(value: Double): Boolean {
+    if (value.isNaN()) return false
     val clamped = VlcContract.clampVolume(value)
     if (clamped == volume) return false
     volume = clamped

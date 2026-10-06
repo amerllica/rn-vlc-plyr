@@ -109,9 +109,13 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     }
   }
 
-  fun seek(timeMs: Double) = onMain { performSeek(timeMs) }
+  fun seek(timeMs: Double) {
+    if (!timeMs.isNaN()) onMain { performSeek(timeMs) }
+  }
 
-  fun seekBy(deltaMs: Double) = onMain { performSeek(locked { media.currentTimeMs } + deltaMs) }
+  fun seekBy(deltaMs: Double) {
+    if (!deltaMs.isNaN()) onMain { performSeek(locked { media.currentTimeMs } + deltaMs) }
+  }
 
   fun setAudioTrack(id: Double) = onMain {
     val trackId = id.toInt()
@@ -281,11 +285,11 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   }
 
   private fun onLengthChanged(lengthMs: Long) = mutate {
-    if (machine.isPlaybackActive()) media = media.copy(durationMs = VlcContract.durationFromEngine(lengthMs))
+    if (media.hasReachedPlaying && machine.isPlaybackActive()) media = media.copy(durationMs = VlcContract.durationFromEngine(lengthMs))
   }
 
   private fun onSeekableChanged(seekable: Boolean) = mutate {
-    if (machine.isPlaybackActive()) media = media.copy(isSeekable = seekable)
+    if (media.hasReachedPlaying && machine.isPlaybackActive()) media = media.copy(isSeekable = seekable)
   }
 
   private fun refreshMediaInfo() {
