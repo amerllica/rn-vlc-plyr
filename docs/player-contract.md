@@ -30,6 +30,7 @@ Native clamps every input. The getter returns the clamped value immediately afte
 
 | Input | Rule |
 |---|---|
+| rounding | JavaScript `Math.round` semantics: `floor(x + 0.5)`, so −0.5 becomes 0 |
 | `volume` | round to integer, clamp 0–100. Engine gain 100 = 0 dB on both OSes |
 | `rate` | clamp 0.25–4 |
 | `timeUpdateInterval` | round, clamp 50–5000 ms |
@@ -65,12 +66,13 @@ Status values: `idle`, `opening`, `buffering`, `playing`, `paused`, `stopped`, `
 
 - `statusChange` never fires twice in a row with the same value.
 - Engine "opening" → `opening`.
-- Engine "buffering" → `buffering` only when the engine is not currently playing. While the engine
-  is playing, buffering signals are ignored. This removes the VLC 3 buffering flicker.
+- Engine "buffering" → `buffering` only when the engine is not playing and the status is not
+  `paused`. Otherwise buffering signals are ignored. This removes the VLC 3 buffering flicker and
+  keeps a paused player paused while it seeks.
 - Engine "playing" → `playing`.
 - Engine "paused" → `paused`.
-- Engine "stopped" after `stop()` → `stopped`. Engine "stopped" caused by the end of media is
-  handled as "ended".
+- The engine "stopped" signal is ignored. VLC sends it after the end of media and on source
+  switches. The `stopped` status comes only from `stop()`.
 - Engine "ended" → when `loop` is false: `ended`, then the `ended` event. When `loop` is true: no
   `ended` status, no `ended` event; playback restarts from 0 and status stays/returns to `playing`.
 - Engine error → `error`, then the `error` event.
@@ -84,7 +86,7 @@ Status values: `idle`, `opening`, `buffering`, `playing`, `paused`, `stopped`, `
 | `stop()` | engine stop, `currentTime` 0, status `stopped`. No-op when `idle` |
 | `seek(ms)` | no-op unless `isSeekable`. In `ended` or `stopped`: restart playback, then seek. Emits one `timeUpdate` right after the seek with the target time |
 | `setAudioTrack(id)` / `setSubtitleTrack(id)` | `-1` disables. Unknown id → no-op. A real change emits `tracksChange` |
-| `addSubtitle(uri, select)` | no source → throws `Error('addSubtitle requires a source')`. Otherwise adds a subtitle slave; the new track arrives through `tracksChange`. `select` true selects it once it appears |
+| `addSubtitle(uri, select)` | no source → throws `Error('addSubtitle requires a source')` (Nitro prefixes synchronous errors with `VlcPlayer.addSubtitle(...): `). Otherwise adds a subtitle slave; the new track arrives through `tracksChange`. `select` true selects it once it appears |
 | `snapshot()` | resolves with a `file://` URI of a PNG of the current frame at video resolution. Rejects with `Error('No video frame available')` when no view is attached or nothing has rendered |
 | `release()` | idempotent. Stops, detaches all views, frees the engine. Afterwards every command is a no-op, getters return defaults, no event fires. `dispose()` calls `release()` |
 
@@ -101,6 +103,16 @@ Status values: `idle`, `opening`, `buffering`, `playing`, `paused`, `stopped`, `
 | `tracksChange` | when either track list or either selection differs from the last emitted value | `{ audioTracks, subtitleTracks, selectedAudioTrack, selectedSubtitleTrack }` |
 | `videoSizeChange` | when the decoded size changes and both sides are > 0 | `{ width, height }` |
 
+Ordering rules:
+
+- `stop()` emits `statusChange('stopped')`, then `timeUpdate` with `currentTime` 0.
+- A load with `autoPlay` emits `statusChange('opening')` at once.
+- An invalid source set while the status is already `error` emits nothing; the `error` getter still
+  updates.
+- `tracksChange` is evaluated on every load, so an empty list is emitted when the previous list was
+  not empty. Track info is not refreshed while `ended`, `stopped` or during a loop restart.
+- `videoSizeChange` deduplication resets on every new source.
+
 Listeners may be added at any time. `remove()` is idempotent. Native may emit from any thread;
 Nitro delivers callbacks on the JS thread.
 
@@ -109,6 +121,9 @@ Nitro delivers callbacks on the JS thread.
 - `duration` = engine length in ms, `0` when the engine reports ≤ 0.
 - `isSeekable` = engine seekable flag.
 - `isLive` = `duration == 0 && !isSeekable`, evaluated once the source is `playing`; `false` before.
+  VLC 3 reports live HLS as seekable with a length, so live HLS reads as not live on both OSes.
+- Engine seekable and length updates are accepted only while the status is `opening`, `buffering`,
+  `playing` or `paused`.
 - Track lists exclude the engine's "Disable" pseudo-track (id −1). Track ids are engine ids.
   Track names are the engine names; an empty name becomes `Track <id>`.
 - Selected ids are the engine's current ids, `-1` when none.
