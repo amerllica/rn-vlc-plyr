@@ -5,7 +5,5 @@ type Props = ViewProps & {
 };
 
 export function RnVlcPlyrView(_props: Props): never {
-  throw new Error(
-    "'rn-vlc-plyr' is only supported on native platforms."
-  );
+  throw new Error("'rn-vlc-plyr' is only supported on native platforms.");
 }

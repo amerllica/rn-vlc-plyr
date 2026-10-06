@@ -2609,15 +2609,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@react-native/eslint-config@npm:0.86.2":
-  version: 0.86.2
-  resolution: "@react-native/eslint-config@npm:0.86.2"
+"@react-native/eslint-config@npm:0.87.1":
+  version: 0.87.1
+  resolution: "@react-native/eslint-config@npm:0.87.1"
   dependencies:
     "@babel/core": "npm:^7.25.2"
     "@babel/eslint-parser": "npm:^7.25.1"
-    "@react-native/eslint-plugin": "npm:0.86.2"
-    "@typescript-eslint/eslint-plugin": "npm:^8.36.0"
-    "@typescript-eslint/parser": "npm:^8.36.0"
+    "@react-native/eslint-plugin": "npm:0.87.1"
+    "@typescript-eslint/eslint-plugin": "npm:^8.59.2"
+    "@typescript-eslint/parser": "npm:^8.59.2"
     eslint-config-prettier: "npm:^8.5.0"
     eslint-plugin-eslint-comments: "npm:^3.2.0"
     eslint-plugin-ft-flow: "npm:^2.0.1"
@@ -2628,14 +2628,14 @@ __metadata:
   peerDependencies:
     eslint: ^8.0.0 || ^9.0.0
     prettier: ">=2"
-  checksum: 10c0/4daa5362bf99a12b60a5a8b7a2e7e00f2a81472017bf5eea2fe42de05c954371f87e75296edc66bc1192dec4af0b5c45c42f24bea5d1acf2d63742b9ff192452
+  checksum: 10c0/fd8ca6d5253a2e1fe1e6d80a09939c6d579f49dfbbd069d60233524b6465fa8e3de3f88f3d051dd79b8f2d364b13bce9bdc89a52af2d7d0feff47c9494fc2f6d
   languageName: node
   linkType: hard
 
-"@react-native/eslint-plugin@npm:0.86.2":
-  version: 0.86.2
-  resolution: "@react-native/eslint-plugin@npm:0.86.2"
-  checksum: 10c0/b883f8666d207e2d30b67606dcdee836eb01ba7cb132f4484d6269253a5c037375e0d56d207b40ae9051166a706db48f29f57a732c3048807e0c48e5cec1533a
+"@react-native/eslint-plugin@npm:0.87.1":
+  version: 0.87.1
+  resolution: "@react-native/eslint-plugin@npm:0.87.1"
+  checksum: 10c0/205eebeabb9bd17db76f141e56fafdd5f6c4b5253cf4e97f5f66f401e642c21501fb8624acba277a050f546f64e5dd4d240febc6ae5e31a6b00b829f30bfe385
   languageName: node
   linkType: hard
 
@@ -2643,21 +2643,6 @@ __metadata:
   version: 0.87.1
   resolution: "@react-native/gradle-plugin@npm:0.87.1"
   checksum: 10c0/281e6d62b5b4a9cc9043ce31a5628cee4666d415d3b69eedf6fa481437f70d0f85d78622bf9d4a3db3e248b27f16747b8bc02536da8aac609c1d1e450ed835d1
-  languageName: node
-  linkType: hard
-
-"@react-native/jest-preset@npm:0.86.2":
-  version: 0.86.2
-  resolution: "@react-native/jest-preset@npm:0.86.2"
-  dependencies:
-    "@jest/create-cache-key-function": "npm:^29.7.0"
-    "@react-native/js-polyfills": "npm:0.86.2"
-    babel-jest: "npm:^29.7.0"
-    jest-environment-node: "npm:^29.7.0"
-    regenerator-runtime: "npm:^0.13.2"
-  peerDependencies:
-    react: ^19.2.3
-  checksum: 10c0/ae6b0665a74f98a86c04eb761360bc854258f98b35f2eb1977cdad7b3e50cee66f6c7c6a9b4486d1eec5102f9c8ac68ba234fcee18ea9ca44ba3737d406ed8ec
   languageName: node
   linkType: hard
 
@@ -2673,13 +2658,6 @@ __metadata:
   peerDependencies:
     react: ^19.2.3
   checksum: 10c0/68d3e8a082b9e37457c58e5f761327fd52517068b217f609a23f001b38de83065dddf2c51d0ab8f55a16dbee0a6a3d2ce862f6ca56d96daeeafb8656179be380
-  languageName: node
-  linkType: hard
-
-"@react-native/js-polyfills@npm:0.86.2":
-  version: 0.86.2
-  resolution: "@react-native/js-polyfills@npm:0.86.2"
-  checksum: 10c0/184c7d2815f79b55bd960f2f76919841a2e4959d9957b159f4d364319e225bf41fdf5eb14c533cafce0cba2e2e47a8ad734e99d82eba7effeca3ccd1282f1f49
   languageName: node
   linkType: hard
 
@@ -3001,7 +2979,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@typescript-eslint/eslint-plugin@npm:^8.36.0":
+"@typescript-eslint/eslint-plugin@npm:^8.59.2":
   version: 8.71.1
   resolution: "@typescript-eslint/eslint-plugin@npm:8.71.1"
   dependencies:
@@ -3021,7 +2999,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@typescript-eslint/parser@npm:^8.36.0":
+"@typescript-eslint/parser@npm:^8.59.2":
   version: 8.71.1
   resolution: "@typescript-eslint/parser@npm:8.71.1"
   dependencies:
@@ -7598,18 +7576,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"nitrogen@npm:^0.36.5":
-  version: 0.36.5
-  resolution: "nitrogen@npm:0.36.5"
+"nitrogen@npm:^0.37.1":
+  version: 0.37.1
+  resolution: "nitrogen@npm:0.37.1"
   dependencies:
     chalk: "npm:^5.3.0"
-    react-native-nitro-modules: "npm:^0.36.5"
+    react-native-nitro-modules: "npm:^0.37.1"
     ts-morph: "npm:^28.0.0"
     yargs: "npm:^18.0.0"
     zod: "npm:^4.4.3"
   bin:
     nitrogen: lib/index.js
-  checksum: 10c0/c3241b92ea5e3823a5edc8107f39dafd1b7b2ddbf1842cb7f365c68dbc82c02d57d38c1c79fb39d8a81e4c0beb1f58469f3372c5543faa06dfc0c28fe73a9516
+  checksum: 10c0/2f0aef19427a58dde9c3e9da9151381c21e0479c0e7fceb55131039201113f3eacd8c5cc01e5b408d4ba86dba8d9a7210d7189144cc35fdde83db950f34c29bd
   languageName: node
   linkType: hard
 
@@ -8269,13 +8247,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-native-nitro-modules@npm:^0.36.5":
-  version: 0.36.5
-  resolution: "react-native-nitro-modules@npm:0.36.5"
+"react-native-nitro-modules@npm:^0.37.1":
+  version: 0.37.1
+  resolution: "react-native-nitro-modules@npm:0.37.1"
   peerDependencies:
     react: "*"
     react-native: "*"
-  checksum: 10c0/c7b2133f924967b68c0f0f678b5a5dce1a784a7e22f57ebf203ef5803a5c9c745b6d4dda8c9bcedd13f7c5ca53a8707784e98572a2ca8a864fe0b905163a34b5
+  checksum: 10c0/5178f2ee891cb746b084fdf382b6020e366d8e4a81922a3f1d60a453d34fca6ebb1b00c4c28785c36385bc182ab76a30cba70441c39abbc25d3ad54db612e46e
   languageName: node
   linkType: hard
 
@@ -8582,7 +8560,7 @@ __metadata:
     react-native: "npm:0.87.1"
     react-native-builder-bob: "npm:^0.43.1"
     react-native-monorepo-config: "npm:^0.4.0"
-    react-native-nitro-modules: "npm:^0.36.5"
+    react-native-nitro-modules: "npm:^0.37.1"
   languageName: unknown
   linkType: soft
 
@@ -8596,8 +8574,8 @@ __metadata:
     "@eslint/js": "npm:^9.39.5"
     "@jest/globals": "npm:^29.7.0"
     "@react-native/babel-preset": "npm:0.87.1"
-    "@react-native/eslint-config": "npm:0.86.2"
-    "@react-native/jest-preset": "npm:0.86.2"
+    "@react-native/eslint-config": "npm:0.87.1"
+    "@react-native/jest-preset": "npm:0.87.1"
     "@types/react": "npm:^19.2.0"
     commitlint: "npm:^21.2.1"
     del-cli: "npm:^7.0.0"
@@ -8607,18 +8585,18 @@ __metadata:
     eslint-plugin-prettier: "npm:^5.5.6"
     jest: "npm:^29.7.0"
     lefthook: "npm:^2.1.10"
-    nitrogen: "npm:^0.36.5"
+    nitrogen: "npm:^0.37.1"
     prettier: "npm:^3.9.6"
     react: "npm:19.2.3"
     react-native: "npm:0.87.1"
     react-native-builder-bob: "npm:^0.43.1"
-    react-native-nitro-modules: "npm:^0.36.5"
+    react-native-nitro-modules: "npm:^0.37.1"
     turbo: "npm:^2.10.8"
     typescript: "npm:^6.0.3"
   peerDependencies:
     react: "*"
     react-native: "*"
-    react-native-nitro-modules: ^0.36.5
+    react-native-nitro-modules: ">=0.37.0"
   languageName: unknown
   linkType: soft
 

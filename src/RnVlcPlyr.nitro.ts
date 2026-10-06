@@ -9,7 +9,4 @@ export interface RnVlcPlyrProps extends HybridViewProps {
 }
 export interface RnVlcPlyrMethods extends HybridViewMethods {}
 
-export type RnVlcPlyr = HybridView<
-  RnVlcPlyrProps,
-  RnVlcPlyrMethods
->;
+export type RnVlcPlyr = HybridView<RnVlcPlyrProps, RnVlcPlyrMethods>;
