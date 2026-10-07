@@ -303,6 +303,7 @@ const player = useVlcPlayer({
 | `pod install` fails with `Unicode Normalization not appropriate for ASCII-8BIT` | `export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8` before running it |
 | Gradle fails with `Unsupported class file major version` | Run Gradle with JDK 17 or 21 (`JAVA_HOME`) |
 | `Nitro: Tried to create VlcPlayer but it does not exist` | Rebuild the native app after installing. Expo Go cannot load native code; use a development build |
+| The app quits at launch on iOS 27 | iOS 27 requires the scene lifecycle. Templates that start React Native in `AppDelegate` must move to a scene delegate. For Expo, see the config plugin in [`example-expo/plugins/withSceneLifecycle.js`](example-expo/plugins/withSceneLifecycle.js) |
 | Android app is too large | Use app bundles or `abiFilters` (see [App size on Android](#app-size-on-android)) |
 
 ## Project documents
