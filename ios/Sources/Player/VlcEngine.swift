@@ -29,15 +29,9 @@ final class VlcEngine: NSObject, VLCMediaPlayerDelegate {
   }
 
   func load(_ request: MediaRequest) {
-    player.stop()
     let media = VLCMedia(url: request.url)
     request.options.forEach { media.addOption($0) }
     player.media = media
-  }
-
-  func unload() {
-    player.stop()
-    player.media = nil
   }
 
   func play() {
@@ -111,12 +105,14 @@ final class VlcEngine: NSObject, VLCMediaPlayerDelegate {
   func retire() {
     delegate = nil
     player.delegate = nil
-    player.stop()
-    Self.releaseOffMainThread(player)
+    Self.stopAndReleaseOffMainThread(player)
   }
 
-  private static func releaseOffMainThread(_ player: VLCMediaPlayer) {
+  private static func stopAndReleaseOffMainThread(_ player: VLCMediaPlayer) {
     let retained = Unmanaged.passRetained(player)
+    retirementQueue.async {
+      retained.takeUnretainedValue().stop()
+    }
     DispatchQueue.main.asyncAfter(deadline: .now() + retirementGracePeriod) {
       retirementQueue.async {
         retained.release()

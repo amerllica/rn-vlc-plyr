@@ -52,17 +52,17 @@ final class PlaybackController {
     resetMediaState()
     guard let source else {
       currentRequest = nil
-      engineInstance?.unload()
+      retireEngine()
       apply(machine.clear())
       return
     }
     currentRequest = MediaRequest.make(uri: source.uri, userAgent: source.userAgent, referrer: source.referrer, vlcOptions: source.vlcOptions)
     guard let request = currentRequest else {
-      engineInstance?.unload()
+      retireEngine()
       failInvalidSource()
       return
     }
-    engine.load(request)
+    replaceEngine().load(request)
     let autoPlay = store.settings.autoPlay
     if autoPlay {
       audioSession.activateOnce()
@@ -188,8 +188,7 @@ final class PlaybackController {
     guard !isShutDown else { return }
     isShutDown = true
     snapshots.rejectAll()
-    engineInstance?.retire()
-    engineInstance = nil
+    retireEngine()
     hosts.removeAll()
     videoContainer.removeFromSuperview()
   }
@@ -200,10 +199,22 @@ final class PlaybackController {
       failInvalidSource()
       return
     }
-    engine.load(request)
+    replaceEngine().load(request)
     audioSession.activateOnce()
     apply(machine.reloadForRetry())
     engine.play()
+  }
+
+  private func replaceEngine() -> VlcEngine {
+    retireEngine()
+    let fresh = engine
+    applyResize(force: true)
+    return fresh
+  }
+
+  private func retireEngine() {
+    engineInstance?.retire()
+    engineInstance = nil
   }
 
   private func failInvalidSource() {
