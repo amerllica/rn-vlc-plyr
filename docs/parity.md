@@ -48,6 +48,13 @@ cd example/android && ./gradlew :rn-vlc-plyr:testDebugUnitTest :rn-vlc-plyr:conn
 | Mount and unmount 20 times, switch sources 20 times | PASS | PASS | No crash. Memory and view count stayed flat |
 | HLS on demand | PASS | PASS | Apple `bipbop_4x3` stream |
 
+## Leak check
+
+| Check | iOS | Android |
+|---|---|---|
+| Method | macOS `leaks` on the simulator process after opening and closing the player screen 5 times (each round creates and releases a native player) | Native heap and view count watched in the profiler during 60 mount, unmount and source-switch rounds |
+| Result | 14 untyped blocks, 336 bytes in total, none from VLC or this library, not growing with player count. Player threads freed after each close | Native heap and view count flat |
+
 ## Known engine limits
 
 These come from VLC 3 and are the same on both platforms.
@@ -71,6 +78,10 @@ These come from VLC 3 and are the same on both platforms.
   catches it and turns it into a rejected promise.
 - **iOS:** the video layer is hidden on every load until the first new frame, so the previous media's
   last frame never shows.
+- **Both:** libvlc's stop waits for the input thread, which can hang on a bad network. A freeze
+  trace from the emulator showed the main thread stuck in `MediaPlayer.stop()` after leaving a stalled
+  stream. Players are therefore never stopped or released on the main thread: each new source, clear,
+  stop or release retires the current player to a background thread and continues with a fresh one.
 - **Android:** libvlc has no mute and no snapshot API. Mute is engine volume 0 with the volume kept;
   snapshots read the `TextureView` bitmap or use `PixelCopy` for `SurfaceView`.
 - **Android:** React Native does not lay out views added from native code, so the video container
