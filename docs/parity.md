@@ -82,6 +82,9 @@ These come from VLC 3 and are the same on both platforms.
   trace from the emulator showed the main thread stuck in `MediaPlayer.stop()` after leaving a stalled
   stream. Players are therefore never stopped or released on the main thread: each new source, clear,
   stop or release retires the current player to a background thread and continues with a fresh one.
+- **Android:** a retired player keeps its video surface until its background shutdown finishes.
+  The fresh player therefore gets a new video layout; sharing the old one left the picture black
+  after a loop, a reload or a stop followed by play.
 - **Android:** libvlc has no mute and no snapshot API. Mute is engine volume 0 with the volume kept;
   snapshots read the `TextureView` bitmap or use `PixelCopy` for `SurfaceView`.
 - **Android:** React Native does not lay out views added from native code, so the video container
