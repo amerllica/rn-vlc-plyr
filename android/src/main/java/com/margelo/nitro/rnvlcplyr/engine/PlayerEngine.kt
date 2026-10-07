@@ -24,11 +24,19 @@ data class EngineMediaInfo(
   val videoHeight: Int
 )
 
-class PlayerEngine(private val libVLC: LibVLC, onEvent: (MediaPlayer.Event) -> Unit) {
-  private var player: MediaPlayer? = MediaPlayer(libVLC).apply {
-    setEventListener(MediaPlayer.EventListener { event -> onEvent(event) })
-  }
+private data class MediaRequest(val uri: String, val options: List<String>)
+
+class PlayerEngine(
+  private val libVLC: LibVLC,
+  private val onEvent: (MediaPlayer.Event) -> Unit
+) {
+  private var player: MediaPlayer? = null
   private var shownOutput: VideoOutput? = null
+  private var mediaRequest: MediaRequest? = null
+
+  init {
+    player = createPlayer()
+  }
 
   val isPlaying: Boolean
     get() = player?.isPlaying ?: false
@@ -37,18 +45,13 @@ class PlayerEngine(private val libVLC: LibVLC, onEvent: (MediaPlayer.Event) -> U
     get() = player?.hasMedia() ?: false
 
   fun load(uri: String, options: List<String>) {
-    val activePlayer = player ?: return
-    activePlayer.stop()
-    val media = Media(libVLC, Uri.parse(uri))
-    options.forEach(media::addOption)
-    activePlayer.media = media
-    media.release()
+    mediaRequest = MediaRequest(uri, options)
+    replacePlayerWithFreshMedia()
   }
 
   fun clear() {
-    val activePlayer = player ?: return
-    activePlayer.stop()
-    activePlayer.media = null
+    mediaRequest = null
+    replacePlayerWithFreshMedia()
   }
 
   fun play() {
@@ -60,13 +63,12 @@ class PlayerEngine(private val libVLC: LibVLC, onEvent: (MediaPlayer.Event) -> U
   }
 
   fun stop() {
-    player?.stop()
+    replacePlayerWithFreshMedia()
   }
 
   fun restart() {
-    val activePlayer = player ?: return
-    activePlayer.stop()
-    activePlayer.play()
+    replacePlayerWithFreshMedia()
+    player?.play()
   }
 
   fun setTime(timeMs: Long) {
@@ -124,9 +126,7 @@ class PlayerEngine(private val libVLC: LibVLC, onEvent: (MediaPlayer.Event) -> U
     val activePlayer = player ?: return
     if (shownOutput != null) activePlayer.detachViews()
     shownOutput = output
-    if (output == null) return
-    activePlayer.attachViews(output.videoLayout, null, ENABLE_SUBTITLES, output.usesTextureView)
-    activePlayer.videoScale = output.scaleType
+    attachShownOutput(activePlayer)
   }
 
   fun applyScale(output: VideoOutput) {
@@ -136,11 +136,44 @@ class PlayerEngine(private val libVLC: LibVLC, onEvent: (MediaPlayer.Event) -> U
   fun release() {
     val activePlayer = player ?: return
     player = null
+    retire(activePlayer)
     shownOutput = null
-    activePlayer.setEventListener(null)
-    activePlayer.detachViews()
-    activePlayer.stop()
-    activePlayer.release()
+    mediaRequest = null
+  }
+
+  private fun createPlayer(): MediaPlayer {
+    val created = MediaPlayer(libVLC)
+    created.setEventListener { event -> if (player === created) onEvent(event) }
+    return created
+  }
+
+  private fun replacePlayerWithFreshMedia() {
+    val previous = player ?: return
+    retire(previous)
+    val fresh = createPlayer()
+    player = fresh
+    attachShownOutput(fresh)
+    assignMedia(fresh)
+  }
+
+  private fun retire(retiring: MediaPlayer) {
+    retiring.setEventListener(null)
+    if (shownOutput != null) retiring.detachViews()
+    PlayerRetirement.retire(retiring)
+  }
+
+  private fun attachShownOutput(target: MediaPlayer) {
+    val output = shownOutput ?: return
+    target.attachViews(output.videoLayout, null, ENABLE_SUBTITLES, output.usesTextureView)
+    target.videoScale = output.scaleType
+  }
+
+  private fun assignMedia(target: MediaPlayer) {
+    val request = mediaRequest ?: return
+    val media = Media(libVLC, Uri.parse(request.uri))
+    request.options.forEach(media::addOption)
+    target.media = media
+    media.release()
   }
 
   private fun readTracks(activePlayer: MediaPlayer): VlcTracksInfo =
