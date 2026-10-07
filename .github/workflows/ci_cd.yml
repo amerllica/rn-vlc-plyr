@@ -28,6 +28,7 @@ env:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -46,6 +47,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -58,6 +60,7 @@ jobs:
 
   build-library:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -73,6 +76,7 @@ jobs:
 
   test-native-android:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -121,6 +125,7 @@ jobs:
 
   test-native-ios:
     runs-on: macos-latest
+    timeout-minutes: 60
     env:
       RCT_USE_RN_DEP: 1
       RCT_USE_PREBUILT_RNCORE: 1
@@ -145,18 +150,28 @@ jobs:
           bundle install
           bundle exec pod install --project-directory=ios
 
+      - name: Boot a simulator
+        run: |
+          UDID=$(xcrun simctl list devices available --json | node -e 'const d=JSON.parse(require("fs").readFileSync(0)).devices;const r=Object.keys(d).filter(k=>k.includes("iOS")).sort().reverse();for(const k of r){const p=d[k].find(x=>x.name.startsWith("iPhone"));if(p){console.log(p.udid);break}}')
+          echo "SIMULATOR_UDID=$UDID" >> $GITHUB_ENV
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+
       - name: Run XCTest
         run: |
-          DEVICE=$(xcrun simctl list devices available | grep -m1 -oE 'iPhone [0-9]+( Pro)?')
           set -o pipefail
           xcodebuild test \
             -workspace example/ios/RnVlcPlyrExample.xcworkspace \
             -scheme RnVlcPlyr-Unit-Tests \
-            -destination "platform=iOS Simulator,name=$DEVICE" \
+            -destination "id=$SIMULATOR_UDID" \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 120 \
+            -maximum-test-execution-time-allowance 300 \
             | xcbeautify
 
   build-android:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     env:
       TURBO_CACHE_DIR: .turbo/android
     steps:
@@ -214,6 +229,7 @@ jobs:
 
   build-ios:
     runs-on: macos-latest
+    timeout-minutes: 60
     env:
       TURBO_CACHE_DIR: .turbo/ios
       RCT_USE_RN_DEP: 1
@@ -261,6 +277,7 @@ jobs:
 
   build-expo-android:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -288,6 +305,7 @@ jobs:
 
   build-expo-ios:
     runs-on: macos-latest
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -315,6 +333,7 @@ jobs:
           xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build | xcbeautify
 
   release:
+    timeout-minutes: 20
     if: startsWith(github.ref, 'refs/tags/v')
     needs:
       - lint
