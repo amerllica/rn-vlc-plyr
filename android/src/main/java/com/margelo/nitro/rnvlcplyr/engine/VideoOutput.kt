@@ -7,4 +7,6 @@ interface VideoOutput {
   val videoLayout: VLCVideoLayout
   val usesTextureView: Boolean
   val scaleType: MediaPlayer.ScaleType
+
+  fun renewVideoLayout()
 }

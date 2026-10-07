@@ -150,6 +150,7 @@ class PlayerEngine(
   private fun replacePlayerWithFreshMedia() {
     val previous = player ?: return
     retire(previous)
+    shownOutput?.renewVideoLayout()
     val fresh = createPlayer()
     player = fresh
     attachShownOutput(fresh)
