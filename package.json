@@ -1,6 +1,6 @@
 {
   "name": "rn-vlc-plyr",
-  "version": "0.1.0",
+  "version": "1.0.0-beta.1",
   "description": "React Native VLC Player (Video/Audio) based on VLC, powered by Nitro Modules",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
@@ -29,6 +29,9 @@
     "!android/gradlew",
     "!android/gradlew.bat",
     "!android/local.properties",
+    "!android/src/test",
+    "!android/src/androidTest",
+    "!ios/Tests",
     "!**/__tests__",
     "!**/__fixtures__",
     "!**/__mocks__",
