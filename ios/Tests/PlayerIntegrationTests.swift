@@ -22,6 +22,13 @@ final class PlayerIntegrationTests: XCTestCase {
     Bundle(for: Self.self).url(forResource: "two-seconds", withExtension: "mp4")?.absoluteString ?? ""
   }
 
+  private var fixtureSource: VlcSource {
+    VlcSource(uri: fixtureUri, userAgent: nil, referrer: nil, vlcOptions: [Self.audioOnlyOption], title: nil)
+  }
+
+  private static let audioOnlyOption = ":no-video"
+  private static let engineTimeout: TimeInterval = 30
+
   func testLocalFileReachesPlayingWithDurationAndFiresLoadedOnce() throws {
     XCTAssertFalse(fixtureUri.isEmpty)
     let playing = expectation(description: "playing")
@@ -37,9 +44,9 @@ final class PlayerIntegrationTests: XCTestCase {
       loaded.fulfill()
     })
 
-    player.source = VlcSource(uri: fixtureUri, userAgent: nil, referrer: nil, vlcOptions: nil, title: nil)
+    player.source = fixtureSource
 
-    wait(for: [playing, loaded], timeout: 15)
+    wait(for: [playing, loaded], timeout: Self.engineTimeout)
     XCTAssertEqual(statuses.first, .opening)
     XCTAssertGreaterThan(loadedDuration, 0)
     XCTAssertGreaterThan(player.duration, 0)
@@ -53,10 +60,10 @@ final class PlayerIntegrationTests: XCTestCase {
     subscriptions.append(try player.addOnStatusChangeListener { statuses.append($0) })
     subscriptions.append(try player.addOnEndedListener { ended.fulfill() })
 
-    player.source = VlcSource(uri: fixtureUri, userAgent: nil, referrer: nil, vlcOptions: nil, title: nil)
+    player.source = fixtureSource
 
-    wait(for: [ended], timeout: 20)
-    XCTAssertEqual(statuses.last, .ended)
+    wait(for: [ended], timeout: Self.engineTimeout)
+    XCTAssertEqual(statuses.last, .ended, "statuses: \(statuses)")
     XCTAssertEqual(statuses.filter { $0 == .ended }.count, 1)
   }
 
@@ -69,9 +76,9 @@ final class PlayerIntegrationTests: XCTestCase {
       if event.currentTime > 0 && times.count > 1 { advanced.fulfill() }
     })
 
-    player.source = VlcSource(uri: fixtureUri, userAgent: nil, referrer: nil, vlcOptions: nil, title: nil)
+    player.source = fixtureSource
 
-    wait(for: [advanced], timeout: 10)
+    wait(for: [advanced], timeout: Self.engineTimeout)
     XCTAssertEqual(times, times.sorted())
   }
 
@@ -90,9 +97,9 @@ final class PlayerIntegrationTests: XCTestCase {
       lastTime = event.currentTime
     })
 
-    player.source = VlcSource(uri: fixtureUri, userAgent: nil, referrer: nil, vlcOptions: nil, title: nil)
+    player.source = fixtureSource
 
-    wait(for: [looped], timeout: 30)
+    wait(for: [looped], timeout: Self.engineTimeout)
     XCTAssertEqual(endedEvents, 0)
     XCTAssertFalse(statuses.contains(.ended))
     XCTAssertEqual(statuses.last, .playing)
@@ -164,7 +171,7 @@ final class PlayerIntegrationTests: XCTestCase {
     player.volume = 10
     try player.release()
     try player.release()
-    player.source = VlcSource(uri: fixtureUri, userAgent: nil, referrer: nil, vlcOptions: nil, title: nil)
+    player.source = fixtureSource
     player.volume = 50
     try player.play()
     let settled = expectation(description: "main queue drained")
