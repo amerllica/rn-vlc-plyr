@@ -78,22 +78,25 @@ final class PlayerIntegrationTests: XCTestCase {
   func testLoopRestartsWithoutEndedStatusOrEvent() throws {
     var statuses: [VlcStatus] = []
     var endedEvents = 0
-    var times: [Double] = []
+    var lastTime = -1.0
+    let looped = expectation(description: "time wrapped back to the start")
+    looped.assertForOverFulfill = false
     player.loop = true
+    player.timeUpdateInterval = 50
     subscriptions.append(try player.addOnStatusChangeListener { statuses.append($0) })
     subscriptions.append(try player.addOnEndedListener { endedEvents += 1 })
-    subscriptions.append(try player.addOnTimeUpdateListener { times.append($0.currentTime) })
+    subscriptions.append(try player.addOnTimeUpdateListener { event in
+      if event.currentTime < lastTime { looped.fulfill() }
+      lastTime = event.currentTime
+    })
 
     player.source = VlcSource(uri: fixtureUri, userAgent: nil, referrer: nil, vlcOptions: nil, title: nil)
 
-    let settled = expectation(description: "two loops")
-    DispatchQueue.main.asyncAfter(deadline: .now() + 6) { settled.fulfill() }
-    wait(for: [settled], timeout: 8)
+    wait(for: [looped], timeout: 30)
     XCTAssertEqual(endedEvents, 0)
     XCTAssertFalse(statuses.contains(.ended))
     XCTAssertEqual(statuses.last, .playing)
     XCTAssertEqual(player.status, .playing)
-    XCTAssertTrue(zip(times, times.dropFirst()).contains { $0.0 > $0.1 })
   }
 
   func testInvalidSourceReportsErrorWithoutEngine() throws {

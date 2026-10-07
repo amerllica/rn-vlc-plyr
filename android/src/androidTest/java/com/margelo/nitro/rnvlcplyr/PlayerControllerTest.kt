@@ -77,9 +77,12 @@ class PlayerControllerTest {
   @Test
   fun loopRestartsWithoutEndedStatus() {
     controller.setLoop(true)
+    controller.setTimeUpdateInterval(FAST_TIME_UPDATE_MS)
     controller.setSource(localSource())
     awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
-    Thread.sleep(LOOP_OBSERVATION_MS)
+    awaitCondition("time wrapped back to the start") {
+      times.map { it.currentTime }.zipWithNext().any { (previous, next) -> next < previous }
+    }
     assertTrue(endings.isEmpty())
     assertFalse(statuses.contains(VlcStatus.ENDED))
     assertEquals(VlcStatus.PLAYING, controller.read { status })
@@ -206,7 +209,7 @@ class PlayerControllerTest {
   private companion object {
     const val TIMEOUT_SECONDS = 15L
     const val POLL_MS = 50L
-    const val LOOP_OBSERVATION_MS = 5000L
+    const val FAST_TIME_UPDATE_MS = 50.0
     const val RELEASE_OBSERVATION_MS = 1000L
     const val SEEK_TARGET_MS = 1000L
   }
