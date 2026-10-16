@@ -87,3 +87,6 @@ nitrogen/
 
 # Kotlin compiler cache
 .kotlin/
+
+# AI
+graphify-out/
