@@ -40,6 +40,10 @@ final class MediaSessionOwner {
     nowPlayingCenter.clear()
   }
 
+  func resetArtwork(_ uri: String) {
+    artwork.reset(uri)
+  }
+
   @discardableResult
   func route(_ request: RemoteRequest) -> Bool {
     guard let owner else { return false }
