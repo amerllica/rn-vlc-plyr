@@ -1,6 +1,9 @@
 package com.margelo.nitro.rnvlcplyr.contract
 
-class ListenerRegistry<T>(private val onListenerFailure: (Throwable) -> Unit = {}) {
+class ListenerRegistry<T>(
+  private val onListenerFailure: (Throwable) -> Unit = {},
+  private val onCountChange: (previous: Int, current: Int) -> Unit = { _, _ -> }
+) {
   private val lock = Any()
   private val listeners = LinkedHashMap<Long, (T) -> Unit>()
   private var nextId = 0L
@@ -9,12 +12,13 @@ class ListenerRegistry<T>(private val onListenerFailure: (Throwable) -> Unit = {
     get() = synchronized(lock) { listeners.size }
 
   fun add(listener: (T) -> Unit): () -> Unit {
-    val id = synchronized(lock) {
+    val (id, current) = synchronized(lock) {
       val assigned = nextId++
       listeners[assigned] = listener
-      assigned
+      assigned to listeners.size
     }
-    return { synchronized(lock) { listeners.remove(id) } }
+    onCountChange(current - 1, current)
+    return { remove(id) }
   }
 
   fun emit(value: T) {
@@ -29,6 +33,16 @@ class ListenerRegistry<T>(private val onListenerFailure: (Throwable) -> Unit = {
   }
 
   fun clear() {
-    synchronized(lock) { listeners.clear() }
+    val previous = synchronized(lock) {
+      val size = listeners.size
+      listeners.clear()
+      size
+    }
+    if (previous > 0) onCountChange(previous, 0)
+  }
+
+  private fun remove(id: Long) {
+    val current = synchronized(lock) { if (listeners.remove(id) == null) null else listeners.size } ?: return
+    onCountChange(current + 1, current)
   }
 }
