@@ -19,6 +19,8 @@ export interface VlcPlayerEventPayloads {
   volumeChange: VlcVolumeInfo;
   tracksChange: VlcTracksInfo;
   videoSizeChange: VlcVideoSize;
+  remoteNext: undefined;
+  remotePrevious: undefined;
 }
 
 export type VlcPlayerEvent = keyof VlcPlayerEventPayloads;
@@ -48,6 +50,10 @@ const subscribers: Subscribers = {
     player.addOnTracksChangeListener(listener),
   videoSizeChange: (player, listener) =>
     player.addOnVideoSizeChangeListener(listener),
+  remoteNext: (player, listener) =>
+    player.addOnRemoteNextListener(() => listener(undefined)),
+  remotePrevious: (player, listener) =>
+    player.addOnRemotePreviousListener(() => listener(undefined)),
 };
 
 export function addVlcPlayerListener<E extends VlcPlayerEvent>(

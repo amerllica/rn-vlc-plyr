@@ -43,6 +43,25 @@ describe('useVlcPlayerEvent', () => {
 
     expect(received).toEqual([undefined]);
   });
+
+  it('maps the remote next and previous events to payload-less callbacks', async () => {
+    const player = new FakePlayer();
+    const received: string[] = [];
+    const next = addVlcPlayerListener(player, 'remoteNext', () =>
+      received.push('next')
+    );
+    addVlcPlayerListener(player, 'remotePrevious', () =>
+      received.push('previous')
+    );
+
+    player.channels.remoteNext.emit();
+    player.channels.remotePrevious.emit();
+    next.remove();
+    player.channels.remoteNext.emit();
+
+    expect(received).toEqual(['next', 'previous']);
+    expect(player.channels.remoteNext.listeners.size).toBe(0);
+  });
 });
 
 describe('useVlcPlayerStatus', () => {
