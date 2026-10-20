@@ -16,6 +16,7 @@ const { createdPlayers } = jest.requireMock<typeof NitroModulesMock>(
 const ROUTE = {
   title: 'Sample',
   source: { uri: 'https://example.com/sample.mkv', title: 'Sample' },
+  nowPlaying: { title: 'Sample', artist: 'Studio' },
 };
 
 const lastPlayer = (): FakePlayer => {
@@ -125,5 +126,61 @@ describe('PlayerScreen', () => {
     await fireEvent(screen.getByLabelText('Seek'), 'slidingComplete', 30_000);
 
     expect(seek).toHaveBeenCalledWith(30_000);
+  });
+
+  it('writes the background settings and system controls to the player', async () => {
+    const player = await renderPlayer();
+
+    await fireEvent(
+      screen.getByLabelText('Keep playing in background'),
+      'valueChange',
+      true
+    );
+    await fireEvent(
+      screen.getByLabelText('System media controls'),
+      'valueChange',
+      true
+    );
+    await fireEvent.press(screen.getByLabelText('30 s'));
+
+    expect(player.staysActiveInBackground).toBe(true);
+    expect(player.nowPlaying).toEqual(ROUTE.nowPlaying);
+    expect(player.remoteSkipInterval).toBe(30_000);
+
+    await fireEvent(
+      screen.getByLabelText('System media controls'),
+      'valueChange',
+      false
+    );
+
+    expect(player.nowPlaying).toBeUndefined();
+  });
+
+  it('listens for next and previous only while the toggle is on', async () => {
+    const player = await renderPlayer();
+    await fireEvent.press(screen.getByLabelText('Expand API lab'));
+
+    expect(player.channels.remoteNext.listeners.size).toBe(0);
+
+    await fireEvent(
+      screen.getByLabelText('Next and previous buttons'),
+      'valueChange',
+      true
+    );
+
+    expect(player.channels.remoteNext.listeners.size).toBe(1);
+    expect(player.channels.remotePrevious.listeners.size).toBe(1);
+
+    await act(() => player.channels.remoteNext.emit());
+
+    expect(screen.getByText('remoteNext')).toBeTruthy();
+
+    await fireEvent(
+      screen.getByLabelText('Next and previous buttons'),
+      'valueChange',
+      false
+    );
+
+    expect(player.channels.remoteNext.listeners.size).toBe(0);
   });
 });

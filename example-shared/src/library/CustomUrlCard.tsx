@@ -88,6 +88,7 @@ export function CustomUrlCard({ onOpen }: CustomUrlCardProps) {
           onOpen({
             title: CUSTOM_TITLE,
             source: buildSource(uri, userAgent, referrer),
+            nowPlaying: { title: CUSTOM_TITLE },
           })
         }
       />

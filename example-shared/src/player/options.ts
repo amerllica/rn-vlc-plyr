@@ -14,3 +14,5 @@ export const SURFACE_TYPES: readonly VlcSurfaceType[] = ['texture', 'surface'];
 export const DELAY_STEP_MS = 100;
 
 export const TIME_UPDATE_INTERVAL_MS = 250;
+
+export const REMOTE_SKIP_INTERVALS_MS = [5000, 10000, 15000, 30000] as const;
