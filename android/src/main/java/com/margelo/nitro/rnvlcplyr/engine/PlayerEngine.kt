@@ -33,6 +33,8 @@ class PlayerEngine(
   private var player: MediaPlayer? = null
   private var shownOutput: VideoOutput? = null
   private var mediaRequest: MediaRequest? = null
+  private var videoTrackEnabled = true
+  private var viewsAttached = false
 
   init {
     player = createPlayer()
@@ -98,6 +100,19 @@ class PlayerEngine(
     setAudioDelay(settings.audioDelayMicros)
   }
 
+  fun setVideoTrackEnabled(enabled: Boolean) {
+    if (videoTrackEnabled == enabled) return
+    videoTrackEnabled = enabled
+    val activePlayer = player ?: return
+    if (enabled) {
+      reattachShownOutput(activePlayer)
+      activePlayer.setVideoTrackEnabled(true)
+    } else {
+      activePlayer.setVideoTrackEnabled(false)
+      detachShownOutput(activePlayer)
+    }
+  }
+
   fun selectAudioTrack(id: Int) {
     player?.setAudioTrack(id)
   }
@@ -124,9 +139,9 @@ class PlayerEngine(
 
   fun show(output: VideoOutput?) {
     val activePlayer = player ?: return
-    if (shownOutput != null) activePlayer.detachViews()
+    detachShownOutput(activePlayer)
     shownOutput = output
-    attachShownOutput(activePlayer)
+    if (videoTrackEnabled) attachShownOutput(activePlayer)
   }
 
   fun applyScale(output: VideoOutput) {
@@ -143,23 +158,26 @@ class PlayerEngine(
 
   private fun createPlayer(): MediaPlayer {
     val created = MediaPlayer(libVLC)
-    created.setEventListener { event -> if (player === created) onEvent(event) }
+    created.setEventListener { event ->
+      if (player !== created) return@setEventListener
+      if (!videoTrackEnabled && event.type in VIDEO_TRACK_EVENTS) created.setVideoTrackEnabled(false)
+      onEvent(event)
+    }
     return created
   }
 
   private fun replacePlayerWithFreshMedia() {
     val previous = player ?: return
     retire(previous)
-    shownOutput?.renewVideoLayout()
     val fresh = createPlayer()
     player = fresh
-    attachShownOutput(fresh)
+    if (videoTrackEnabled) reattachShownOutput(fresh)
     assignMedia(fresh)
   }
 
   private fun retire(retiring: MediaPlayer) {
     retiring.setEventListener(null)
-    if (shownOutput != null) retiring.detachViews()
+    detachShownOutput(retiring)
     PlayerRetirement.retire(retiring)
   }
 
@@ -167,6 +185,18 @@ class PlayerEngine(
     val output = shownOutput ?: return
     target.attachViews(output.videoLayout, null, ENABLE_SUBTITLES, output.usesTextureView)
     target.videoScale = output.scaleType
+    viewsAttached = true
+  }
+
+  private fun reattachShownOutput(target: MediaPlayer) {
+    shownOutput?.renewVideoLayout()
+    attachShownOutput(target)
+  }
+
+  private fun detachShownOutput(target: MediaPlayer) {
+    if (!viewsAttached) return
+    target.detachViews()
+    viewsAttached = false
   }
 
   private fun assignMedia(target: MediaPlayer) {
@@ -190,5 +220,6 @@ class PlayerEngine(
 
   private companion object {
     const val ENABLE_SUBTITLES = true
+    val VIDEO_TRACK_EVENTS = setOf(MediaPlayer.Event.ESAdded, MediaPlayer.Event.Playing)
   }
 }
