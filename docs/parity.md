@@ -13,11 +13,11 @@ Results of the cross-platform checklist against [the player contract](player-con
 
 | Suite | iOS | Android |
 |---|---|---|
-| Pure contract rules | XCTest, pass | JUnit on the JVM, 77 pass |
-| Real playback | XCTest with a bundled 2-second MP4, pass | Instrumented tests on the emulator with bundled MP4, MKV and SRT files, 28 pass |
-| Total | 111 pass | 105 pass |
+| Pure contract rules | XCTest, pass | JUnit on the JVM, 95 pass |
+| Real playback | XCTest with a bundled 2-second MP4, pass | Instrumented tests on the emulator with bundled MP4, MKV and SRT files, 36 pass |
+| Total | 111 pass | 131 pass |
 
-Counts updated on 2026-10-20 for 1.1. The background and media session contract rules have the same
+Android counts updated on 2026-10-21 with the subtitle style and subtitle drawing tests. iOS counts are from 2026-10-20 for 1.1. The background and media session contract rules have the same
 33 test names on both OSes. The 8 Android subtitle drawing tests are described in
 [Android subtitle drawing](#android-subtitle-drawing).
 
@@ -65,14 +65,18 @@ Api35_GoogleApis emulators.
 | Style change while paused | PASS | PASS | Pauses again at the same position |
 | Two quick style changes | PASS | PASS | Position from before the first change is kept |
 | Styled text on screen | PASS | PASS | 200 % yellow verified visually. Android drew it once the subtitle was added after the style change |
-| Added subtitle drawn again after a style change | PASS | not confirmed | iOS verified visually on HLS. Android restores and selects the track (instrumented test), but the emulators did not draw subtitles reliably even without a style: libVLC logs `can't get Subtitles Surface` |
+| Added subtitle drawn again after a style change | PASS | not confirmed | iOS verified visually on HLS. Android restores and selects the track (instrumented test), but the emulators did not draw subtitles reliably even without a style: libVLC logs `can't get Subtitles Surface`. Not checked again after the fixes in [Android subtitle drawing](#android-subtitle-drawing) |
 
 ## Android subtitle drawing
 
 `SubtitleRenderingTest` plays bundled media in a test activity. The activity hosts the library's
-`VideoContainer` in a parent that ignores `requestLayout`, as React Native does. The SRT has one
-magenta cue from 0 to 1 hour. Each test takes emulator screenshots until at least 200 magenta
-pixels show, and saves the last screenshot to the test app's external files folder.
+`VideoContainer` in a parent that ignores `requestLayout`, as React Native does. The external SRT has
+one magenta cue from 0 to 1 hour and sits in its own folder, so VLC cannot auto-load it next to the
+video. The MKV has an embedded SRT track with a new magenta cue every second; the test selects that
+track, as an app does. Each test takes emulator screenshots until at least 200 magenta pixels show,
+and saves the last screenshot to the test app's external files folder. The class first plays one
+subtitle until it shows, because the first subtitle after an install did not draw at all during the
+10-second video.
 
 | Case | Texture view | Surface view |
 |---|---|---|
@@ -83,14 +87,16 @@ pixels show, and saves the last screenshot to the test app's external files fold
 | Embedded SRT after a switch to `texture` while playing | PASS | — |
 | External SRT after the video track goes off and on | PASS | — |
 
-Run on 2026-10-20 on two emulators. Api35_GoogleApis (Android 15) decodes with MediaCodec opaque
-frames. A new Android 17 emulator (Pixel 9 profile, same system image as Pixel_10a) falls back to
-software decoding in the test app, because MediaCodec `queueInputBuffer` fails there. All 28
-instrumented tests pass on both. The example app on Android 15 also draws the SRT in texture view,
-in surface view, after a switch while playing, and on the Apple HLS stream.
+Run on 2026-10-21 on two emulators, from a clean install of the test app. Api35_GoogleApis
+(Android 15) decodes with MediaCodec opaque frames. A new Android 17 emulator (Pixel 9 profile, same
+system image as Pixel_10a) used MediaCodec in some runs and software decoding in others. All 36
+instrumented tests pass on both. The example app on Android 15 also draws an external SRT in texture
+view, in surface view, after a switch while playing, and on the Apple HLS stream.
 
-Before the fix, the last four rows failed with 0 subtitle pixels. The first four rows passed before
-the fix too: the default setup draws subtitles in both view types. The failures came from these
+Before the fix, the last four rows failed with 0 subtitle pixels. The external SRT rows passed before
+the fix too. A first run of the embedded rows also passed, but that result was not valid: VLC had
+auto-loaded the external SRT from the same folder. VLC does not auto-select the embedded track of the
+test MKV, which also has an audio track, so the test now selects it. The failures came from these
 causes:
 
 - **A fresh player lost added subtitles.** `play()` after `stop()` or after the end, `loop`, and a
@@ -139,7 +145,8 @@ These come from VLC 3 and are the same on both platforms.
 - **Seeking inside remote MKV files** depends on the file's index. The Matroska test file can land
   on damaged frames after large jumps over HTTP.
 - **First subtitle render** builds a font cache. On a fresh install this can take more than 15
-  seconds.
+  seconds. On Android emulators in October 2026, the first subtitle after an install did not show
+  during a 10-second video, even after `buildFontCache()`. Later subtitles showed in 1 to 5 seconds.
 - **A newly attached view** stays black while paused or ended, until the next frame is decoded.
 
 ## Platform-specific workarounds
