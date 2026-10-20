@@ -9,10 +9,20 @@ struct PlayerSettings: Equatable {
   var timeUpdateInterval = 250
   var subtitleDelay = 0
   var audioDelay = 0
+  var staysActiveInBackground = false
+  var nowPlaying: NowPlayingInfo?
+  var remoteSkipInterval = 10_000
 
   var volumeState: VolumeState {
     VolumeState(volume: volume, muted: muted)
   }
+}
+
+struct NowPlayingInfo: Equatable {
+  var title: String
+  var artist: String?
+  var album: String?
+  var artworkUri: String?
 }
 
 struct MediaState {

@@ -11,6 +11,7 @@ object VlcContract {
   const val DEFAULT_TIME_UPDATE_INTERVAL_MS = 250
   const val DEFAULT_DELAY_MS = 0
   const val NO_TRACK_ID = -1
+  const val DEFAULT_REMOTE_SKIP_INTERVAL_MS = 10_000
 
   private const val MIN_VOLUME = 0
   private const val MAX_VOLUME = 100
@@ -19,6 +20,8 @@ object VlcContract {
   private const val MIN_TIME_UPDATE_INTERVAL_MS = 50
   private const val MAX_TIME_UPDATE_INTERVAL_MS = 5000
   private const val MAX_DELAY_MS = 60_000
+  private const val MIN_REMOTE_SKIP_INTERVAL_MS = 1_000
+  private const val MAX_REMOTE_SKIP_INTERVAL_MS = 60_000
   private const val MICROS_PER_MILLI = 1000L
   private const val FILE_SCHEME_PREFIX = "file://"
   private const val USER_AGENT_OPTION = ":http-user-agent="
@@ -43,6 +46,11 @@ object VlcContract {
       .toInt()
 
   fun clampDelay(value: Double): Int = roundHalfUp(value).coerceIn(-MAX_DELAY_MS.toLong(), MAX_DELAY_MS.toLong()).toInt()
+
+  fun clampSkipInterval(value: Double): Int =
+    roundHalfUp(value)
+      .coerceIn(MIN_REMOTE_SKIP_INTERVAL_MS.toLong(), MAX_REMOTE_SKIP_INTERVAL_MS.toLong())
+      .toInt()
 
   fun delayToMicros(delayMs: Int): Long = delayMs * MICROS_PER_MILLI
 
