@@ -108,7 +108,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     val action = locked { machine.resolvePlay() }
     if (action == PlayAction.NONE) return@onMain
     session.onUserCommand()
-    if (!session.requestFocus()) return@onMain
+    session.requestFocus()
     locked { pendingSessionPause = false }
     when (action) {
       PlayAction.NONE -> Unit
@@ -231,8 +231,8 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   private fun loadSource(value: VlcSource?, forcePlay: Boolean) {
     val resolvedUri = value?.let { VlcContract.resolveMediaUri(it.uri) }
     val wantsPlay = resolvedUri != null && (forcePlay || locked { settings.autoPlay })
-    val playNow = wantsPlay && session.requestFocus()
-    mutate { applySource(value, resolvedUri, playNow) }
+    if (wantsPlay) session.requestFocus()
+    mutate { applySource(value, resolvedUri, wantsPlay) }
   }
 
   private fun Outbox.applySource(value: VlcSource?, resolvedUri: String?, playNow: Boolean) {

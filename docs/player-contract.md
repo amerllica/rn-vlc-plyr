@@ -212,7 +212,10 @@ and any background pause forget a pending interruption, so a user pause is never
 Android requests audio focus (`AUDIOFOCUS_GAIN`, usage media, content movie) on every play or
 resume. All players in the process share one focus request, the same way all iOS players share one
 audio session, so one player never pauses another. Pausing keeps focus. Focus is abandoned on `stop()`, on source clear and on `release()`. When
-the request is denied, playback does not start.
+the request is denied, playback still starts without focus and the next play asks again. Android 15
+denies focus to an app that is neither the top app nor running a foreground service, for example a
+paused app resumed from the notification. iOS behaves the same way: a failed session activation does
+not block playback.
 
 ## Media session
 
