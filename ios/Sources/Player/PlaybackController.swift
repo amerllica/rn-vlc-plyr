@@ -1,11 +1,6 @@
 import NitroModules
 import UIKit
 
-protocol VideoHost: AnyObject {
-  var hostView: UIView { get }
-  var hostResizeMode: ResizeMode { get }
-}
-
 final class PlaybackController {
   private static let snapshotQueue = DispatchQueue(label: "rn-vlc-plyr.snapshot")
   private static let snapshotStatuses: Set<PlayerStatus> = [.buffering, .playing, .paused]
@@ -17,22 +12,18 @@ final class PlaybackController {
   private var videoSizeGate = VideoSizeGate()
   private var throttle = TimeUpdateThrottle()
   private var audioSession = PlaybackAudioSession()
-  private var hosts = SurfaceStack<AnyObject>()
   private let snapshots = SnapshotRequests()
   private var engineInstance: VlcEngine?
   private var currentRequest: MediaRequest?
   private var pendingSeekMs: Int?
   private var pendingSubtitles: [(url: URL, select: Bool)] = []
+  private var pausesOnceStarted = false
   private var isShutDown = false
-  private var lastResize: ResizeSettings?
-  private lazy var videoContainer = Self.makeVideoContainer()
+  private lazy var surface = VideoSurface()
+  private lazy var session = MediaSessionCoordinator(store: store, control: self)
 
   init(store: PlayerStore) {
     self.store = store
-  }
-
-  private var topHost: VideoHost? {
-    hosts.top as? VideoHost
   }
 
   private var isActive: Bool {
@@ -41,18 +32,21 @@ final class PlaybackController {
 
   private var engine: VlcEngine {
     if let engineInstance { return engineInstance }
-    let created = VlcEngine(drawable: videoContainer)
+    let created = VlcEngine(drawable: surface.container)
     created.delegate = self
     engineInstance = created
+    surface.engine = created
     return created
   }
 
   func load(_ source: VlcSource?) {
     guard isActive else { return }
+    defer { session.sourceDidChange() }
     resetMediaState()
     guard let source else {
       currentRequest = nil
       retireEngine()
+      audioSession.deactivate()
       apply(machine.clear())
       return
     }
@@ -65,7 +59,7 @@ final class PlaybackController {
     replaceEngine().load(request)
     let autoPlay = store.settings.autoPlay
     if autoPlay {
-      audioSession.activateOnce()
+      audioSession.activate()
     }
     apply(machine.load(uri: source.uri, autoPlay: autoPlay))
     if autoPlay {
@@ -75,29 +69,21 @@ final class PlaybackController {
 
   func play() {
     guard isActive else { return }
-    switch machine.playAction() {
-    case .none:
-      return
-    case .start:
-      startPlayback()
-    case .resume:
-      audioSession.activateOnce()
-      engine.play()
-    case .restart:
-      engine.stop()
-      startPlayback()
-    case .reload:
-      reloadAndPlay()
-    }
+    session.userDidCommand()
+    startOrResume()
   }
 
   func pause() {
-    guard isActive, machine.canPause else { return }
-    engine.pause()
+    guard isActive else { return }
+    session.userDidCommand()
+    pausesOnceStarted = false
+    pauseEngine()
   }
 
   func stop() {
     guard isActive, machine.canStop else { return }
+    session.userDidCommand()
+    pausesOnceStarted = false
     pendingSeekMs = nil
     engineInstance?.stop()
     store.updateMedia { $0.currentTime = 0 }
@@ -147,7 +133,7 @@ final class PlaybackController {
   }
 
   func snapshot(_ promise: Promise<String>) {
-    guard isActive, let engineInstance, !hosts.isEmpty, Self.snapshotStatuses.contains(machine.status), store.media.videoSize.isRenderable else {
+    guard isActive, let engineInstance, surface.hasHosts, Self.snapshotStatuses.contains(machine.status), store.media.videoSize.isRenderable else {
       SnapshotRequests.reject(promise)
       return
     }
@@ -163,25 +149,27 @@ final class PlaybackController {
   }
 
   func applySettings() {
-    guard isActive, Self.mediaActiveStatuses.contains(machine.status) else { return }
-    engineInstance?.apply(store.settings)
+    guard isActive else { return }
+    if Self.mediaActiveStatuses.contains(machine.status) {
+      engineInstance?.apply(store.settings)
+    }
+    session.settingsDidChange()
   }
 
   func attach(_ host: VideoHost) {
     guard isActive else { return }
-    hosts.attach(host)
-    mountVideoContainer()
+    surface.attach(host)
   }
 
   func detach(_ host: VideoHost) {
-    hosts.detach(host)
+    surface.detach(host)
     guard !isShutDown else { return }
-    mountVideoContainer()
+    surface.mount()
   }
 
   func hostDidLayout(_ host: VideoHost) {
-    guard isActive, topHost === host else { return }
-    mountVideoContainer()
+    guard isActive else { return }
+    surface.hostDidLayout(host)
   }
 
   func shutdown() {
@@ -189,8 +177,32 @@ final class PlaybackController {
     isShutDown = true
     snapshots.rejectAll()
     retireEngine()
-    hosts.removeAll()
-    videoContainer.removeFromSuperview()
+    session.shutdown()
+    audioSession.deactivate()
+    surface.removeAll()
+  }
+
+  private func startOrResume() {
+    pausesOnceStarted = false
+    switch machine.playAction() {
+    case .none:
+      return
+    case .start:
+      startPlayback()
+    case .resume:
+      audioSession.activate()
+      engine.play()
+    case .restart:
+      engine.stop()
+      startPlayback()
+    case .reload:
+      reloadAndPlay()
+    }
+  }
+
+  private func pauseEngine() {
+    guard machine.canPause else { return }
+    engine.pause()
   }
 
   private func reloadAndPlay() {
@@ -200,7 +212,7 @@ final class PlaybackController {
       return
     }
     replaceEngine().load(request)
-    audioSession.activateOnce()
+    audioSession.activate()
     apply(machine.reloadForRetry())
     engine.play()
   }
@@ -208,13 +220,14 @@ final class PlaybackController {
   private func replaceEngine() -> VlcEngine {
     retireEngine()
     let fresh = engine
-    applyResize(force: true)
+    surface.applyResize(force: true)
     return fresh
   }
 
   private func retireEngine() {
     engineInstance?.retire()
     engineInstance = nil
+    surface.engine = nil
   }
 
   private func failInvalidSource() {
@@ -223,7 +236,7 @@ final class PlaybackController {
   }
 
   private func startPlayback() {
-    audioSession.activateOnce()
+    audioSession.activate()
     apply(machine.beginPlayback())
     engine.play()
   }
@@ -233,14 +246,16 @@ final class PlaybackController {
     store.updateMedia { $0.currentTime = milliseconds }
     throttle.markEmitted(atMs: Self.nowMs)
     store.emit(\.timeUpdate, PlayerPayloads.timeUpdate(store.media))
+    session.refresh()
   }
 
   private func resetMediaState() {
     pendingSeekMs = nil
+    pausesOnceStarted = false
     pendingSubtitles.removeAll()
     throttle.reset()
     videoSizeGate.reset()
-    videoContainer.isHidden = true
+    surface.container.isHidden = true
     store.updateMedia { media in
       let status = media.status
       media = MediaState()
@@ -275,16 +290,22 @@ final class PlaybackController {
         }
       }
     }
+    guard !effects.isEmpty else { return }
+    session.refresh()
   }
 
   private func didEnterPlaying() {
     guard let engineInstance else { return }
     engineInstance.apply(store.settings)
-    applyResize(force: true)
+    surface.applyResize(force: true)
     refreshReadout()
     let subtitles = pendingSubtitles
     pendingSubtitles.removeAll()
     subtitles.forEach { addSubtitle(uri: $0.url.absoluteString, select: $0.select) }
+    if pausesOnceStarted {
+      pausesOnceStarted = false
+      engineInstance.pause()
+    }
   }
 
   private func applyPendingSeekOnceStarted() {
@@ -296,6 +317,8 @@ final class PlaybackController {
   private func restartForLoop() {
     guard isActive else { return }
     engineInstance?.restartFromBeginning()
+    store.updateMedia { $0.currentTime = 0 }
+    session.refresh()
   }
 
   private func refreshReadout() {
@@ -316,13 +339,13 @@ final class PlaybackController {
     revealVideoOnceRendered(readout.videoSize)
     if videoSizeGate.shouldEmit(readout.videoSize) {
       store.emit(\.videoSizeChange, PlayerPayloads.videoSize(readout.videoSize))
-      applyResize(force: false)
+      surface.applyResize(force: false)
     }
   }
 
   private func revealVideoOnceRendered(_ size: VideoDimensions) {
-    guard videoContainer.isHidden, size.isRenderable, machine.hasReachedPlaying else { return }
-    videoContainer.isHidden = false
+    guard surface.container.isHidden, size.isRenderable, machine.hasReachedPlaying else { return }
+    surface.container.isHidden = false
   }
 
   private func emitTracksIfChanged(_ tracks: TracksSnapshot) {
@@ -330,55 +353,17 @@ final class PlaybackController {
     store.emit(\.tracksChange, PlayerPayloads.tracksInfo(tracks))
   }
 
-  private func mountVideoContainer() {
-    guard let host = topHost else {
-      videoContainer.removeFromSuperview()
-      return
-    }
-    let isNewHost = videoContainer.superview !== host.hostView
-    if isNewHost {
-      host.hostView.insertSubview(videoContainer, at: 0)
-    }
-    let sizeChanged = videoContainer.frame != host.hostView.bounds
-    videoContainer.frame = host.hostView.bounds
-    if isNewHost || sizeChanged {
-      relayoutRenderedVideo()
-    }
-    applyResize(force: isNewHost || sizeChanged)
-  }
-
-  private func relayoutRenderedVideo() {
-    videoContainer.subviews.forEach { renderView in
-      renderView.frame = videoContainer.bounds
-      renderView.setNeedsLayout()
-    }
-    videoContainer.layoutIfNeeded()
-  }
-
-  private func applyResize(force: Bool) {
-    guard let engineInstance, let host = topHost else { return }
-    let settings = ResizeGeometry.settings(mode: host.hostResizeMode, viewSize: host.hostView.bounds.size)
-    guard force || settings != lastResize else { return }
-    lastResize = settings
-    engineInstance.apply(settings)
-  }
-
   private static var nowMs: Double {
     ProcessInfo.processInfo.systemUptime * 1000
-  }
-
-  private static func makeVideoContainer() -> UIView {
-    let container = UIView()
-    container.backgroundColor = .black
-    container.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-    container.isUserInteractionEnabled = false
-    return container
   }
 }
 
 extension PlaybackController: VlcEngineDelegate {
   func engineDidChangeState(_ state: EngineState, isPlaying: Bool) {
     guard isActive else { return }
+    if session.isVideoDisabled {
+      engineInstance?.disableVideoTrack()
+    }
     apply(machine.handle(engine: state, engineIsPlaying: isPlaying, loop: store.settings.loop))
     refreshReadout()
   }
@@ -394,5 +379,30 @@ extension PlaybackController: VlcEngineDelegate {
 
   func engineDidTakeSnapshot() {
     snapshots.engineDidTakeSnapshot()
+  }
+}
+
+extension PlaybackController: MediaSessionControl {
+  func pauseForSession() {
+    guard isActive else { return }
+    if machine.canPause {
+      pauseEngine()
+    } else if machine.status == .opening {
+      pausesOnceStarted = true
+    }
+  }
+
+  func resumeForSession() {
+    guard isActive else { return }
+    startOrResume()
+  }
+
+  func setVideoTrackEnabled(_ enabled: Bool) {
+    guard isActive else { return }
+    if enabled {
+      engineInstance?.restoreVideoTrack()
+    } else {
+      engineInstance?.disableVideoTrack()
+    }
   }
 }

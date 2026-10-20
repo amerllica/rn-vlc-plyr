@@ -62,4 +62,12 @@ enum PlayerPayloads {
       subtitleTracks: tracks(media.tracks.subtitleTracks)
     )
   }
+
+  static func nowPlaying(_ info: NowPlayingInfo) -> VlcNowPlaying {
+    VlcNowPlaying(title: info.title, artist: info.artist, album: info.album, artworkUri: info.artworkUri)
+  }
+
+  static func nowPlayingInfo(_ payload: VlcNowPlaying) -> NowPlayingInfo {
+    NowPlayingInfo(title: payload.title, artist: payload.artist, album: payload.album, artworkUri: payload.artworkUri)
+  }
 }

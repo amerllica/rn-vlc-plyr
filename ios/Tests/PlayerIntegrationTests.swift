@@ -1,3 +1,4 @@
+import MediaPlayer
 import XCTest
 @testable import RnVlcPlyr
 
@@ -28,6 +29,35 @@ final class PlayerIntegrationTests: XCTestCase {
 
   private static let audioOnlyOption = ":no-video"
   private static let engineTimeout: TimeInterval = 30
+  private static let nowPlayingTitle = "Two seconds"
+
+  private static let lateSeekMs = 1500.0
+
+  private var publishedElapsedSeconds: Double? {
+    MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPNowPlayingInfoPropertyElapsedPlaybackTime] as? Double
+  }
+
+  private var publishedTitle: String? {
+    MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPMediaItemPropertyTitle] as? String
+  }
+
+  private func drainMainQueue() {
+    let drained = expectation(description: "main queue drained")
+    DispatchQueue.main.async { drained.fulfill() }
+    wait(for: [drained], timeout: 5)
+  }
+
+  private func playWithNowPlaying() throws {
+    let playing = expectation(description: "playing")
+    playing.assertForOverFulfill = false
+    subscriptions.append(try player.addOnStatusChangeListener { status in
+      if status == .playing { playing.fulfill() }
+    })
+    player.nowPlaying = VlcNowPlaying(title: Self.nowPlayingTitle, artist: "Artist", album: nil, artworkUri: nil)
+    player.source = fixtureSource
+    wait(for: [playing], timeout: Self.engineTimeout)
+    drainMainQueue()
+  }
 
   func testLocalFileReachesPlayingWithDurationAndFiresLoadedOnce() throws {
     XCTAssertFalse(fixtureUri.isEmpty)
@@ -159,6 +189,10 @@ final class PlayerIntegrationTests: XCTestCase {
     XCTAssertEqual(player.selectedSubtitleTrack, -1)
     XCTAssertTrue(player.audioTracks.isEmpty)
     XCTAssertEqual(player.videoSize.width, 0)
+    XCTAssertFalse(player.staysActiveInBackground)
+    XCTAssertNil(player.nowPlaying)
+    XCTAssertEqual(player.remoteSkipInterval, 10_000)
+    XCTAssertNil(player.androidNotification)
   }
 
   func testAddSubtitleWithoutSourceThrows() {
@@ -169,6 +203,10 @@ final class PlayerIntegrationTests: XCTestCase {
     var statusEvents = 0
     subscriptions.append(try player.addOnStatusChangeListener { _ in statusEvents += 1 })
     player.volume = 10
+    player.staysActiveInBackground = true
+    player.remoteSkipInterval = 30_000
+    player.nowPlaying = VlcNowPlaying(title: Self.nowPlayingTitle, artist: nil, album: nil, artworkUri: nil)
+    player.androidNotification = VlcAndroidNotification(color: "#ff0000", smallIcon: nil)
     try player.release()
     try player.release()
     player.source = fixtureSource
@@ -181,5 +219,103 @@ final class PlayerIntegrationTests: XCTestCase {
     XCTAssertNil(player.source)
     XCTAssertEqual(player.status, .idle)
     XCTAssertEqual(statusEvents, 0)
+    XCTAssertFalse(player.staysActiveInBackground)
+    XCTAssertEqual(player.remoteSkipInterval, 10_000)
+    XCTAssertNil(player.nowPlaying)
+    XCTAssertNil(player.androidNotification)
+  }
+
+  func testRemoteSkipIntervalDefaultsAndClampsImmediately() {
+    XCTAssertEqual(player.remoteSkipInterval, 10_000)
+    player.remoteSkipInterval = 100
+    XCTAssertEqual(player.remoteSkipInterval, 1000)
+    player.remoteSkipInterval = 90_000
+    XCTAssertEqual(player.remoteSkipInterval, 60_000)
+    player.remoteSkipInterval = 15_000.5
+    XCTAssertEqual(player.remoteSkipInterval, 15_001)
+    player.remoteSkipInterval = .nan
+    XCTAssertEqual(player.remoteSkipInterval, 15_001)
+  }
+
+  func testAndroidNotificationIsStoredAndReturned() {
+    player.androidNotification = VlcAndroidNotification(color: "#123456", smallIcon: "ic_play")
+    XCTAssertEqual(player.androidNotification?.color, "#123456")
+    XCTAssertEqual(player.androidNotification?.smallIcon, "ic_play")
+  }
+
+  func testLoopRestartPublishesElapsedTimeFromTheStart() throws {
+    var lastTime = -1.0
+    let looped = expectation(description: "time wrapped back to the start")
+    looped.assertForOverFulfill = false
+    player.loop = true
+    player.timeUpdateInterval = 50
+    try playWithNowPlaying()
+    subscriptions.append(try player.addOnTimeUpdateListener { event in
+      if event.currentTime < lastTime { looped.fulfill() }
+      lastTime = event.currentTime
+    })
+    try player.seek(timeMs: Self.lateSeekMs)
+    drainMainQueue()
+    XCTAssertGreaterThanOrEqual(try XCTUnwrap(publishedElapsedSeconds), Self.lateSeekMs / 1000 - 0.1)
+
+    wait(for: [looped], timeout: Self.engineTimeout)
+    drainMainQueue()
+
+    XCTAssertLessThan(try XCTUnwrap(publishedElapsedSeconds), 1)
+  }
+
+  func testNowPlayingIsPublishedWhilePlayingAndClearedWhenUnset() throws {
+    try playWithNowPlaying()
+    XCTAssertEqual(publishedTitle, Self.nowPlayingTitle)
+    XCTAssertEqual(MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPMediaItemPropertyArtist] as? String, "Artist")
+
+    player.nowPlaying = nil
+    drainMainQueue()
+
+    XCTAssertNil(publishedTitle)
+  }
+
+  func testReleaseClearsNowPlaying() throws {
+    try playWithNowPlaying()
+    XCTAssertEqual(publishedTitle, Self.nowPlayingTitle)
+
+    try player.release()
+
+    XCTAssertNil(publishedTitle)
+  }
+
+  func testRemotePauseRoutedToOwnerPausesPlayback() throws {
+    try playWithNowPlaying()
+    let paused = expectation(description: "paused")
+    subscriptions.append(try player.addOnStatusChangeListener { status in
+      if status == .paused { paused.fulfill() }
+    })
+
+    XCTAssertTrue(MediaSessionOwner.shared.route(.pause))
+
+    wait(for: [paused], timeout: Self.engineTimeout)
+    XCTAssertEqual(player.status, .paused)
+    drainMainQueue()
+    XCTAssertEqual(MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPNowPlayingInfoPropertyPlaybackRate] as? Double, 0)
+  }
+
+  func testRemoteNextListenerEnablesNextCommandUntilRemoved() throws {
+    try playWithNowPlaying()
+    let nextCommand = MPRemoteCommandCenter.shared().nextTrackCommand
+    XCTAssertFalse(nextCommand.isEnabled)
+    XCTAssertEqual(MPRemoteCommandCenter.shared().skipForwardCommand.preferredIntervals, [10])
+    var nextEvents = 0
+
+    let subscription = try player.addOnRemoteNextListener { nextEvents += 1 }
+    XCTAssertTrue(nextCommand.isEnabled)
+    XCTAssertTrue(MediaSessionOwner.shared.route(.next))
+    XCTAssertEqual(nextEvents, 1)
+
+    subscription.remove()
+    XCTAssertFalse(nextCommand.isEnabled)
+  }
+
+  func testRemoteCommandsAreIgnoredWithoutOwner() {
+    XCTAssertFalse(MediaSessionOwner.shared.route(.play))
   }
 }

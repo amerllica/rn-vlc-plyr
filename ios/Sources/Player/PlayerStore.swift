@@ -4,6 +4,7 @@ struct PlayerMirror {
   var source: VlcSource?
   var settings = PlayerSettings()
   var media = MediaState()
+  var androidNotification: VlcAndroidNotification?
   var isReleased = false
 }
 
@@ -16,6 +17,8 @@ final class PlayerEvents {
   let volumeChange = ListenerRegistry<VlcVolumeInfo>()
   let tracksChange = ListenerRegistry<VlcTracksInfo>()
   let videoSizeChange = ListenerRegistry<VlcVideoSize>()
+  let remoteNext = ListenerRegistry<Void>()
+  let remotePrevious = ListenerRegistry<Void>()
 
   func removeAll() {
     statusChange.removeAll()
@@ -26,6 +29,8 @@ final class PlayerEvents {
     volumeChange.removeAll()
     tracksChange.removeAll()
     videoSizeChange.removeAll()
+    remoteNext.removeAll()
+    remotePrevious.removeAll()
   }
 }
 
@@ -37,6 +42,7 @@ final class PlayerStore {
   var source: VlcSource? { mirror.read { $0.source } }
   var settings: PlayerSettings { mirror.read { $0.settings } }
   var media: MediaState { mirror.read { $0.media } }
+  var androidNotification: VlcAndroidNotification? { mirror.read { $0.androidNotification } }
 
   func read<Result>(_ body: (PlayerMirror) -> Result) -> Result {
     mirror.read(body)
@@ -47,6 +53,13 @@ final class PlayerStore {
       guard !state.isReleased else { return false }
       state.source = source
       return true
+    }
+  }
+
+  func setAndroidNotification(_ notification: VlcAndroidNotification?) {
+    mirror.mutate { state in
+      guard !state.isReleased else { return }
+      state.androidNotification = notification
     }
   }
 
