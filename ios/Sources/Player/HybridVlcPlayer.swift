@@ -62,6 +62,14 @@ final class HybridVlcPlayer: HybridVlcPlayerSpec {
     set { updateSetting(VlcContract.clampDelay(newValue)) { $0.subtitleDelay = $1 } }
   }
 
+  var subtitleStyle: VlcSubtitleStyle? {
+    get { store.settings.subtitleStyle.map(PlayerPayloads.subtitleStyle) }
+    set {
+      let style = newValue.flatMap(PlayerPayloads.subtitleStyle)
+      changeSettings { $0.subtitleStyle = style }
+    }
+  }
+
   var audioDelay: Double {
     get { Double(store.settings.audioDelay) }
     set { updateSetting(VlcContract.clampDelay(newValue)) { $0.audioDelay = $1 } }
@@ -236,6 +244,9 @@ final class HybridVlcPlayer: HybridVlcPlayerSpec {
     guard let change = store.updateSettings(body), change.before != change.after else { return }
     if change.before.volumeState != change.after.volumeState {
       store.emit(\.volumeChange, PlayerPayloads.volume(change.after.volumeState))
+    }
+    if change.before.subtitleStyle != change.after.subtitleStyle {
+      onMain { $0.subtitleStyleDidChange() }
     }
     onMain { $0.applySettings() }
   }

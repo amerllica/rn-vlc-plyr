@@ -32,6 +32,12 @@ final class PlayerIntegrationTests: XCTestCase {
   private static let nowPlayingTitle = "Two seconds"
 
   private static let lateSeekMs = 1500.0
+  private static let restyleSeekMs = 1000.0
+  private static let restylePositionTolerance = 300.0
+  private static let yellowSubtitles = VlcSubtitleStyle(
+    fontFamily: nil, fontScale: 150, bold: true, color: "#ffff00", backgroundColor: nil,
+    outlineColor: nil, outlineThickness: VlcOutlineThickness.thick, shadowColor: nil, shadowDistance: nil, marginBottom: nil
+  )
 
   private var publishedElapsedSeconds: Double? {
     MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPNowPlayingInfoPropertyElapsedPlaybackTime] as? Double
@@ -193,6 +199,7 @@ final class PlayerIntegrationTests: XCTestCase {
     XCTAssertNil(player.nowPlaying)
     XCTAssertEqual(player.remoteSkipInterval, 10_000)
     XCTAssertNil(player.androidNotification)
+    XCTAssertNil(player.subtitleStyle)
   }
 
   func testAddSubtitleWithoutSourceThrows() {
@@ -207,6 +214,7 @@ final class PlayerIntegrationTests: XCTestCase {
     player.remoteSkipInterval = 30_000
     player.nowPlaying = VlcNowPlaying(title: Self.nowPlayingTitle, artist: nil, album: nil, artworkUri: nil)
     player.androidNotification = VlcAndroidNotification(color: "#ff0000", smallIcon: nil)
+    player.subtitleStyle = Self.yellowSubtitles
     try player.release()
     try player.release()
     player.source = fixtureSource
@@ -223,6 +231,7 @@ final class PlayerIntegrationTests: XCTestCase {
     XCTAssertEqual(player.remoteSkipInterval, 10_000)
     XCTAssertNil(player.nowPlaying)
     XCTAssertNil(player.androidNotification)
+    XCTAssertNil(player.subtitleStyle)
   }
 
   func testRemoteSkipIntervalDefaultsAndClampsImmediately() {
@@ -317,5 +326,100 @@ final class PlayerIntegrationTests: XCTestCase {
 
   func testRemoteCommandsAreIgnoredWithoutOwner() {
     XCTAssertFalse(MediaSessionOwner.shared.route(.play))
+  }
+
+  func testSubtitleStyleIsNormalisedImmediatelyAndClearedByEmptyStyle() {
+    player.subtitleStyle = VlcSubtitleStyle(
+      fontFamily: "  Menlo ", fontScale: 5, bold: nil, color: "#abc", backgroundColor: "bad",
+      outlineColor: nil, outlineThickness: nil, shadowColor: nil, shadowDistance: 3, marginBottom: nil
+    )
+    XCTAssertEqual(player.subtitleStyle?.fontFamily, "Menlo")
+    XCTAssertEqual(player.subtitleStyle?.fontScale, 25)
+    XCTAssertEqual(player.subtitleStyle?.color, "#AABBCC")
+    XCTAssertNil(player.subtitleStyle?.backgroundColor)
+    XCTAssertEqual(player.subtitleStyle?.shadowDistance, 1)
+    player.subtitleStyle = VlcSubtitleStyle(
+      fontFamily: nil, fontScale: nil, bold: nil, color: nil, backgroundColor: nil,
+      outlineColor: nil, outlineThickness: nil, shadowColor: nil, shadowDistance: nil, marginBottom: nil
+    )
+    XCTAssertNil(player.subtitleStyle)
+  }
+
+  func testSubtitleStyleSetBeforeLoadReachesPlaying() throws {
+    player.subtitleStyle = Self.yellowSubtitles
+    try playWithNowPlaying()
+    XCTAssertEqual(player.status, .playing)
+    XCTAssertEqual(player.subtitleStyle?.fontScale, 150)
+  }
+
+  func testSubtitleStyleChangeWhilePlayingReopensAndKeepsPosition() throws {
+    player.loop = true
+    try playWithNowPlaying()
+    try player.seek(timeMs: Self.restyleSeekMs)
+    drainMainQueue()
+    var statuses: [VlcStatus] = []
+    var loadedEvents = 0
+    let replaying = expectation(description: "playing again after the style change")
+    replaying.assertForOverFulfill = false
+    subscriptions.append(try player.addOnLoadedListener { _ in loadedEvents += 1 })
+    subscriptions.append(try player.addOnStatusChangeListener { status in
+      statuses.append(status)
+      if status == .playing { replaying.fulfill() }
+    })
+    let restored = expectation(description: "position restored after the style change")
+    restored.assertForOverFulfill = false
+    player.subtitleStyle = Self.yellowSubtitles
+    wait(for: [replaying], timeout: Self.engineTimeout)
+    subscriptions.append(try player.addOnTimeUpdateListener { event in
+      if event.currentTime >= Self.restyleSeekMs - Self.restylePositionTolerance { restored.fulfill() }
+    })
+    wait(for: [restored], timeout: Self.engineTimeout)
+    XCTAssertEqual(statuses.first, .opening)
+    XCTAssertEqual(loadedEvents, 0)
+  }
+
+  func testSubtitleStyleChangeWhilePausedStaysPaused() throws {
+    player.loop = true
+    try playWithNowPlaying()
+    try player.seek(timeMs: Self.restyleSeekMs)
+    try player.pause()
+    let paused = expectation(description: "paused")
+    paused.assertForOverFulfill = false
+    if player.status == .paused { paused.fulfill() }
+    subscriptions.append(try player.addOnStatusChangeListener { if $0 == .paused { paused.fulfill() } })
+    wait(for: [paused], timeout: Self.engineTimeout)
+    subscriptions.removeAll()
+    var statuses: [VlcStatus] = []
+    let pausedAgain = expectation(description: "paused again after the style change")
+    pausedAgain.assertForOverFulfill = false
+    subscriptions.append(try player.addOnStatusChangeListener { status in
+      statuses.append(status)
+      if status == .paused { pausedAgain.fulfill() }
+    })
+    player.subtitleStyle = Self.yellowSubtitles
+    wait(for: [pausedAgain], timeout: Self.engineTimeout)
+    drainMainQueue()
+    XCTAssertEqual(statuses.first, .opening)
+    XCTAssertEqual(player.status, .paused)
+    XCTAssertGreaterThanOrEqual(player.currentTime, Self.restyleSeekMs - Self.restylePositionTolerance)
+  }
+
+  func testTwoQuickSubtitleStyleChangesStillRestorePosition() throws {
+    player.loop = true
+    try playWithNowPlaying()
+    try player.seek(timeMs: Self.restyleSeekMs)
+    drainMainQueue()
+    let restored = expectation(description: "position restored after two quick style changes")
+    restored.assertForOverFulfill = false
+    player.subtitleStyle = Self.yellowSubtitles
+    player.subtitleStyle = VlcSubtitleStyle(
+      fontFamily: nil, fontScale: 50, bold: nil, color: "#00FFFF", backgroundColor: nil,
+      outlineColor: nil, outlineThickness: nil, shadowColor: nil, shadowDistance: nil, marginBottom: nil
+    )
+    subscriptions.append(try player.addOnTimeUpdateListener { event in
+      if event.currentTime >= Self.restyleSeekMs - Self.restylePositionTolerance { restored.fulfill() }
+    })
+    wait(for: [restored], timeout: Self.engineTimeout)
+    XCTAssertEqual(player.subtitleStyle?.fontScale, 50)
   }
 }

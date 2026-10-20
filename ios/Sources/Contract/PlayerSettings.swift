@@ -8,6 +8,7 @@ struct PlayerSettings: Equatable {
   var autoPlay = true
   var timeUpdateInterval = 250
   var subtitleDelay = 0
+  var subtitleStyle: SubtitleStyle?
   var audioDelay = 0
   var staysActiveInBackground = false
   var nowPlaying: NowPlayingInfo?
