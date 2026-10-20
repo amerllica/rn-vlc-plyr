@@ -189,6 +189,7 @@ Settable properties. They persist across source changes and are clamped natively
 | `autoPlay` | `boolean` | `true` | |
 | `timeUpdateInterval` | `number` | `250` | 50–5000 ms |
 | `subtitleDelay` | `number` | `0` | −60000–60000 ms |
+| `subtitleStyle` | `VlcSubtitleStyle \| undefined` | `undefined` | Font, size, colours, outline, shadow and bottom margin of text subtitles. See [Subtitle style](#subtitle-style) |
 | `audioDelay` | `number` | `0` | −60000–60000 ms |
 | `staysActiveInBackground` | `boolean` | `false` | Keep playing audio in the background and on the lock screen. Needs [app setup](#background-audio-and-lock-screen-controls) |
 | `nowPlaying` | `VlcNowPlaying \| undefined` | `undefined` | `{ title, artist?, album?, artworkUri? }`. Shows the media on the lock screen, in Control Center and in the notification shade |
@@ -319,6 +320,38 @@ player.subtitleDelay = 250;
 player.audioDelay = -100;
 ```
 
+### Subtitle style
+
+```ts
+player.subtitleStyle = {
+  fontScale: 150,
+  color: '#FFFF00',
+  outlineThickness: 'thick',
+  backgroundColor: '#00000080',
+};
+```
+
+| Field | Type | Rule |
+|---|---|---|
+| `fontFamily` | `string` | Font name. iOS finds system fonts and fonts in `UIAppFonts`. Android finds system fonts only |
+| `fontScale` | `number` | Percent of the default size, 25–400 |
+| `bold` | `boolean` | |
+| `color` | `string` | `#RGB`, `#RRGGBB` or `#RRGGBBAA`. The alpha byte sets the opacity |
+| `backgroundColor` | `string` | Box behind the text. Same colour format |
+| `outlineColor` | `string` | Same colour format |
+| `outlineThickness` | `'none' \| 'thin' \| 'normal' \| 'thick'` | VLC default is `normal` |
+| `shadowColor` | `string` | Same colour format |
+| `shadowDistance` | `number` | 0–1, relative to the font size |
+| `marginBottom` | `number` | 0–1000 px from the bottom of the video |
+
+- Unset fields keep the VLC default. An invalid colour or `NaN` drops that field. The getter returns
+  the normalised style, for example `#ff0` reads back as `#FFFF00`.
+- `undefined` or a style with no valid field restores the defaults.
+- The style persists across sources. Setting it on a loaded source reloads the media in place. The
+  player keeps the position, the pause state, the audio and subtitle choices and the subtitles added
+  with `addSubtitle`. `statusChange` goes through `opening` again; `loaded` does not fire again.
+- It styles text subtitles: SRT, WebVTT and plain text tracks. ASS and SSA keep their own styling.
+
 ### Snapshot
 
 ```tsx
@@ -371,6 +404,9 @@ const player = useVlcPlayer({
   notification colour and small icon.
 - **One system player.** The OS shows one Now Playing entry. With several players, the last one that
   started playing with `nowPlaying` set owns it.
+- **Subtitle style is not live.** libVLC 3 reads the style when the engine starts, so a change
+  reloads the media in place. A player with a style uses its own libVLC instance, which costs extra
+  memory and builds its own font list the first time it draws text.
 - **Picture-in-Picture and casting** are not supported.
 
 ## Troubleshooting
@@ -383,6 +419,7 @@ const player = useVlcPlayer({
 | The app quits at launch on iOS 27 | iOS 27 requires the scene lifecycle. Templates that start React Native in `AppDelegate` must move to a scene delegate. For Expo, see the config plugin in [`example-expo/plugins/withSceneLifecycle.js`](example-expo/plugins/withSceneLifecycle.js) |
 | Android app is too large | Use app bundles or `abiFilters` (see [App size on Android](#app-size-on-android)) |
 | Audio stops a few seconds after the app goes to the background | The background setup is missing: `UIBackgroundModes` with `audio` on iOS, or the `VlcPlaybackService` declaration on Android. See [the setup](#background-audio-and-lock-screen-controls). The console shows a `rn-vlc-plyr: staysActiveInBackground needs …` warning |
+| No cover on the lock screen, Control Center or notification | Use `https://`, or allow cleartext traffic for `http://`. The URL must answer with HTTP 2xx and a real image. The player retries 4 times over about 13 s, then logs `rn-vlc-plyr: artwork could not be loaded from …` with the reason. To retry, set `nowPlaying` to `undefined`, then back |
 | No notification on Android | Set `nowPlaying` and load a source. On Android 13 and newer, media notifications do not need the notification permission |
 
 ## Project documents
@@ -401,4 +438,3 @@ It links against VLC: [MobileVLCKit](https://code.videolan.org/videolan/VLCKit) 
 the **LGPL 2.1 or later**. Apps that ship this library also distribute those libraries and must meet
 the LGPL terms, such as giving credit and letting users obtain and replace the LGPL parts. Review
 the obligations for your distribution channel, including the app stores, before you ship.
-| No cover on the lock screen, Control Center or notification | Use `https://`, or allow cleartext traffic for `http://`. The URL must answer with HTTP 2xx and a real image. The player retries 4 times over about 13 s, then logs `rn-vlc-plyr: artwork could not be loaded from …` with the reason. To retry, set `nowPlaying` to `undefined`, then back |
