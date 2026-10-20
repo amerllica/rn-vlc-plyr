@@ -1,13 +1,25 @@
 import AVFoundation
 
 struct PlaybackAudioSession {
-  private var isConfigured = false
+  private static var activeClients = 0
 
-  mutating func activateOnce() {
-    guard !isConfigured else { return }
-    isConfigured = true
+  private var isActive = false
+
+  mutating func activate() {
     let session = AVAudioSession.sharedInstance()
-    try? session.setCategory(.playback, mode: .moviePlayback)
+    if !isActive {
+      isActive = true
+      Self.activeClients += 1
+      try? session.setCategory(.playback, mode: .moviePlayback)
+    }
     try? session.setActive(true)
+  }
+
+  mutating func deactivate() {
+    guard isActive else { return }
+    isActive = false
+    Self.activeClients -= 1
+    guard Self.activeClients == 0 else { return }
+    try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
   }
 }

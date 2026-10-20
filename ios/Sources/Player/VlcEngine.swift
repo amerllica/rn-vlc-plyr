@@ -18,9 +18,11 @@ struct EngineReadout {
 final class VlcEngine: NSObject, VLCMediaPlayerDelegate {
   private static let retirementQueue = DispatchQueue(label: "rn-vlc-plyr.engine-retirement")
   private static let retirementGracePeriod: TimeInterval = 1
+  private static let noTrack: Int32 = -1
 
   weak var delegate: VlcEngineDelegate?
   private let player = VLCMediaPlayer()
+  private var disabledVideoTrack: Int32?
 
   init(drawable: UIView) {
     super.init()
@@ -77,6 +79,19 @@ final class VlcEngine: NSObject, VLCMediaPlayerDelegate {
 
   func selectSubtitleTrack(_ id: Int) {
     player.currentVideoSubTitleIndex = Int32(id)
+  }
+
+  func disableVideoTrack() {
+    let current = player.currentVideoTrackIndex
+    guard current != Self.noTrack else { return }
+    disabledVideoTrack = current
+    player.currentVideoTrackIndex = Self.noTrack
+  }
+
+  func restoreVideoTrack() {
+    guard let disabledVideoTrack else { return }
+    self.disabledVideoTrack = nil
+    player.currentVideoTrackIndex = disabledVideoTrack
   }
 
   func addSubtitle(_ url: URL, select: Bool) -> Bool {

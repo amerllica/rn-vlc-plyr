@@ -67,6 +67,29 @@ final class HybridVlcPlayer: HybridVlcPlayerSpec {
     set { updateSetting(VlcContract.clampDelay(newValue)) { $0.audioDelay = $1 } }
   }
 
+  var staysActiveInBackground: Bool {
+    get { store.settings.staysActiveInBackground }
+    set { updateSetting(newValue) { $0.staysActiveInBackground = $1 } }
+  }
+
+  var nowPlaying: VlcNowPlaying? {
+    get { store.settings.nowPlaying.map(PlayerPayloads.nowPlaying) }
+    set {
+      let info = newValue.map(PlayerPayloads.nowPlayingInfo)
+      changeSettings { $0.nowPlaying = info }
+    }
+  }
+
+  var remoteSkipInterval: Double {
+    get { Double(store.settings.remoteSkipInterval) }
+    set { updateSetting(VlcContract.clampSkipInterval(newValue)) { $0.remoteSkipInterval = $1 } }
+  }
+
+  var androidNotification: VlcAndroidNotification? {
+    get { store.androidNotification }
+    set { store.setAndroidNotification(newValue) }
+  }
+
   var status: VlcStatus { PlayerPayloads.status(store.media.status) }
   var error: VlcError? { store.media.error.map(PlayerPayloads.error) }
   var currentTime: Double { Double(store.media.currentTime) }
@@ -169,6 +192,14 @@ final class HybridVlcPlayer: HybridVlcPlayerSpec {
     store.events.videoSizeChange.add(listener)
   }
 
+  func addOnRemoteNextListener(listener: @escaping () -> Void) throws -> VlcListenerSubscription {
+    store.events.remoteNext.add { listener() }
+  }
+
+  func addOnRemotePreviousListener(listener: @escaping () -> Void) throws -> VlcListenerSubscription {
+    store.events.remotePrevious.add { listener() }
+  }
+
   func attach(_ host: VideoHost) {
     controller.attach(host)
   }
@@ -197,8 +228,12 @@ final class HybridVlcPlayer: HybridVlcPlayerSpec {
   }
 
   private func updateSetting<Value>(_ value: Value?, _ assign: (inout PlayerSettings, Value) -> Void) {
-    guard let value, let change = store.updateSettings({ assign(&$0, value) }) else { return }
-    guard change.before != change.after else { return }
+    guard let value else { return }
+    changeSettings { assign(&$0, value) }
+  }
+
+  private func changeSettings(_ body: (inout PlayerSettings) -> Void) {
+    guard let change = store.updateSettings(body), change.before != change.after else { return }
     if change.before.volumeState != change.after.volumeState {
       store.emit(\.volumeChange, PlayerPayloads.volume(change.after.volumeState))
     }
