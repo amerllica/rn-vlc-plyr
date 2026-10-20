@@ -401,3 +401,4 @@ It links against VLC: [MobileVLCKit](https://code.videolan.org/videolan/VLCKit) 
 the **LGPL 2.1 or later**. Apps that ship this library also distribute those libraries and must meet
 the LGPL terms, such as giving credit and letting users obtain and replace the LGPL parts. Review
 the obligations for your distribution channel, including the app stores, before you ship.
+| No cover on the lock screen, Control Center or notification | Use `https://`, or allow cleartext traffic for `http://`. The URL must answer with HTTP 2xx and a real image. The player retries 4 times over about 13 s, then logs `rn-vlc-plyr: artwork could not be loaded from …` with the reason. To retry, set `nowPlaying` to `undefined`, then back |
