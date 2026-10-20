@@ -16,6 +16,7 @@ and Android disagree, this file decides.
 | `autoPlay` | `true` |
 | `timeUpdateInterval` | `250` |
 | `subtitleDelay`, `audioDelay` | `0` |
+| `subtitleStyle` | `undefined` |
 | `staysActiveInBackground` | `false` |
 | `nowPlaying` | `undefined` |
 | `remoteSkipInterval` | `10000` |
@@ -41,6 +42,12 @@ Native clamps every input. The getter returns the clamped value immediately afte
 | `timeUpdateInterval` | round, clamp 50–5000 ms |
 | `subtitleDelay`, `audioDelay` | round, clamp −60000–60000 ms. Engine takes microseconds: multiply by 1000 |
 | `remoteSkipInterval` | round, clamp 1000–60000 ms |
+| `subtitleStyle.fontScale` | round, clamp 25–400 %. Engine size: `--freetype-rel-fontsize=round(1600 / fontScale)` |
+| `subtitleStyle.shadowDistance` | clamp 0–1 |
+| `subtitleStyle.marginBottom` | round, clamp 0–1000 px |
+| `subtitleStyle` colours | `#RGB`, `#RRGGBB` or `#RRGGBBAA`, case-insensitive. Anything else drops the field. The getter returns `#RRGGBB`, or `#RRGGBBAA` when alpha is not `FF` |
+| `subtitleStyle.fontFamily` | trimmed; empty drops the field |
+| `subtitleStyle` | `NaN` and invalid fields are dropped. No valid field left → `undefined` |
 | `seek(ms)` | round, clamp to ≥ 0, and to ≤ `duration` when `duration > 0` |
 | `seekBy(ms)` | `seek(currentTime + ms)` |
 | times | integer milliseconds everywhere |
@@ -48,7 +55,7 @@ Native clamps every input. The getter returns the clamped value immediately afte
 ## Persistence across sources
 
 `volume`, `muted`, `rate`, `loop`, `autoPlay`, `timeUpdateInterval`, `subtitleDelay`,
-`audioDelay`, `staysActiveInBackground`, `nowPlaying`, `remoteSkipInterval` and
+`subtitleStyle`, `audioDelay`, `staysActiveInBackground`, `nowPlaying`, `remoteSkipInterval` and
 `androidNotification` belong to the player, not to the media. They survive every source change and are
 re-applied to the engine each time a new media reaches `playing`.
 
@@ -151,6 +158,38 @@ Nitro delivers callbacks on the JS thread.
 Messages are fixed strings so they match across OSes: `Invalid source uri`,
 `Could not open the media over the network`, `The media could not be played`.
 
+## Subtitle style
+
+The style becomes libVLC instance options. Order and format are identical on both platforms:
+
+| Field | Options |
+|---|---|
+| `fontFamily` | `--freetype-font=<name>` |
+| `fontScale` | `--freetype-rel-fontsize=<n>` |
+| `bold: true` | `--freetype-bold` |
+| `color` | `--freetype-color=<RGB as decimal>`, `--freetype-opacity=<alpha, default 255>` |
+| `backgroundColor` | `--freetype-background-color=…`, `--freetype-background-opacity=…` |
+| `outlineColor` | `--freetype-outline-color=…`, `--freetype-outline-opacity=…` |
+| `outlineThickness` | `--freetype-outline-thickness=0/2/4/6` |
+| `shadowColor` | `--freetype-shadow-color=…`, `--freetype-shadow-opacity=…` |
+| `shadowDistance` | `--freetype-shadow-distance=<float>` |
+| `marginBottom` | `--sub-margin=<px>` |
+
+- No options → the player uses the shared libVLC instance. Any option → the player owns a private
+  instance, created when the style changes and released with the player or the next style.
+- A change to a different normalised style:
+  - `opening`, `buffering`, `playing` or `paused`: the media reloads on a new engine. Status goes
+    to `opening` and back. Position is restored with a seek once the media is seekable; a paused
+    player pauses again after that seek. Subtitles added with `addSubtitle` are added again, and the
+    selected one stays selected. iOS attaches them to the new media before it plays. Android adds
+    them one second after playback resumes, because libVLC 3 on Android does not draw a subtitle
+    attached before playback. Audio and embedded subtitle
+    selections are restored by position in the track list. `loaded` is not emitted again.
+  - `idle`, `stopped` or `ended`: the engine is rebuilt without playing, so the next `play()` uses
+    the style.
+  - `error` or no source: nothing happens until the next load.
+- An equal normalised style does nothing.
+
 ## View
 
 - `player` attaches this view's video surface to the player. Several views may show one player;
@@ -246,8 +285,19 @@ not block playback.
   screen and in the Quick Settings player, with artwork as the large icon and a seek bar.
   `androidNotification.color` is a hex colour; an invalid value is ignored. `smallIcon` is a
   drawable resource name in the app; the default is the app icon.
-- `artworkUri` takes `http(s)://` and `file://`, and `content://` on Android. It is loaded off the
-  main thread and downscaled to 512 px on the long side. A failed load shows no artwork.
+- `artworkUri` takes `https://`, `http://` and `file://`, and `content://` on Android. Plain
+  `http://` works only when the app allows cleartext traffic (an iOS App Transport Security
+  exception, Android `usesCleartextTraffic`).
+- Artwork loads off the main thread. A load succeeds only with an HTTP 2xx reply, after redirects,
+  whose body decodes as an image. It is downscaled to 512 px on the long side. Connect and read each
+  time out after 10 s.
+- A failed load is retried after 1 s, 3 s and 9 s, four attempts in all. After the last failure the
+  URI is marked failed and native logs one warning:
+  `rn-vlc-plyr: artwork could not be loaded from <uri>: <reason>`. Changing `nowPlaying` to a different
+  value starts a new set of attempts. To retry the same value, set `nowPlaying` to `undefined`, then
+  back.
+- The last loaded image is cached per process, keyed by URI. Until the image arrives, the system entry
+  shows without artwork; it is published again when the image arrives.
 
 ## Remote commands
 

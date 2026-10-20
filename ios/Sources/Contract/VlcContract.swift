@@ -47,7 +47,7 @@ enum VlcContract {
     hasReachedPlaying && duration == 0 && !isSeekable
   }
 
-  private static func roundedClamp(_ value: Double, to range: ClosedRange<Int>) -> Int? {
+  static func roundedClamp(_ value: Double, to range: ClosedRange<Int>) -> Int? {
     guard !value.isNaN else { return nil }
     let clamped = min(max(jsRound(value), Double(range.lowerBound)), Double(range.upperBound))
     return Int(clamped)

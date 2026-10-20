@@ -52,6 +52,21 @@ cd example/android && ./gradlew :rn-vlc-plyr:testDebugUnitTest :rn-vlc-plyr:conn
 | Mount and unmount 20 times, switch sources 20 times | PASS | PASS | No crash. Memory and view count stayed flat |
 | HLS on demand | PASS | PASS | Apple `bipbop_4x3` stream |
 
+## Subtitle style (1.2)
+
+Run on 2026-10-20 on the iPhone 17 and iPhone 18 Pro simulators (iOS 27.0) and on the Pixel_10a and
+Api35_GoogleApis emulators.
+
+| Check | iOS | Android | Notes |
+|---|---|---|---|
+| Normalisation and option list | PASS | PASS | Same unit test names and the same option list on both OSes |
+| Style set before load | PASS | PASS | Instrumented and XCTest playback |
+| Style change while playing | PASS | PASS | Reopens, keeps the position, no second `loaded` |
+| Style change while paused | PASS | PASS | Pauses again at the same position |
+| Two quick style changes | PASS | PASS | Position from before the first change is kept |
+| Styled text on screen | PASS | PASS | 200 % yellow verified visually. Android drew it once the subtitle was added after the style change |
+| Added subtitle drawn again after a style change | PASS | not confirmed | iOS verified visually on HLS. Android restores and selects the track (instrumented test), but the emulators did not draw subtitles reliably even without a style: libVLC logs `can't get Subtitles Surface` |
+
 ## Android subtitle drawing
 
 `SubtitleRenderingTest` plays bundled media in a test activity. The activity hosts the library's
@@ -187,4 +202,5 @@ Smoke run on 2026-10-20 with the bare example, before the real-device run:
 | Android Auto basic controls | — | not run | |
 | Foreground service starts on Android 14 and the app survives 10 minutes locked | — | not run | |
 | Missing setup logs one warning and plays in the foreground | not run | not run | |
+| Artwork shows; a failing URL retries 4 times, then logs one warning | not run | not run | |
 
