@@ -48,6 +48,17 @@ class SubtitleRenderingTest {
   @Test
   fun embeddedSubtitleDrawsOnSurfaceView() = assertEmbeddedSubtitleDraws(usesTextureView = false, name = "embedded-surface")
 
+  @Test
+  fun externalSubtitleDrawsAgainAfterStopAndPlay() {
+    assertExternalSubtitleDraws(usesTextureView = true, name = "before-restart")
+    controller.stop()
+    awaitCondition("stopped") { statuses.last() == VlcStatus.STOPPED }
+    statuses.clear()
+    controller.play()
+    awaitCondition("playing again") { statuses.contains(VlcStatus.PLAYING) }
+    assertSubtitleOnScreen("after-restart")
+  }
+
   private fun assertExternalSubtitleDraws(usesTextureView: Boolean, name: String) {
     play(TestMedia.PLAIN_VIDEO_ASSET, usesTextureView)
     controller.addSubtitle(TestMedia.copyToCache(TestMedia.LONG_CUE_SUBTITLE_ASSET).absolutePath, true)
