@@ -9,6 +9,9 @@ import java.io.File
 object TestMedia {
   const val VIDEO_ASSET = "two-seconds.mp4"
   const val SUBTITLE_ASSET = "subtitles.srt"
+  const val PLAIN_VIDEO_ASSET = "grey-ten-seconds.mp4"
+  const val EMBEDDED_SUBTITLE_ASSET = "embedded-subtitle.mkv"
+  const val LONG_CUE_SUBTITLE_ASSET = "subtitle-check.srt"
   const val VIDEO_WIDTH = 640.0
   const val VIDEO_HEIGHT = 360.0
 
