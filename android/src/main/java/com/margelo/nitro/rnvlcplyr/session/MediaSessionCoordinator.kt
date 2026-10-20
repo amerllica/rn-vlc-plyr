@@ -48,7 +48,9 @@ class MediaSessionCoordinator(context: Context, private val host: SessionHost) {
     focus.abandon()
   }
 
-  fun requestFocus(): Boolean = !released && focus.request()
+  fun requestFocus() {
+    if (!released) focus.request()
+  }
 
   fun staysActiveChanged(staysActive: Boolean) = onMain {
     if (staysActive) PlaybackServiceSetup.warnIfMissing(context)
