@@ -23,6 +23,8 @@ export type {
   VlcLoadedInfo,
   VlcVolumeInfo,
   VlcTracksInfo,
+  VlcNowPlaying,
+  VlcAndroidNotification,
   VlcListenerSubscription,
 } from './specs/VlcPlayer.nitro';
 export type {

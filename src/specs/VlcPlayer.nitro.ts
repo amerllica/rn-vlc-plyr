@@ -61,6 +61,18 @@ export interface VlcTracksInfo {
   selectedSubtitleTrack: number;
 }
 
+export interface VlcNowPlaying {
+  title: string;
+  artist?: string;
+  album?: string;
+  artworkUri?: string;
+}
+
+export interface VlcAndroidNotification {
+  color?: string;
+  smallIcon?: string;
+}
+
 export interface VlcListenerSubscription {
   remove: () => void;
 }
@@ -78,6 +90,10 @@ export interface VlcPlayer extends HybridObject<{
   timeUpdateInterval: number;
   subtitleDelay: number;
   audioDelay: number;
+  staysActiveInBackground: boolean;
+  nowPlaying?: VlcNowPlaying;
+  remoteSkipInterval: number;
+  androidNotification?: VlcAndroidNotification;
 
   readonly status: VlcStatus;
   readonly error?: VlcError;
@@ -124,4 +140,6 @@ export interface VlcPlayer extends HybridObject<{
   addOnVideoSizeChangeListener(
     listener: (size: VlcVideoSize) => void
   ): VlcListenerSubscription;
+  addOnRemoteNextListener(listener: () => void): VlcListenerSubscription;
+  addOnRemotePreviousListener(listener: () => void): VlcListenerSubscription;
 }

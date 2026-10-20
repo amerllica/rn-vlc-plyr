@@ -17,6 +17,8 @@ const EVENT_COLORS: Record<VlcPlayerEvent, string> = {
   volumeChange: colors.info,
   tracksChange: colors.info,
   videoSizeChange: colors.info,
+  remoteNext: colors.accent,
+  remotePrevious: colors.accent,
 };
 
 export function EventLog({ entries, onClear }: EventLogProps) {
