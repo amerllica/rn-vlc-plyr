@@ -59,6 +59,37 @@ class SubtitleRenderingTest {
     assertSubtitleOnScreen("after-restart")
   }
 
+  @Test
+  fun externalSubtitleDrawsAfterSwitchingToSurfaceViewWhilePlaying() {
+    assertExternalSubtitleDraws(usesTextureView = true, name = "external-before-switch")
+    switchSurfaceType(usesTextureView = false)
+    assertSubtitleOnScreen("external-after-switch")
+  }
+
+  @Test
+  fun embeddedSubtitleDrawsAfterSwitchingToTextureViewWhilePlaying() {
+    assertEmbeddedSubtitleDraws(usesTextureView = false, name = "embedded-before-switch")
+    switchSurfaceType(usesTextureView = true)
+    assertSubtitleOnScreen("embedded-after-switch")
+  }
+
+  @Test
+  fun externalSubtitleDrawsAfterTheVideoTrackComesBack() {
+    assertExternalSubtitleDraws(usesTextureView = true, name = "before-video-off")
+    controller.setVideoTrackEnabled(false)
+    Thread.sleep(VIDEO_OFF_MS)
+    controller.setVideoTrackEnabled(true)
+    assertSubtitleOnScreen("after-video-on")
+  }
+
+  private fun switchSurfaceType(usesTextureView: Boolean) {
+    scenario.onActivity {
+      val shown = output ?: return@onActivity
+      shown.useSurfaceType(usesTextureView)
+      controller.renewOutput(shown)
+    }
+  }
+
   private fun assertExternalSubtitleDraws(usesTextureView: Boolean, name: String) {
     play(TestMedia.PLAIN_VIDEO_ASSET, usesTextureView)
     controller.addSubtitle(TestMedia.copyToCache(TestMedia.LONG_CUE_SUBTITLE_ASSET).absolutePath, true)
@@ -120,6 +151,7 @@ class SubtitleRenderingTest {
     const val SUBTITLE_TIMEOUT_SECONDS = 6L
     const val POLL_MS = 50L
     const val SCREENSHOT_INTERVAL_MS = 250L
+    const val VIDEO_OFF_MS = 1000L
     const val MIN_SUBTITLE_PIXELS = 200
     const val CHANNEL_HIGH = 190
     const val CHANNEL_LOW = 90

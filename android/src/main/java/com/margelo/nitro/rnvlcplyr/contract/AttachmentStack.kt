@@ -22,8 +22,6 @@ class AttachmentStack<T : Any> {
     return previousTop !== top
   }
 
-  fun isTop(item: T): Boolean = top === item
-
   fun clear() {
     items.clear()
   }

@@ -46,8 +46,8 @@ class HybridVlcPlayerView(private val context: ThemedReactContext) : HybridVlcPl
     val wantsTexture = (surfaceType ?: DEFAULT_SURFACE_TYPE) == VlcSurfaceType.TEXTURE
     if (wantsTexture == usesTextureView) return
     usesTextureView = wantsTexture
-    renewVideoLayout()
-    attachedPlayer?.reattachOutput(this)
+    val target = attachedPlayer
+    if (target == null) renewVideoLayout() else target.renewOutput(this)
   }
 
   override fun renewVideoLayout() {

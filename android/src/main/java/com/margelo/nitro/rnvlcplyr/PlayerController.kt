@@ -220,8 +220,8 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     if (outputs.detach(output)) engine.show(outputs.top)
   }
 
-  fun reattachOutput(output: VideoOutput) {
-    if (outputs.isTop(output)) engine.show(output)
+  fun renewOutput(output: VideoOutput) {
+    engine.renewOutput(output)
   }
 
   fun applyScale(output: VideoOutput) {
