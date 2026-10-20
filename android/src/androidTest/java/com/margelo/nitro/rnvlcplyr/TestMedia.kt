@@ -32,8 +32,9 @@ object TestMedia {
     return libVLC
   }
 
-  fun copyToCache(asset: String): File {
-    val file = File(targetContext.cacheDir, asset)
+  fun copyToCache(asset: String, folder: String? = null): File {
+    val directory = folder?.let { File(targetContext.cacheDir, it).apply { mkdirs() } } ?: targetContext.cacheDir
+    val file = File(directory, asset)
     InstrumentationRegistry.getInstrumentation().context.assets.open(asset).use { input ->
       file.outputStream().use { output -> input.copyTo(output) }
     }
