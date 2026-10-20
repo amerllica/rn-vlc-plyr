@@ -24,7 +24,8 @@
     },
     "plugins": [
       "expo-dev-client",
-      "./plugins/withSceneLifecycle"
+      "./plugins/withSceneLifecycle",
+      "rn-vlc-plyr"
     ]
   }
 }
