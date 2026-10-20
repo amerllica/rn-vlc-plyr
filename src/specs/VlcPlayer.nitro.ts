@@ -68,6 +68,21 @@ export interface VlcNowPlaying {
   artworkUri?: string;
 }
 
+export type VlcOutlineThickness = 'none' | 'thin' | 'normal' | 'thick';
+
+export interface VlcSubtitleStyle {
+  fontFamily?: string;
+  fontScale?: number;
+  bold?: boolean;
+  color?: string;
+  backgroundColor?: string;
+  outlineColor?: string;
+  outlineThickness?: VlcOutlineThickness;
+  shadowColor?: string;
+  shadowDistance?: number;
+  marginBottom?: number;
+}
+
 export interface VlcAndroidNotification {
   color?: string;
   smallIcon?: string;
@@ -89,6 +104,7 @@ export interface VlcPlayer extends HybridObject<{
   autoPlay: boolean;
   timeUpdateInterval: number;
   subtitleDelay: number;
+  subtitleStyle?: VlcSubtitleStyle;
   audioDelay: number;
   staysActiveInBackground: boolean;
   nowPlaying?: VlcNowPlaying;

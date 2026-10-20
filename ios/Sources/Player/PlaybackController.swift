@@ -17,6 +17,11 @@ final class PlaybackController {
   private var currentRequest: MediaRequest?
   private var pendingSeekMs: Int?
   private var pendingSubtitles: [(url: URL, select: Bool)] = []
+  private var addedSubtitles: [(url: URL, select: Bool)] = []
+  private var reopenSubtitles: [(url: URL, select: Bool)] = []
+  private var trackRestore = TrackSelectionRestore()
+  private var isReopeningForStyle = false
+  private var tracksBeforeReopen: TracksSnapshot?
   private var pausesOnceStarted = false
   private var isShutDown = false
   private lazy var surface = VideoSurface()
@@ -32,7 +37,7 @@ final class PlaybackController {
 
   private var engine: VlcEngine {
     if let engineInstance { return engineInstance }
-    let created = VlcEngine(drawable: surface.container)
+    let created = VlcEngine(drawable: surface.container, libraryOptions: VlcContract.subtitleStyleOptions(store.settings.subtitleStyle))
     created.delegate = self
     engineInstance = created
     surface.engine = created
@@ -43,6 +48,7 @@ final class PlaybackController {
     guard isActive else { return }
     defer { session.sourceDidChange() }
     resetMediaState()
+    addedSubtitles.removeAll()
     guard let source else {
       currentRequest = nil
       retireEngine()
@@ -84,6 +90,7 @@ final class PlaybackController {
     guard isActive, machine.canStop else { return }
     session.userDidCommand()
     pausesOnceStarted = false
+    isReopeningForStyle = false
     pendingSeekMs = nil
     engineInstance?.stop()
     store.updateMedia { $0.currentTime = 0 }
@@ -113,18 +120,58 @@ final class PlaybackController {
 
   func selectAudioTrack(_ id: Int) {
     guard isActive, TrackList.canSelect(id, in: store.media.tracks.audioTracks) else { return }
+    tracksBeforeReopen = nil
     engine.selectAudioTrack(id)
     refreshReadout()
   }
 
   func selectSubtitleTrack(_ id: Int) {
     guard isActive, TrackList.canSelect(id, in: store.media.tracks.subtitleTracks) else { return }
+    tracksBeforeReopen = nil
     engine.selectSubtitleTrack(id)
     refreshReadout()
   }
 
   func addSubtitle(uri: String, select: Bool) {
     guard isActive, let url = MediaUri.resolve(uri) else { return }
+    addedSubtitles.append((url, select))
+    attachSubtitle(url, select: select)
+  }
+
+  func subtitleStyleDidChange() {
+    guard isActive, engineInstance != nil, let request = currentRequest, machine.status != .error else { return }
+    guard Self.mediaActiveStatuses.contains(machine.status) else {
+      replaceEngine().load(request)
+      return
+    }
+    if !isReopeningForStyle {
+      captureStateForReopen()
+      isReopeningForStyle = true
+    }
+    let fresh = replaceEngine()
+    fresh.load(request)
+    reopenSubtitles.forEach { _ = fresh.addSubtitle($0.url, select: $0.select) }
+    audioSession.activate()
+    apply(machine.beginPlayback())
+    engine.play()
+  }
+
+  private func captureStateForReopen() {
+    let media = store.media
+    if pendingSeekMs == nil && machine.hasReachedPlaying && media.isSeekable && media.currentTime > 0 {
+      pendingSeekMs = media.currentTime
+    }
+    pausesOnceStarted = pausesOnceStarted || machine.status == .paused
+    let tracks = tracksBeforeReopen.flatMap { TrackList.isStillLoading(media.tracks, comparedTo: $0) ? $0 : nil } ?? media.tracks
+    tracksBeforeReopen = tracks
+    let restore = TrackSelectionRestore(capturing: tracks, externalSubtitleCount: addedSubtitles.count)
+    reopenSubtitles = addedSubtitles.enumerated().map { index, subtitle in
+      (subtitle.url, index == restore.selectedExternalSubtitle)
+    }
+    trackRestore = restore
+  }
+
+  private func attachSubtitle(_ url: URL, select: Bool) {
     let isMediaOpen = Self.mediaActiveStatuses.contains(machine.status)
     if isMediaOpen && engine.addSubtitle(url, select: select) {
       return
@@ -253,6 +300,10 @@ final class PlaybackController {
     pendingSeekMs = nil
     pausesOnceStarted = false
     pendingSubtitles.removeAll()
+    reopenSubtitles.removeAll()
+    trackRestore = TrackSelectionRestore()
+    isReopeningForStyle = false
+    tracksBeforeReopen = nil
     throttle.reset()
     videoSizeGate.reset()
     surface.container.isHidden = true
@@ -296,22 +347,27 @@ final class PlaybackController {
 
   private func didEnterPlaying() {
     guard let engineInstance else { return }
+    isReopeningForStyle = false
     engineInstance.apply(store.settings)
     surface.applyResize(force: true)
     refreshReadout()
     let subtitles = pendingSubtitles
     pendingSubtitles.removeAll()
-    subtitles.forEach { addSubtitle(uri: $0.url.absoluteString, select: $0.select) }
-    if pausesOnceStarted {
+    subtitles.forEach { attachSubtitle($0.url, select: $0.select) }
+    if pausesOnceStarted && pendingSeekMs == nil {
       pausesOnceStarted = false
       engineInstance.pause()
     }
   }
 
   private func applyPendingSeekOnceStarted() {
-    guard let pendingSeekMs, machine.status == .playing else { return }
+    guard let pendingSeekMs, machine.status == .playing, store.media.isSeekable else { return }
     self.pendingSeekMs = nil
     performSeek(pendingSeekMs)
+    if pausesOnceStarted {
+      pausesOnceStarted = false
+      engineInstance?.pause()
+    }
   }
 
   private func restartForLoop() {
@@ -336,6 +392,7 @@ final class PlaybackController {
       media.tracks = readout.tracks
     }
     emitTracksIfChanged(readout.tracks)
+    restoreTrackSelection(readout.tracks)
     revealVideoOnceRendered(readout.videoSize)
     if videoSizeGate.shouldEmit(readout.videoSize) {
       store.emit(\.videoSizeChange, PlayerPayloads.videoSize(readout.videoSize))
@@ -346,6 +403,19 @@ final class PlaybackController {
   private func revealVideoOnceRendered(_ size: VideoDimensions) {
     guard surface.container.isHidden, size.isRenderable, machine.hasReachedPlaying else { return }
     surface.container.isHidden = false
+  }
+
+  private func restoreTrackSelection(_ tracks: TracksSnapshot) {
+    if let before = tracksBeforeReopen, !TrackList.isStillLoading(tracks, comparedTo: before) {
+      tracksBeforeReopen = nil
+    }
+    guard let engineInstance else { return }
+    if let id = trackRestore.takeAudioTrack(from: tracks.audioTracks), id != tracks.selectedAudioTrack {
+      engineInstance.selectAudioTrack(id)
+    }
+    if let id = trackRestore.takeSubtitleTrack(from: tracks.subtitleTracks), id != tracks.selectedSubtitleTrack {
+      engineInstance.selectSubtitleTrack(id)
+    }
   }
 
   private func emitTracksIfChanged(_ tracks: TracksSnapshot) {

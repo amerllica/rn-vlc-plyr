@@ -28,6 +28,9 @@ object TrackList {
 
   fun contains(tracks: Array<VlcTrack>, id: Int): Boolean = tracks.any { it.id == id.toDouble() }
 
+  fun isStillLoading(tracks: VlcTracksInfo, before: VlcTracksInfo): Boolean =
+    tracks.audioTracks.size < before.audioTracks.size || tracks.subtitleTracks.size < before.subtitleTracks.size
+
   private fun displayName(track: EngineTrack): String =
     track.name?.takeIf { it.isNotEmpty() } ?: "Track ${track.id}"
 }

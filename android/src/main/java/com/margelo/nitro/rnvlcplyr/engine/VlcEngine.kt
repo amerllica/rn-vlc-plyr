@@ -14,6 +14,8 @@ object VlcEngine {
     NitroModules.applicationContext?.applicationContext
       ?: throw Error("rn-vlc-plyr: the React application context is not available yet")
 
+  fun create(context: Context, options: List<String>): LibVLC = LibVLC(context.applicationContext, ArrayList(options))
+
   fun libVLC(context: Context = applicationContext()): LibVLC =
     shared ?: synchronized(this) {
       shared ?: LibVLC(context.applicationContext, LIBVLC_OPTIONS).also { shared = it }

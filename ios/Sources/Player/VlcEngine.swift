@@ -21,10 +21,11 @@ final class VlcEngine: NSObject, VLCMediaPlayerDelegate {
   private static let noTrack: Int32 = -1
 
   weak var delegate: VlcEngineDelegate?
-  private let player = VLCMediaPlayer()
+  private let player: VLCMediaPlayer
   private var disabledVideoTrack: Int32?
 
-  init(drawable: UIView) {
+  init(drawable: UIView, libraryOptions: [String]) {
+    player = libraryOptions.isEmpty ? VLCMediaPlayer() : VLCMediaPlayer(options: libraryOptions)
     super.init()
     player.delegate = self
     player.drawable = drawable

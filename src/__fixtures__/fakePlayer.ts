@@ -7,6 +7,7 @@ import type {
   VlcPlayer,
   VlcSource,
   VlcStatus,
+  VlcSubtitleStyle,
   VlcTimeUpdate,
   VlcTracksInfo,
   VlcVideoSize,
@@ -53,6 +54,7 @@ export class FakePlayer implements VlcPlayer {
   autoPlay = true;
   timeUpdateInterval = 250;
   subtitleDelay = 0;
+  subtitleStyle: VlcSubtitleStyle | undefined = undefined;
   audioDelay = 0;
   staysActiveInBackground = false;
   nowPlaying: VlcNowPlaying | undefined = undefined;

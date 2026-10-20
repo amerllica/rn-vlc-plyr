@@ -43,6 +43,10 @@ class HybridVlcPlayer : HybridVlcPlayerSpec() {
     get() = controller.read { settings.subtitleDelayMs.toDouble() }
     set(value) = controller.setSubtitleDelay(value)
 
+  override var subtitleStyle: VlcSubtitleStyle?
+    get() = controller.read { settings.subtitleStyle }
+    set(value) = controller.setSubtitleStyle(value)
+
   override var audioDelay: Double
     get() = controller.read { settings.audioDelayMs.toDouble() }
     set(value) = controller.setAudioDelay(value)
