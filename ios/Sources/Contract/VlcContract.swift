@@ -5,6 +5,7 @@ enum VlcContract {
   static let rateRange = 0.25...4.0
   static let timeUpdateIntervalRange = 50...5000
   static let delayRange = -60_000...60_000
+  static let skipIntervalRange = 1000...60_000
   static let microsecondsPerMillisecond = 1000
 
   static func clampVolume(_ value: Double) -> Int? {
@@ -22,6 +23,10 @@ enum VlcContract {
 
   static func clampDelay(_ value: Double) -> Int? {
     roundedClamp(value, to: delayRange)
+  }
+
+  static func clampSkipInterval(_ value: Double) -> Int? {
+    roundedClamp(value, to: skipIntervalRange)
   }
 
   static func engineDelay(fromMilliseconds milliseconds: Int) -> Int {

@@ -9,6 +9,10 @@ enum PlayerStatus: String {
   case stopped
   case ended
   case error
+
+  var isActive: Bool {
+    self == .opening || self == .buffering || self == .playing
+  }
 }
 
 enum PlayerErrorCode: String {
