@@ -2,6 +2,7 @@ import Foundation
 
 final class ListenerRegistry<Payload> {
   typealias Listener = (Payload) -> Void
+  typealias PresenceHandler = (Bool) -> Void
 
   private struct Entry {
     let id: UInt64
@@ -11,6 +12,7 @@ final class ListenerRegistry<Payload> {
   private struct State {
     var nextId: UInt64 = 0
     var entries: [Entry] = []
+    var onPresenceChange: PresenceHandler?
   }
 
   private let state = Locked(State())
@@ -19,13 +21,22 @@ final class ListenerRegistry<Payload> {
     state.read { $0.entries.count }
   }
 
+  var hasListeners: Bool {
+    count > 0
+  }
+
+  func observePresence(_ handler: @escaping PresenceHandler) {
+    state.mutate { $0.onPresenceChange = handler }
+  }
+
   func add(_ listener: @escaping Listener) -> VlcListenerSubscription {
-    let id = state.mutate { state -> UInt64 in
+    var id: UInt64 = 0
+    changeEntries { state in
       state.nextId += 1
-      state.entries.append(Entry(id: state.nextId, listener: listener))
-      return state.nextId
+      id = state.nextId
+      state.entries.append(Entry(id: id, listener: listener))
     }
-    return VlcListenerSubscription(remove: { [weak self] in
+    return VlcListenerSubscription(remove: { [weak self, id] in
       self?.remove(id)
     })
   }
@@ -36,10 +47,20 @@ final class ListenerRegistry<Payload> {
   }
 
   func removeAll() {
-    state.mutate { $0.entries.removeAll() }
+    changeEntries { $0.entries.removeAll() }
   }
 
   private func remove(_ id: UInt64) {
-    state.mutate { $0.entries.removeAll { $0.id == id } }
+    changeEntries { $0.entries.removeAll { $0.id == id } }
+  }
+
+  private func changeEntries(_ body: (inout State) -> Void) {
+    let change = state.mutate { state -> (handler: PresenceHandler?, before: Bool, after: Bool) in
+      let before = !state.entries.isEmpty
+      body(&state)
+      return (state.onPresenceChange, before, !state.entries.isEmpty)
+    }
+    guard change.before != change.after else { return }
+    change.handler?(change.after)
   }
 }

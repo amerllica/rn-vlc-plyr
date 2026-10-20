@@ -138,4 +138,17 @@ class SmallContractPiecesTest {
     registry.clear()
     assertEquals(0, registry.count)
   }
+
+  @Test
+  fun listenerRegistryReportsEveryCountChangeOnce() {
+    val changes = mutableListOf<Pair<Int, Int>>()
+    val registry = ListenerRegistry<Unit>(onCountChange = { previous, current -> changes.add(previous to current) })
+    val removeFirst = registry.add {}
+    registry.add {}
+    removeFirst()
+    removeFirst()
+    registry.clear()
+    registry.clear()
+    assertEquals(listOf(0 to 1, 1 to 2, 2 to 1, 1 to 0), changes)
+  }
 }
