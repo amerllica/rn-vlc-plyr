@@ -17,3 +17,4 @@
 - [0015. Commit style](0015-commits.md)
 - [0016. Documentation](0016-docs.md)
 - [0017. Public names](0017-naming.md)
+- [0018. Background audio and media session stack](0018-media-session-stack.md)

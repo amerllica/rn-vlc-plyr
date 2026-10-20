@@ -13,9 +13,12 @@ Results of the cross-platform checklist against [the player contract](player-con
 
 | Suite | iOS | Android |
 |---|---|---|
-| Pure contract rules | XCTest, pass | JUnit on the JVM, 43 pass |
-| Real playback | XCTest with a bundled 2-second MP4, pass | Instrumented tests on the emulator with a bundled 2-second MP4, 13 pass |
-| Total | 70 pass | 56 pass |
+| Pure contract rules | XCTest, pass | JUnit on the JVM, 77 pass |
+| Real playback | XCTest with a bundled 2-second MP4, pass | Instrumented tests on the emulator with a bundled 2-second MP4, 20 pass |
+| Total | 111 pass | 97 pass |
+
+Counts updated on 2026-10-20 for 1.1. The background and media session contract rules have the same
+33 test names on both OSes.
 
 ```sh
 xcodebuild test -workspace example/ios/RnVlcPlyrExample.xcworkspace -scheme RnVlcPlyr-Unit-Tests -destination 'platform=iOS Simulator,name=iPhone 18 Pro'
@@ -95,3 +98,38 @@ These come from VLC 3 and are the same on both platforms.
 During the runs, a long-running Expo Go app in another simulator exhausted the Mac's free network
 ports. Remote media then failed at random on both platforms. Local media servers were used to
 confirm the behaviour, and remote media passed whenever the network worked.
+
+## Background and media session (1.1)
+
+Manual run on real devices. Status is "not run" until the run is recorded.
+
+Smoke run on 2026-10-20 with the bare example, before the real-device run:
+
+- Android, Pixel_10a emulator (API 37). The foreground service ran with type `mediaPlayback`. The
+  Quick Settings player showed the title, artist, artwork, seek bar, skip buttons, and next and
+  previous only while the listeners were on. Audio continued in the background, including across
+  loop restarts. Video came back on return.
+- iOS, iPhone 18 Pro simulator (iOS 27). The settings reached the native player and playback
+  survived a screen lock. The simulator has no Control Center media module, so Now Playing was
+  checked only by the XCTest suite.
+
+| Check | iOS | Android | Notes |
+|---|---|---|---|
+| Background off: player pauses on Home, stays paused on return | not run | not run | |
+| Background on: audio continues on Home and screen lock | not run | not run | |
+| Background on: video track off in background, back on return | not run | not run | |
+| Lock screen shows title, artist, artwork, position | not run | not run | |
+| Control Center / notification shade controls | not run | not run | |
+| Notification seek bar | — | not run | |
+| Quick Settings media player | — | not run | Android 11 and newer |
+| Skip back and forward use `remoteSkipInterval` | not run | not run | |
+| Next and previous appear only with listeners | not run | not run | |
+| Phone call pauses, playback resumes after the call | not run | not run | |
+| User pause before a call is not undone | not run | not run | |
+| Headphones unplugged pauses | not run | not run | |
+| Bluetooth headset play, pause, next | not run | not run | |
+| CarPlay basic controls | not run | — | |
+| Android Auto basic controls | — | not run | |
+| Foreground service starts on Android 14 and the app survives 10 minutes locked | — | not run | |
+| Missing setup logs one warning and plays in the foreground | not run | not run | |
+
