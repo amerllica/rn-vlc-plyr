@@ -12,6 +12,7 @@ import type { PlayerRoute } from '../media';
 import { colors, spacing } from '../theme';
 import { ApiLabSection } from './ApiLabSection';
 import { AudioSection } from './AudioSection';
+import { BackgroundSection } from './BackgroundSection';
 import { FullscreenPlayer } from './FullscreenPlayer';
 import { TIME_UPDATE_INTERVAL_MS } from './options';
 import { PlaybackSection } from './PlaybackSection';
@@ -82,6 +83,13 @@ export function PlayerScreen({ route, onBack }: PlayerScreenProps) {
           media={media}
           settings={settings}
           onUpdateSetting={updateSetting}
+        />
+        <BackgroundSection
+          player={player}
+          nowPlaying={route.nowPlaying}
+          settings={settings}
+          onUpdateSetting={updateSetting}
+          onRemoteEvent={eventLog.record}
         />
         <SubtitleSection
           player={player}

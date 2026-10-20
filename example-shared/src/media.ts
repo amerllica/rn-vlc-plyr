@@ -1,4 +1,4 @@
-import type { VlcSource } from 'rn-vlc-plyr';
+import type { VlcNowPlaying, VlcSource } from 'rn-vlc-plyr';
 
 export type BadgeTone = 'neutral' | 'accent' | 'info' | 'danger';
 
@@ -13,6 +13,8 @@ export interface MediaItem {
   description: string;
   format: string;
   uri: string;
+  artist?: string;
+  artworkUri?: string;
   badges: MediaBadge[];
 }
 
@@ -23,6 +25,9 @@ const container = (label: string): MediaBadge => ({ label, tone: 'neutral' });
 const codec = (label: string): MediaBadge => ({ label, tone: 'neutral' });
 const MULTI_AUDIO: MediaBadge = { label: 'multi-audio', tone: 'info' };
 const SUBTITLES: MediaBadge = { label: 'subtitles', tone: 'info' };
+const BLENDER = 'Blender Foundation';
+const BIG_BUCK_BUNNY_POSTER =
+  'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/500px-Big_buck_bunny_poster_big.jpg';
 
 export const LIVE_BADGE: MediaBadge = { label: 'live', tone: 'accent' };
 
@@ -33,6 +38,8 @@ export const MEDIA: MediaItem[] = [
     description: 'Blender open movie, 10 s at 1080p. The quickest smoke test.',
     format: 'MP4',
     uri: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_1MB.mp4',
+    artist: BLENDER,
+    artworkUri: BIG_BUCK_BUNNY_POSTER,
     badges: [container('MP4'), codec('H.264'), codec('1080p')],
   },
   {
@@ -58,6 +65,8 @@ export const MEDIA: MediaItem[] = [
     description: 'The same clip in a Matroska container.',
     format: 'MKV',
     uri: 'https://test-videos.co.uk/vids/bigbuckbunny/mkv/1080/Big_Buck_Bunny_1080_10s_1MB.mkv',
+    artist: BLENDER,
+    artworkUri: BIG_BUCK_BUNNY_POSTER,
     badges: [container('MKV'), codec('H.264'), codec('1080p')],
   },
   {
@@ -74,9 +83,16 @@ export const MEDIA: MediaItem[] = [
 export interface PlayerRoute {
   title: string;
   source: VlcSource;
+  nowPlaying: VlcNowPlaying;
 }
 
 export const routeForMedia = (media: MediaItem): PlayerRoute => ({
   title: media.title,
   source: { uri: media.uri, title: media.title },
+  nowPlaying: {
+    title: media.title,
+    artist: media.artist,
+    album: media.format,
+    artworkUri: media.artworkUri,
+  },
 });

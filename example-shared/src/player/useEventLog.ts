@@ -80,5 +80,5 @@ export function useEventLog(player: VlcPlayer) {
     record('videoSizeChange', payload)
   );
 
-  return { entries, clear };
+  return { entries, clear, record };
 }

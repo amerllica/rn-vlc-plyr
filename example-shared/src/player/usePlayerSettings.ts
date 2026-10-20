@@ -2,7 +2,14 @@ import { useCallback, useState } from 'react';
 import type { VlcPlayer } from 'rn-vlc-plyr';
 
 export type PlayerSettingKey =
-  'rate' | 'loop' | 'autoPlay' | 'audioDelay' | 'subtitleDelay';
+  | 'rate'
+  | 'loop'
+  | 'autoPlay'
+  | 'audioDelay'
+  | 'subtitleDelay'
+  | 'staysActiveInBackground'
+  | 'nowPlaying'
+  | 'remoteSkipInterval';
 
 export type PlayerSettings = Pick<VlcPlayer, PlayerSettingKey>;
 
@@ -17,6 +24,9 @@ const readSettings = (player: VlcPlayer): PlayerSettings => ({
   autoPlay: player.autoPlay,
   audioDelay: player.audioDelay,
   subtitleDelay: player.subtitleDelay,
+  staysActiveInBackground: player.staysActiveInBackground,
+  nowPlaying: player.nowPlaying,
+  remoteSkipInterval: player.remoteSkipInterval,
 });
 
 export function usePlayerSettings(
