@@ -11,6 +11,7 @@ import { Stepper } from '../ui/Stepper';
 import { TextField } from '../ui/TextField';
 import { TrackPickerSheet } from '../ui/TrackPickerSheet';
 import { DELAY_STEP_MS } from './options';
+import { SubtitleStyleControls } from './SubtitleStyleControls';
 import { trackName } from './playback';
 import type { MediaState } from './useMediaState';
 import type { PlayerSettings, UpdatePlayerSetting } from './usePlayerSettings';
@@ -73,6 +74,10 @@ export function SubtitleSection({
         step={DELAY_STEP_MS}
         unit="ms"
         onChange={(value) => onUpdateSetting('subtitleDelay', value)}
+      />
+      <SubtitleStyleControls
+        style={settings.subtitleStyle}
+        onChange={(style) => onUpdateSetting('subtitleStyle', style)}
       />
       <TrackPickerSheet
         title="Subtitle track"

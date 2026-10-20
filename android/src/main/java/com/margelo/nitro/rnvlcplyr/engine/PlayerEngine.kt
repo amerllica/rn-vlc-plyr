@@ -27,7 +27,7 @@ data class EngineMediaInfo(
 private data class MediaRequest(val uri: String, val options: List<String>)
 
 class PlayerEngine(
-  private val libVLC: LibVLC,
+  private var libVLC: LibVLC,
   private val onEvent: (MediaPlayer.Event) -> Unit
 ) {
   private var player: MediaPlayer? = null
@@ -45,6 +45,13 @@ class PlayerEngine(
 
   val hasMedia: Boolean
     get() = player?.hasMedia() ?: false
+
+  val isSeekable: Boolean
+    get() = player?.isSeekable ?: false
+
+  fun useLibVLC(next: LibVLC) {
+    libVLC = next
+  }
 
   fun load(uri: String, options: List<String>) {
     mediaRequest = MediaRequest(uri, options)

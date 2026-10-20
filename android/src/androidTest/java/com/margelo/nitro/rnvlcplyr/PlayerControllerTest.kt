@@ -193,6 +193,92 @@ class PlayerControllerTest {
     assertNull(controller.read { source })
   }
 
+  @Test
+  fun subtitleStyleIsNormalisedImmediately() {
+    controller.setSubtitleStyle(subtitleStyle(fontScale = 5.0, color = "#abc", backgroundColor = "bad"))
+    val stored = controller.read { settings.subtitleStyle }
+    assertEquals(25.0, stored?.fontScale)
+    assertEquals("#AABBCC", stored?.color)
+    assertNull(stored?.backgroundColor)
+    controller.setSubtitleStyle(subtitleStyle())
+    assertNull(controller.read { settings.subtitleStyle })
+  }
+
+  @Test
+  fun subtitleStyleSetBeforeLoadReachesPlaying() {
+    controller.setSubtitleStyle(YELLOW_SUBTITLES)
+    controller.setSource(localSource())
+    awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
+    assertEquals(1, loaded.size)
+  }
+
+  @Test
+  fun subtitleStyleChangeWhilePlayingReopensAndRestoresPositionAndSubtitle() {
+    controller.setLoop(true)
+    controller.setSource(localSource())
+    awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
+    controller.addSubtitle(TestMedia.copyToCache(TestMedia.SUBTITLE_ASSET).absolutePath, true)
+    awaitCondition("subtitle selected") { tracks.any { it.subtitleTracks.isNotEmpty() && it.selectedSubtitleTrack >= 0 } }
+    controller.seek(SEEK_TARGET_MS.toDouble())
+    statuses.clear()
+    tracks.clear()
+    controller.setSubtitleStyle(YELLOW_SUBTITLES)
+    awaitCondition("playing again") { statuses.contains(VlcStatus.PLAYING) }
+    awaitCondition("position restored") { controller.read { media.currentTimeMs } >= SEEK_TARGET_MS - POSITION_TOLERANCE_MS }
+    awaitCondition("subtitle restored") {
+      controller.read { media.tracks.subtitleTracks.isNotEmpty() && media.tracks.selectedSubtitleTrack >= 0 }
+    }
+    assertEquals(VlcStatus.OPENING, statuses.first())
+    assertEquals(1, loaded.size)
+  }
+
+  @Test
+  fun subtitleStyleChangeWhilePausedStaysPaused() {
+    controller.setLoop(true)
+    controller.setSource(localSource())
+    awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
+    controller.seek(SEEK_TARGET_MS.toDouble())
+    controller.pause()
+    awaitCondition("paused") { controller.read { status } == VlcStatus.PAUSED }
+    statuses.clear()
+    controller.setSubtitleStyle(YELLOW_SUBTITLES)
+    awaitCondition("paused again") { statuses.contains(VlcStatus.PLAYING) && controller.read { status } == VlcStatus.PAUSED }
+    assertEquals(VlcStatus.OPENING, statuses.first())
+    assertTrue(controller.read { media.currentTimeMs } >= SEEK_TARGET_MS - POSITION_TOLERANCE_MS)
+  }
+
+  @Test
+  fun twoQuickSubtitleStyleChangesStillRestorePosition() {
+    controller.setLoop(true)
+    controller.setSource(localSource())
+    awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
+    controller.seek(SEEK_TARGET_MS.toDouble())
+    statuses.clear()
+    controller.setSubtitleStyle(YELLOW_SUBTITLES)
+    controller.setSubtitleStyle(subtitleStyle(fontScale = 50.0, color = "#00FFFF"))
+    awaitCondition("playing again") { statuses.contains(VlcStatus.PLAYING) }
+    awaitCondition("position restored") { controller.read { media.currentTimeMs } >= SEEK_TARGET_MS - POSITION_TOLERANCE_MS }
+    assertEquals(50.0, controller.read { settings.subtitleStyle?.fontScale })
+  }
+
+  private fun subtitleStyle(
+    fontScale: Double? = null,
+    color: String? = null,
+    backgroundColor: String? = null,
+    outlineThickness: VlcOutlineThickness? = null
+  ) = VlcSubtitleStyle(
+    fontFamily = null,
+    fontScale = fontScale,
+    bold = null,
+    color = color,
+    backgroundColor = backgroundColor,
+    outlineColor = null,
+    outlineThickness = outlineThickness,
+    shadowColor = null,
+    shadowDistance = null,
+    marginBottom = null
+  )
+
   private fun assertNoRepeatedStatus() {
     statuses.zipWithNext().forEach { (previous, next) -> assertFalse("repeated $next", previous == next) }
   }
@@ -212,5 +298,18 @@ class PlayerControllerTest {
     const val FAST_TIME_UPDATE_MS = 50.0
     const val RELEASE_OBSERVATION_MS = 1000L
     const val SEEK_TARGET_MS = 1000L
+    const val POSITION_TOLERANCE_MS = 300L
+    val YELLOW_SUBTITLES = VlcSubtitleStyle(
+      fontFamily = null,
+      fontScale = 150.0,
+      bold = true,
+      color = "#FFFF00",
+      backgroundColor = null,
+      outlineColor = null,
+      outlineThickness = VlcOutlineThickness.THICK,
+      shadowColor = null,
+      shadowDistance = null,
+      marginBottom = null
+    )
   }
 }

@@ -10,8 +10,10 @@ import com.margelo.nitro.rnvlcplyr.contract.PlayAction
 import com.margelo.nitro.rnvlcplyr.contract.PlaybackEffect
 import com.margelo.nitro.rnvlcplyr.contract.PlaybackStateMachine
 import com.margelo.nitro.rnvlcplyr.contract.PlayerSettings
+import com.margelo.nitro.rnvlcplyr.contract.SubtitleStyles
 import com.margelo.nitro.rnvlcplyr.contract.TimeUpdateThrottle
 import com.margelo.nitro.rnvlcplyr.contract.TrackList
+import com.margelo.nitro.rnvlcplyr.contract.TrackSelectionRestore
 import com.margelo.nitro.rnvlcplyr.contract.VlcContract
 import com.margelo.nitro.rnvlcplyr.engine.EngineMediaInfo
 import com.margelo.nitro.rnvlcplyr.engine.EngineSettings
@@ -22,6 +24,7 @@ import com.margelo.nitro.rnvlcplyr.engine.VlcEngine
 import com.margelo.nitro.rnvlcplyr.session.MediaSessionCoordinator
 import com.margelo.nitro.rnvlcplyr.session.SessionHost
 import com.margelo.nitro.rnvlcplyr.session.SessionSnapshot
+import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.MediaPlayer
 
 private typealias Outbox = MutableList<() -> Unit>
@@ -42,6 +45,13 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   private var source: VlcSource? = null
   private var pendingSeekMs: Long? = null
   private var pendingSessionPause = false
+  private val addedSubtitles = mutableListOf<String>()
+  private var reopenSubtitles: List<Pair<String, Boolean>> = emptyList()
+  private var reopenSubtitlesAtMs: Long? = null
+  private var trackRestore = TrackSelectionRestore.none()
+  private var styledLibVLC: LibVLC? = null
+  private var reopeningForStyle = false
+  private var tracksBeforeReopen: VlcTracksInfo? = null
   private var released = false
 
   val isReleased: Boolean
@@ -50,7 +60,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   fun <T> read(selector: PlayerReadModel.() -> T): T = locked { PlayerReadModel(settings, machine.status, media, source).selector() }
 
   fun setSource(value: VlcSource?) {
-    if (!locked { if (released) false else { source = value; true } }) return
+    if (!locked { if (released) false else { source = value; addedSubtitles.clear(); true } }) return
     onMain { loadSource(value, forcePlay = false) }
   }
 
@@ -82,6 +92,14 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     settings.setSubtitleDelay(value)
     val micros = VlcContract.delayToMicros(settings.subtitleDelayMs)
     add { onMain { engine.setSubtitleDelay(micros) } }
+  }
+
+  fun setSubtitleStyle(value: VlcSubtitleStyle?) {
+    val options = locked {
+      if (released || !settings.setSubtitleStyle(value)) return
+      SubtitleStyles.options(settings.subtitleStyle)
+    }
+    onMain { applySubtitleStyle(options) }
   }
 
   fun setAudioDelay(value: Double) = mutate {
@@ -139,6 +157,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
       val effects = machine.stop() ?: return@mutate
       pendingSeekMs = null
       pendingSessionPause = false
+      reopeningForStyle = false
       media = media.copy(currentTimeMs = 0L)
       val update = media.timeUpdate
       add { engine.stop() }
@@ -157,7 +176,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
 
   fun setAudioTrack(id: Double) = onMain {
     val trackId = id.toInt()
-    if (locked { isSelectable(media.tracks.audioTracks, trackId) }) {
+    if (locked { isSelectable(media.tracks.audioTracks, trackId).also { if (it) tracksBeforeReopen = null } }) {
       engine.selectAudioTrack(trackId)
       refreshMediaInfo()
     }
@@ -165,7 +184,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
 
   fun setSubtitleTrack(id: Double) = onMain {
     val trackId = id.toInt()
-    if (locked { isSelectable(media.tracks.subtitleTracks, trackId) }) {
+    if (locked { isSelectable(media.tracks.subtitleTracks, trackId).also { if (it) tracksBeforeReopen = null } }) {
       engine.selectSubtitleTrack(trackId)
       refreshMediaInfo()
     }
@@ -175,6 +194,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     if (locked { released }) return
     if (locked { source == null }) throw VlcPlayerError("addSubtitle requires a source")
     val resolved = VlcContract.resolveMediaUri(uri) ?: return
+    locked { addedSubtitles.add(resolved) }
     onMain { engine.addSubtitle(resolved, select) }
   }
 
@@ -208,6 +228,8 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     MainThread.run {
       outputs.clear()
       engine.release()
+      styledLibVLC?.release()
+      styledLibVLC = null
     }
   }
 
@@ -239,6 +261,11 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     media = MediaState()
     pendingSeekMs = null
     pendingSessionPause = false
+    reopenSubtitles = emptyList()
+    reopenSubtitlesAtMs = null
+    trackRestore = TrackSelectionRestore.none()
+    reopeningForStyle = false
+    tracksBeforeReopen = null
     throttle.reset()
     videoSizeFilter.reset()
     queueTracks(TrackList.EMPTY_INFO)
@@ -265,6 +292,46 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   private fun restartFromBeginning() = mutate {
     media = media.copy(currentTimeMs = 0L)
     add { engine.restart() }
+  }
+
+  private fun applySubtitleStyle(options: List<String>) {
+    val previous = styledLibVLC
+    val next = if (options.isEmpty()) null else VlcEngine.create(context, options)
+    styledLibVLC = next
+    engine.useLibVLC(next ?: VlcEngine.libVLC(context))
+    mutate {
+      when {
+        !machine.hasSource || machine.status == VlcStatus.ERROR -> Unit
+        machine.isPlaybackActive() -> reopenWithCurrentState()
+        else -> add { engine.stop() }
+      }
+    }
+    previous?.release()
+  }
+
+  private fun Outbox.reopenWithCurrentState() {
+    val current = source ?: return
+    val uri = VlcContract.resolveMediaUri(current.uri) ?: return
+    if (!reopeningForStyle) {
+      captureStateForReopen()
+      reopeningForStyle = true
+    }
+    val options = VlcContract.mediaOptions(current)
+    add { engine.load(uri, options) }
+    applyEffects(machine.reopen())
+    add { engine.play() }
+  }
+
+  private fun captureStateForReopen() {
+    if (pendingSeekMs == null && media.hasReachedPlaying && media.isSeekable && media.currentTimeMs > 0L) {
+      pendingSeekMs = media.currentTimeMs
+    }
+    pendingSessionPause = pendingSessionPause || machine.status == VlcStatus.PAUSED
+    val tracks = tracksBeforeReopen?.takeIf { TrackList.isStillLoading(media.tracks, it) } ?: media.tracks
+    tracksBeforeReopen = tracks
+    val restore = TrackSelectionRestore.capture(tracks, addedSubtitles.size)
+    reopenSubtitles = addedSubtitles.mapIndexed { index, uri -> uri to (index == restore.selectedExternalSubtitle) }
+    trackRestore = restore
   }
 
   private fun performSeek(targetMs: Double) = mutate {
@@ -317,15 +384,49 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
       applyEffects(machine.onEngineEvent(EngineEvent.PLAYING, true))
       val engineSettings = currentEngineSettings()
       add { engine.apply(engineSettings) }
-      pendingSeekMs?.let { target -> add { engine.setTime(target) } }
-      pendingSeekMs = null
-      if (pendingSessionPause) add { engine.pause() }
-      pendingSessionPause = false
+      reopeningForStyle = false
+      if (pendingSeekMs == null) queuePendingSessionPause()
     }
   }
 
-  private fun onTimeChanged(timeMs: Long) = mutate {
-    if (machine.status !in TIME_TRACKING_STATUSES) return@mutate
+  private fun onTimeChanged(timeMs: Long) {
+    val seekable = engine.isSeekable
+    mutate {
+      if (machine.status !in TIME_TRACKING_STATUSES) return@mutate
+      val target = pendingSeekMs
+      if (target != null && machine.status == VlcStatus.PLAYING && seekable) {
+        applyPendingSeek(target)
+        return@mutate
+      }
+      trackTime(timeMs)
+      reattachSubtitlesOnceSettled()
+    }
+  }
+
+  private fun Outbox.applyPendingSeek(target: Long) {
+    pendingSeekMs = null
+    media = media.copy(currentTimeMs = target)
+    add { engine.setTime(target) }
+    queuePendingSessionPause()
+  }
+
+  private fun Outbox.reattachSubtitlesOnceSettled() {
+    if (reopenSubtitles.isEmpty() || pendingSeekMs != null || machine.status != VlcStatus.PLAYING) return
+    val now = SystemClock.elapsedRealtime()
+    val dueAt = reopenSubtitlesAtMs ?: (now + VlcContract.SUBTITLE_REATTACH_DELAY_MS).also { reopenSubtitlesAtMs = it }
+    if (now < dueAt) return
+    val subtitles = reopenSubtitles
+    reopenSubtitles = emptyList()
+    reopenSubtitlesAtMs = null
+    subtitles.forEach { (uri, select) -> add { onMain { engine.addSubtitle(uri, select) } } }
+  }
+
+  private fun Outbox.queuePendingSessionPause() {
+    if (pendingSessionPause) add { engine.pause() }
+    pendingSessionPause = false
+  }
+
+  private fun Outbox.trackTime(timeMs: Long) {
     media = media.copy(currentTimeMs = timeMs)
     if (machine.status == VlcStatus.PLAYING && throttle.shouldEmit(SystemClock.elapsedRealtime())) {
       val update = media.timeUpdate
@@ -359,6 +460,17 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   private fun Outbox.queueTracks(tracks: VlcTracksInfo) {
     media = media.copy(tracks = tracks)
     if (tracksFilter.offer(tracks)) add { events.tracksChange.emit(tracks) }
+    queueTrackRestore(tracks)
+  }
+
+  private fun Outbox.queueTrackRestore(tracks: VlcTracksInfo) {
+    if (tracksBeforeReopen?.let { TrackList.isStillLoading(tracks, it) } == false) tracksBeforeReopen = null
+    trackRestore.takeAudioTrack(tracks.audioTracks)
+      ?.takeIf { it != tracks.selectedAudioTrack.toInt() }
+      ?.let { id -> add { onMain { engine.selectAudioTrack(id) } } }
+    trackRestore.takeSubtitleTrack(tracks.subtitleTracks)
+      ?.takeIf { it != tracks.selectedSubtitleTrack.toInt() }
+      ?.let { id -> add { onMain { engine.selectSubtitleTrack(id) } } }
   }
 
   private fun Outbox.queueVideoSize(width: Int, height: Int) {

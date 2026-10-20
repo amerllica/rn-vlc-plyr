@@ -40,6 +40,11 @@ class PlaybackStateMachine(private val isLooping: () -> Boolean) {
     return transition(if (autoPlay) VlcStatus.OPENING else VlcStatus.IDLE)
   }
 
+  fun reopen(): List<PlaybackEffect> {
+    restartingForLoop = false
+    return transition(VlcStatus.OPENING)
+  }
+
   fun rejectInvalidSource(): List<PlaybackEffect> {
     hasSource = true
     sourceUri = null

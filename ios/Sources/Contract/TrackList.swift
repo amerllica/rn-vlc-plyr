@@ -19,6 +19,10 @@ enum TrackList {
   static func canSelect(_ id: Int, in tracks: [TrackInfo]) -> Bool {
     id == disabledTrackId || tracks.contains { $0.id == id }
   }
+
+  static func isStillLoading(_ tracks: TracksSnapshot, comparedTo before: TracksSnapshot) -> Bool {
+    tracks.audioTracks.count < before.audioTracks.count || tracks.subtitleTracks.count < before.subtitleTracks.count
+  }
 }
 
 struct TracksSnapshot: Equatable {

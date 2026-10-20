@@ -70,4 +70,52 @@ enum PlayerPayloads {
   static func nowPlayingInfo(_ payload: VlcNowPlaying) -> NowPlayingInfo {
     NowPlayingInfo(title: payload.title, artist: payload.artist, album: payload.album, artworkUri: payload.artworkUri)
   }
+
+  static func subtitleStyle(_ style: SubtitleStyle) -> VlcSubtitleStyle {
+    VlcSubtitleStyle(
+      fontFamily: style.fontFamily,
+      fontScale: style.fontScale.map(Double.init),
+      bold: style.bold,
+      color: style.color?.hex,
+      backgroundColor: style.backgroundColor?.hex,
+      outlineColor: style.outlineColor?.hex,
+      outlineThickness: style.outlineThickness.map(outlineThickness),
+      shadowColor: style.shadowColor?.hex,
+      shadowDistance: style.shadowDistance,
+      marginBottom: style.marginBottom.map(Double.init)
+    )
+  }
+
+  static func subtitleStyle(_ payload: VlcSubtitleStyle) -> SubtitleStyle? {
+    SubtitleStyle(
+      fontFamily: VlcContract.fontFamily(payload.fontFamily),
+      fontScale: payload.fontScale.flatMap(VlcContract.clampFontScale),
+      bold: payload.bold,
+      color: payload.color.flatMap(SubtitleColor.init(hex:)),
+      backgroundColor: payload.backgroundColor.flatMap(SubtitleColor.init(hex:)),
+      outlineColor: payload.outlineColor.flatMap(SubtitleColor.init(hex:)),
+      outlineThickness: payload.outlineThickness.map(subtitleOutline),
+      shadowColor: payload.shadowColor.flatMap(SubtitleColor.init(hex:)),
+      shadowDistance: payload.shadowDistance.flatMap(VlcContract.clampShadowDistance),
+      marginBottom: payload.marginBottom.flatMap(VlcContract.clampSubtitleMargin)
+    ).nonEmpty
+  }
+
+  private static func outlineThickness(_ outline: SubtitleOutline) -> VlcOutlineThickness {
+    switch outline {
+    case .none: return .none
+    case .thin: return .thin
+    case .normal: return .normal
+    case .thick: return .thick
+    }
+  }
+
+  private static func subtitleOutline(_ thickness: VlcOutlineThickness) -> SubtitleOutline {
+    switch thickness {
+    case .none: return .none
+    case .thin: return .thin
+    case .normal: return .normal
+    case .thick: return .thick
+    }
+  }
 }

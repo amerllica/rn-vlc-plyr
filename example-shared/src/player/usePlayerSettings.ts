@@ -7,6 +7,7 @@ export type PlayerSettingKey =
   | 'autoPlay'
   | 'audioDelay'
   | 'subtitleDelay'
+  | 'subtitleStyle'
   | 'staysActiveInBackground'
   | 'nowPlaying'
   | 'remoteSkipInterval';
@@ -24,6 +25,7 @@ const readSettings = (player: VlcPlayer): PlayerSettings => ({
   autoPlay: player.autoPlay,
   audioDelay: player.audioDelay,
   subtitleDelay: player.subtitleDelay,
+  subtitleStyle: player.subtitleStyle,
   staysActiveInBackground: player.staysActiveInBackground,
   nowPlaying: player.nowPlaying,
   remoteSkipInterval: player.remoteSkipInterval,

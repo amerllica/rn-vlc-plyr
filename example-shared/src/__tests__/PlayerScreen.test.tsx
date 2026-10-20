@@ -97,6 +97,35 @@ describe('PlayerScreen', () => {
     expect(apiValue('loop')).toBe('true');
   });
 
+  it('writes the subtitle style to the player and resets it', async () => {
+    const player = await renderPlayer();
+
+    await fireEvent.press(screen.getByLabelText('150%'));
+    await fireEvent.press(screen.getByLabelText('Yellow'));
+    await fireEvent.press(screen.getByLabelText('thick'));
+    await fireEvent(
+      screen.getByLabelText('Bold subtitles'),
+      'valueChange',
+      true
+    );
+    await fireEvent(
+      screen.getByLabelText('Subtitle background'),
+      'valueChange',
+      true
+    );
+
+    expect(player.subtitleStyle).toEqual({
+      fontScale: 150,
+      color: '#FFFF00',
+      outlineThickness: 'thick',
+      bold: true,
+      backgroundColor: '#000000B3',
+    });
+
+    await fireEvent.press(screen.getByLabelText('Reset subtitle style'));
+    expect(player.subtitleStyle).toBeUndefined();
+  });
+
   it('shows the error panel and retries with play', async () => {
     const player = await renderPlayer();
     const play = jest.spyOn(player, 'play');

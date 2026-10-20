@@ -2,6 +2,7 @@ package com.margelo.nitro.rnvlcplyr.contract
 
 import com.margelo.nitro.rnvlcplyr.VlcAndroidNotification
 import com.margelo.nitro.rnvlcplyr.VlcNowPlaying
+import com.margelo.nitro.rnvlcplyr.VlcSubtitleStyle
 
 class PlayerSettings {
   val volumeControl = VolumeControl()
@@ -14,6 +15,8 @@ class PlayerSettings {
   var subtitleDelayMs: Int = VlcContract.DEFAULT_DELAY_MS
     private set
   var audioDelayMs: Int = VlcContract.DEFAULT_DELAY_MS
+    private set
+  var subtitleStyle: VlcSubtitleStyle? = null
     private set
   var staysActiveInBackground: Boolean = false
   var nowPlaying: VlcNowPlaying? = null
@@ -34,6 +37,13 @@ class PlayerSettings {
   fun setSubtitleDelay(value: Double) {
     if (value.isNaN()) return
     subtitleDelayMs = VlcContract.clampDelay(value)
+  }
+
+  fun setSubtitleStyle(value: VlcSubtitleStyle?): Boolean {
+    val normalized = SubtitleStyles.normalize(value)
+    if (normalized == subtitleStyle) return false
+    subtitleStyle = normalized
+    return true
   }
 
   fun setAudioDelay(value: Double) {
