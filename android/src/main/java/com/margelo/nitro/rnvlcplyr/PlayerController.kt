@@ -19,12 +19,15 @@ import com.margelo.nitro.rnvlcplyr.engine.MainThread
 import com.margelo.nitro.rnvlcplyr.engine.PlayerEngine
 import com.margelo.nitro.rnvlcplyr.engine.VideoOutput
 import com.margelo.nitro.rnvlcplyr.engine.VlcEngine
+import com.margelo.nitro.rnvlcplyr.session.MediaSessionCoordinator
+import com.margelo.nitro.rnvlcplyr.session.SessionHost
+import com.margelo.nitro.rnvlcplyr.session.SessionSnapshot
 import org.videolan.libvlc.MediaPlayer
 
 private typealias Outbox = MutableList<() -> Unit>
 
-class PlayerController(private val context: Context = VlcEngine.applicationContext()) {
-  val events = PlayerEvents()
+class PlayerController(private val context: Context = VlcEngine.applicationContext()) : SessionHost {
+  override val events = PlayerEvents(onRemoteListenerPresenceChange = { session.refresh() })
 
   private val lock = Any()
   private var settings = PlayerSettings()
@@ -34,9 +37,11 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   private val videoSizeFilter = ChangeFilter(MediaState.EMPTY_VIDEO_SIZE)
   private val outputs = AttachmentStack<VideoOutput>()
   private val engine = PlayerEngine(VlcEngine.libVLC(context)) { event -> onEngineEvent(event) }
+  private val session = MediaSessionCoordinator(context, this)
   private var media = MediaState()
   private var source: VlcSource? = null
   private var pendingSeekMs: Long? = null
+  private var pendingSessionPause = false
   private var released = false
 
   val isReleased: Boolean
@@ -61,6 +66,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     settings.setRate(value)
     val rate = settings.rate
     add { onMain { engine.setRate(rate) } }
+    add(session::refresh)
   }
 
   fun setLoop(value: Boolean) = mutate { settings.loop = value }
@@ -84,8 +90,27 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     add { onMain { engine.setAudioDelay(micros) } }
   }
 
-  fun play() = onMain {
-    when (locked { machine.resolvePlay() }) {
+  fun setStaysActiveInBackground(value: Boolean) = mutate {
+    if (settings.staysActiveInBackground == value) return@mutate
+    settings.staysActiveInBackground = value
+    add { session.staysActiveChanged(value) }
+  }
+
+  fun updateSessionSettings(change: PlayerSettings.() -> Unit) = mutate {
+    settings.change()
+    add(session::refresh)
+  }
+
+  override fun sessionSnapshot(): SessionSnapshot =
+    read { SessionSnapshot.of(this, events.remoteNext.count > 0, events.remotePrevious.count > 0) }
+
+  override fun play() = onMain {
+    val action = locked { machine.resolvePlay() }
+    if (action == PlayAction.NONE) return@onMain
+    session.onUserCommand()
+    if (!session.requestFocus()) return@onMain
+    locked { pendingSessionPause = false }
+    when (action) {
       PlayAction.NONE -> Unit
       PlayAction.RESUME -> engine.play()
       PlayAction.RESTART -> restartFromBeginning()
@@ -93,14 +118,27 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     }
   }
 
-  fun pause() = onMain {
+  override fun pause() = onMain {
+    session.onUserCommand()
     if (locked { machine.canPause() }) engine.pause()
   }
 
-  fun stop() = onMain {
+  override fun pauseForSession() = onMain {
+    val pausable = locked {
+      pendingSessionPause = machine.status == VlcStatus.OPENING
+      machine.canPause()
+    }
+    if (pausable) engine.pause()
+  }
+
+  override fun setVideoTrackEnabled(enabled: Boolean) = onMain { engine.setVideoTrackEnabled(enabled) }
+
+  override fun stop() = onMain {
+    session.onStopped()
     mutate {
       val effects = machine.stop() ?: return@mutate
       pendingSeekMs = null
+      pendingSessionPause = false
       media = media.copy(currentTimeMs = 0L)
       val update = media.timeUpdate
       add { engine.stop() }
@@ -109,11 +147,11 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     }
   }
 
-  fun seek(timeMs: Double) {
+  override fun seek(timeMs: Double) {
     if (!timeMs.isNaN()) onMain { performSeek(timeMs) }
   }
 
-  fun seekBy(deltaMs: Double) {
+  override fun seekBy(deltaMs: Double) {
     if (!deltaMs.isNaN()) onMain { performSeek(locked { media.currentTimeMs } + deltaMs) }
   }
 
@@ -165,6 +203,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
       previous
     }
     if (wasReleased) return
+    session.release()
     events.clear()
     MainThread.run {
       outputs.clear()
@@ -189,13 +228,20 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     engine.applyScale(output)
   }
 
-  private fun loadSource(value: VlcSource?, forcePlay: Boolean) = mutate {
+  private fun loadSource(value: VlcSource?, forcePlay: Boolean) {
+    val resolvedUri = value?.let { VlcContract.resolveMediaUri(it.uri) }
+    val wantsPlay = resolvedUri != null && (forcePlay || locked { settings.autoPlay })
+    val playNow = wantsPlay && session.requestFocus()
+    mutate { applySource(value, resolvedUri, playNow) }
+  }
+
+  private fun Outbox.applySource(value: VlcSource?, resolvedUri: String?, playNow: Boolean) {
     media = MediaState()
     pendingSeekMs = null
+    pendingSessionPause = false
     throttle.reset()
     videoSizeFilter.reset()
     queueTracks(TrackList.EMPTY_INFO)
-    val resolvedUri = value?.let { VlcContract.resolveMediaUri(it.uri) }
     when {
       value == null -> {
         add { engine.clear() }
@@ -207,13 +253,13 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
         media = media.copy(error = VlcContract.INVALID_SOURCE_ERROR)
       }
       else -> {
-        val playNow = forcePlay || settings.autoPlay
         val options = VlcContract.mediaOptions(value)
         add { engine.load(resolvedUri, options) }
         applyEffects(machine.begin(resolvedUri, playNow))
         if (playNow) add { engine.play() }
       }
     }
+    add { session.onSourceChanged(cleared = value == null) }
   }
 
   private fun restartFromBeginning() = mutate {
@@ -235,6 +281,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
       add { engine.setTime(target) }
     }
     add { events.timeUpdate.emit(update) }
+    add(session::refresh)
   }
 
   private fun onEngineEvent(event: MediaPlayer.Event) {
@@ -272,6 +319,8 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
       add { engine.apply(engineSettings) }
       pendingSeekMs?.let { target -> add { engine.setTime(target) } }
       pendingSeekMs = null
+      if (pendingSessionPause) add { engine.pause() }
+      pendingSessionPause = false
     }
   }
 
@@ -329,8 +378,15 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   private fun Outbox.applyEffects(effects: List<PlaybackEffect>) {
     effects.forEach { effect ->
       when (effect) {
-        is PlaybackEffect.StatusChanged -> add { events.statusChange.emit(effect.status) }
-        PlaybackEffect.Loaded -> media.loadedInfo.let { info -> add { events.loaded.emit(info) } }
+        is PlaybackEffect.StatusChanged -> {
+          add { events.statusChange.emit(effect.status) }
+          add(session::onStatusChanged)
+        }
+        PlaybackEffect.Loaded -> {
+          val info = media.loadedInfo
+          add { events.loaded.emit(info) }
+          add(session::refresh)
+        }
         PlaybackEffect.Ended -> add { events.ended.emit(Unit) }
         is PlaybackEffect.Failed -> {
           media = media.copy(error = effect.error)
@@ -340,6 +396,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
           media = media.copy(currentTimeMs = 0L)
           throttle.reset()
           add { engine.restart() }
+          add(session::refresh)
         }
       }
     }

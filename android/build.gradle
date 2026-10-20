@@ -133,6 +133,9 @@ dependencies {
   implementation "com.facebook.react:react-android"
   implementation project(":react-native-nitro-modules")
   implementation "org.videolan.android:libvlc-all:3.7.7"
+  implementation "androidx.core:core:1.13.1"
+  implementation "androidx.media:media:1.7.0"
+  implementation "androidx.lifecycle:lifecycle-process:2.8.7"
 
   testImplementation "junit:junit:4.13.2"
 

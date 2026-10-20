@@ -47,6 +47,22 @@ class HybridVlcPlayer : HybridVlcPlayerSpec() {
     get() = controller.read { settings.audioDelayMs.toDouble() }
     set(value) = controller.setAudioDelay(value)
 
+  override var staysActiveInBackground: Boolean
+    get() = controller.read { settings.staysActiveInBackground }
+    set(value) = controller.setStaysActiveInBackground(value)
+
+  override var nowPlaying: VlcNowPlaying?
+    get() = controller.read { settings.nowPlaying }
+    set(value) = controller.updateSessionSettings { nowPlaying = value }
+
+  override var remoteSkipInterval: Double
+    get() = controller.read { settings.remoteSkipIntervalMs.toDouble() }
+    set(value) = controller.updateSessionSettings { setRemoteSkipInterval(value) }
+
+  override var androidNotification: VlcAndroidNotification?
+    get() = controller.read { settings.androidNotification }
+    set(value) = controller.updateSessionSettings { androidNotification = value }
+
   override val status: VlcStatus
     get() = controller.read { status }
 
@@ -134,6 +150,12 @@ class HybridVlcPlayer : HybridVlcPlayerSpec() {
 
   override fun addOnVideoSizeChangeListener(listener: (size: VlcVideoSize) -> Unit) =
     events.subscribe(events.videoSizeChange, listener)
+
+  override fun addOnRemoteNextListener(listener: () -> Unit) =
+    events.subscribe(events.remoteNext) { listener() }
+
+  override fun addOnRemotePreviousListener(listener: () -> Unit) =
+    events.subscribe(events.remotePrevious) { listener() }
 
   internal fun attachOutput(output: VideoOutput) = controller.attachOutput(output)
 
