@@ -246,8 +246,19 @@ not block playback.
   screen and in the Quick Settings player, with artwork as the large icon and a seek bar.
   `androidNotification.color` is a hex colour; an invalid value is ignored. `smallIcon` is a
   drawable resource name in the app; the default is the app icon.
-- `artworkUri` takes `http(s)://` and `file://`, and `content://` on Android. It is loaded off the
-  main thread and downscaled to 512 px on the long side. A failed load shows no artwork.
+- `artworkUri` takes `https://`, `http://` and `file://`, and `content://` on Android. Plain
+  `http://` works only when the app allows cleartext traffic (an iOS App Transport Security
+  exception, Android `usesCleartextTraffic`).
+- Artwork loads off the main thread. A load succeeds only with an HTTP 2xx reply, after redirects,
+  whose body decodes as an image. It is downscaled to 512 px on the long side. Connect and read each
+  time out after 10 s.
+- A failed load is retried after 1 s, 3 s and 9 s, four attempts in all. After the last failure the
+  URI is marked failed and native logs one warning:
+  `rn-vlc-plyr: artwork could not be loaded from <uri>: <reason>`. Changing `nowPlaying` to a different
+  value starts a new set of attempts. To retry the same value, set `nowPlaying` to `undefined`, then
+  back.
+- The last loaded image is cached per process, keyed by URI. Until the image arrives, the system entry
+  shows without artwork; it is published again when the image arrives.
 
 ## Remote commands
 

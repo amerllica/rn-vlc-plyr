@@ -133,3 +133,4 @@ Smoke run on 2026-10-20 with the bare example, before the real-device run:
 | Foreground service starts on Android 14 and the app survives 10 minutes locked | — | not run | |
 | Missing setup logs one warning and plays in the foreground | not run | not run | |
 
+| Artwork shows; a failing URL retries 4 times, then logs one warning | not run | not run | |
