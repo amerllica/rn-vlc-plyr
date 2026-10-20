@@ -161,7 +161,7 @@ class HybridVlcPlayer : HybridVlcPlayerSpec() {
 
   internal fun detachOutput(output: VideoOutput) = controller.detachOutput(output)
 
-  internal fun reattachOutput(output: VideoOutput) = controller.reattachOutput(output)
+  internal fun renewOutput(output: VideoOutput) = controller.renewOutput(output)
 
   internal fun applyScale(output: VideoOutput) = controller.applyScale(output)
 }

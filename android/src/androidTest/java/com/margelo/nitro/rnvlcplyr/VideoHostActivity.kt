@@ -42,12 +42,19 @@ private class ReactLikeHost(context: Context) : ViewGroup(context) {
 
 class HostVideoOutput(
   private val container: VideoContainer,
-  override val usesTextureView: Boolean
+  usesTextureView: Boolean
 ) : VideoOutput {
+  override var usesTextureView: Boolean = usesTextureView
+    private set
+
   override var videoLayout: VLCVideoLayout = createVideoLayout()
     private set
 
   override val scaleType: MediaPlayer.ScaleType = MediaPlayer.ScaleType.SURFACE_BEST_FIT
+
+  fun useSurfaceType(usesTextureView: Boolean) {
+    this.usesTextureView = usesTextureView
+  }
 
   override fun renewVideoLayout() {
     container.removeView(videoLayout)

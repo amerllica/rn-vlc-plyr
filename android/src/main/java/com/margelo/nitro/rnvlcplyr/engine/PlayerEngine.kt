@@ -35,6 +35,7 @@ class PlayerEngine(
   private val onEvent: (MediaPlayer.Event) -> Unit
 ) {
   private var player: MediaPlayer? = null
+  private var outputSwitch: OutputSwitch? = null
   private var shownOutput: VideoOutput? = null
   private var mediaRequest: MediaRequest? = null
   private var videoTrackEnabled = true
@@ -109,6 +110,7 @@ class PlayerEngine(
     videoTrackEnabled = enabled
     val activePlayer = player ?: return
     if (enabled) {
+      outputSwitch?.begin()
       reattachShownOutput(activePlayer)
       activePlayer.setVideoTrackEnabled(true)
     } else {
@@ -144,8 +146,21 @@ class PlayerEngine(
 
   fun show(output: VideoOutput?) {
     val activePlayer = player ?: return
+    if (videoTrackEnabled) outputSwitch?.begin()
     detachShownOutput(activePlayer)
     shownOutput = output
+    if (videoTrackEnabled) attachShownOutput(activePlayer)
+  }
+
+  fun renewOutput(output: VideoOutput) {
+    val activePlayer = player
+    if (activePlayer == null || shownOutput !== output) {
+      output.renewVideoLayout()
+      return
+    }
+    if (videoTrackEnabled) outputSwitch?.begin()
+    detachShownOutput(activePlayer)
+    output.renewVideoLayout()
     if (videoTrackEnabled) attachShownOutput(activePlayer)
   }
 
@@ -163,11 +178,14 @@ class PlayerEngine(
 
   private fun createPlayer(): MediaPlayer {
     val created = MediaPlayer(libVLC)
+    val createdSwitch = OutputSwitch(created) { videoTrackEnabled }
     created.setEventListener { event ->
       if (player !== created) return@setEventListener
       if (!videoTrackEnabled && event.type in VIDEO_TRACK_EVENTS) created.setVideoTrackEnabled(false)
+      if (event.type == MediaPlayer.Event.Vout) createdSwitch.onVoutCountChanged(event.voutCount)
       onEvent(event)
     }
+    outputSwitch = createdSwitch
     return created
   }
 
