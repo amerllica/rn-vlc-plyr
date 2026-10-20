@@ -24,7 +24,11 @@ data class EngineMediaInfo(
   val videoHeight: Int
 )
 
-private data class MediaRequest(val uri: String, val options: List<String>)
+private data class MediaRequest(
+  val uri: String,
+  val options: List<String>,
+  val subtitleUris: List<String> = emptyList()
+)
 
 class PlayerEngine(
   private val libVLC: LibVLC,
@@ -122,6 +126,7 @@ class PlayerEngine(
   }
 
   fun addSubtitle(uri: String, select: Boolean) {
+    mediaRequest = mediaRequest?.let { it.copy(subtitleUris = it.subtitleUris + uri) }
     player?.addSlave(IMedia.Slave.Type.Subtitle, Uri.parse(uri), select)
   }
 
@@ -203,6 +208,7 @@ class PlayerEngine(
     val request = mediaRequest ?: return
     val media = Media(libVLC, Uri.parse(request.uri))
     request.options.forEach(media::addOption)
+    request.subtitleUris.forEach { uri -> media.addSlave(IMedia.Slave(IMedia.Slave.Type.Subtitle, USER_SLAVE_PRIORITY, uri)) }
     target.media = media
     media.release()
   }
@@ -220,6 +226,7 @@ class PlayerEngine(
 
   private companion object {
     const val ENABLE_SUBTITLES = true
+    const val USER_SLAVE_PRIORITY = 4
     val VIDEO_TRACK_EVENTS = setOf(MediaPlayer.Event.ESAdded, MediaPlayer.Event.Playing)
   }
 }
