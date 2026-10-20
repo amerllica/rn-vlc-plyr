@@ -20,6 +20,8 @@ and more) with **the same API and the same behaviour on iOS and Android**.
 - **Bare React Native and Expo.** Works in both (Expo needs a development build, not Expo Go).
 - **Player object plus view.** One player can be shown by several views, so fullscreen never reloads
   the media.
+- **Background audio and system controls.** Lock screen, Control Center, the Android notification
+  shade and headset buttons, with one API on both platforms.
 
 ## Contents
 
@@ -62,7 +64,47 @@ npx expo run:ios
 npx expo run:android
 ```
 
-No config plugin is needed for 1.0.
+Add the config plugin only if you use background audio (see the next section).
+
+### Background audio and lock screen controls
+
+System media controls (`nowPlaying`) work without extra setup while the app is in the foreground.
+Playback in the background and on a locked screen (`staysActiveInBackground`) needs the app to
+declare it.
+
+**Expo.** Add the plugin to `app.json`, then run `npx expo prebuild` again:
+
+```json
+{ "expo": { "plugins": ["rn-vlc-plyr"] } }
+```
+
+**Bare iOS.** Add the audio background mode to `Info.plist`:
+
+```xml
+<key>UIBackgroundModes</key>
+<array>
+  <string>audio</string>
+</array>
+```
+
+**Bare Android.** Add the foreground service and its permissions to
+`android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+
+<application>
+  <service
+    android:name="com.margelo.nitro.rnvlcplyr.VlcPlaybackService"
+    android:exported="false"
+    android:foregroundServiceType="mediaPlayback" />
+</application>
+```
+
+The library adds none of these itself, so apps that do not play in the background never declare a
+media foreground service in Google Play review. When the setup is missing, the player logs one
+warning and plays in the foreground only.
 
 ### App size on Android
 
@@ -148,6 +190,10 @@ Settable properties. They persist across source changes and are clamped natively
 | `timeUpdateInterval` | `number` | `250` | 50–5000 ms |
 | `subtitleDelay` | `number` | `0` | −60000–60000 ms |
 | `audioDelay` | `number` | `0` | −60000–60000 ms |
+| `staysActiveInBackground` | `boolean` | `false` | Keep playing audio in the background and on the lock screen. Needs [app setup](#background-audio-and-lock-screen-controls) |
+| `nowPlaying` | `VlcNowPlaying \| undefined` | `undefined` | `{ title, artist?, album?, artworkUri? }`. Shows the media on the lock screen, in Control Center and in the notification shade |
+| `remoteSkipInterval` | `number` | `10000` | 1000–60000 ms. Step for the skip back and skip forward buttons |
+| `androidNotification` | `VlcAndroidNotification \| undefined` | `undefined` | Android only. `{ color?, smallIcon? }`: a hex colour and a drawable resource name. The default icon is the app icon |
 
 Read-only properties:
 
@@ -195,6 +241,11 @@ Subscribe with `useVlcPlayerEvent(player, event, listener)` in components, or
 | `volumeChange` | `{ volume, muted }` | `volume` or `muted` changed |
 | `tracksChange` | `{ audioTracks, subtitleTracks, selectedAudioTrack, selectedSubtitleTrack }` | Tracks or selection changed |
 | `videoSizeChange` | `{ width, height }` | Decoded size changed |
+| `remoteNext` | none | The next button was pressed on the lock screen, notification, headset or car |
+| `remotePrevious` | none | The previous button was pressed |
+
+The next and previous buttons appear only while at least one `remoteNext` or `remotePrevious`
+listener is registered. The library owns no playlist; your listener decides what to play.
 
 `useVlcPlayerStatus(player)` returns the current status and re-renders on change.
 
@@ -275,6 +326,30 @@ const uri = await player.snapshot();
 <Image source={{ uri }} style={{ width: 160, height: 90 }} />;
 ```
 
+### Background audio with Now Playing
+
+```tsx
+const player = useVlcPlayer(episode.uri, (p) => {
+  p.staysActiveInBackground = true;
+  p.remoteSkipInterval = 15000;
+});
+
+useEffect(() => {
+  player.nowPlaying = {
+    title: episode.title,
+    artist: episode.show,
+    artworkUri: episode.coverUrl,
+  };
+}, [player, episode]);
+
+useVlcPlayerEvent(player, 'remoteNext', playNextEpisode);
+```
+
+Without `staysActiveInBackground`, the player pauses when the app goes to the background. With it,
+audio continues and the video track stops decoding until the app returns. Calls, alarms and other
+apps pause playback. Playback resumes after a call only if the player was playing before it, and
+unplugging headphones always pauses.
+
 ### Network tuning
 
 ```ts
@@ -292,8 +367,10 @@ const player = useVlcPlayer({
   only after `play()`.
 - **Buffering progress.** There is no buffering percentage, because iOS does not report one. Use
   `status === 'buffering'`.
-- **Background audio, lock screen and notification controls** are planned for 1.1 (see
-  [amerllica/rn-vlc-plyr#2](https://github.com/amerllica/rn-vlc-plyr/issues/2)).
+- **Lock screen styling.** iOS has no styling hooks; the artwork is the only visual. Android allows a
+  notification colour and small icon.
+- **One system player.** The OS shows one Now Playing entry. With several players, the last one that
+  started playing with `nowPlaying` set owns it.
 - **Picture-in-Picture and casting** are not supported.
 
 ## Troubleshooting
@@ -305,6 +382,8 @@ const player = useVlcPlayer({
 | `Nitro: Tried to create VlcPlayer but it does not exist` | Rebuild the native app after installing. Expo Go cannot load native code; use a development build |
 | The app quits at launch on iOS 27 | iOS 27 requires the scene lifecycle. Templates that start React Native in `AppDelegate` must move to a scene delegate. For Expo, see the config plugin in [`example-expo/plugins/withSceneLifecycle.js`](example-expo/plugins/withSceneLifecycle.js) |
 | Android app is too large | Use app bundles or `abiFilters` (see [App size on Android](#app-size-on-android)) |
+| Audio stops a few seconds after the app goes to the background | The background setup is missing: `UIBackgroundModes` with `audio` on iOS, or the `VlcPlaybackService` declaration on Android. See [the setup](#background-audio-and-lock-screen-controls). The console shows a `rn-vlc-plyr: staysActiveInBackground needs …` warning |
+| No notification on Android | Set `nowPlaying` and load a source. On Android 13 and newer, media notifications do not need the notification permission |
 
 ## Project documents
 
