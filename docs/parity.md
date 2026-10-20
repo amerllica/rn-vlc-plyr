@@ -14,11 +14,12 @@ Results of the cross-platform checklist against [the player contract](player-con
 | Suite | iOS | Android |
 |---|---|---|
 | Pure contract rules | XCTest, pass | JUnit on the JVM, 77 pass |
-| Real playback | XCTest with a bundled 2-second MP4, pass | Instrumented tests on the emulator with a bundled 2-second MP4, 20 pass |
-| Total | 111 pass | 97 pass |
+| Real playback | XCTest with a bundled 2-second MP4, pass | Instrumented tests on the emulator with bundled MP4, MKV and SRT files, 28 pass |
+| Total | 111 pass | 105 pass |
 
 Counts updated on 2026-10-20 for 1.1. The background and media session contract rules have the same
-33 test names on both OSes.
+33 test names on both OSes. The 8 Android subtitle drawing tests are described in
+[Android subtitle drawing](#android-subtitle-drawing).
 
 ```sh
 xcodebuild test -workspace example/ios/RnVlcPlyrExample.xcworkspace -scheme RnVlcPlyr-Unit-Tests -destination 'platform=iOS Simulator,name=iPhone 18 Pro'
@@ -50,6 +51,60 @@ cd example/android && ./gradlew :rn-vlc-plyr:testDebugUnitTest :rn-vlc-plyr:conn
 | Error codes | PASS | PASS | Broken URL gives `network`. Bad URI gives `invalidSource` |
 | Mount and unmount 20 times, switch sources 20 times | PASS | PASS | No crash. Memory and view count stayed flat |
 | HLS on demand | PASS | PASS | Apple `bipbop_4x3` stream |
+
+## Android subtitle drawing
+
+`SubtitleRenderingTest` plays bundled media in a test activity. The activity hosts the library's
+`VideoContainer` in a parent that ignores `requestLayout`, as React Native does. The SRT has one
+magenta cue from 0 to 1 hour. Each test takes emulator screenshots until at least 200 magenta
+pixels show, and saves the last screenshot to the test app's external files folder.
+
+| Case | Texture view | Surface view |
+|---|---|---|
+| External SRT through `addSubtitle` | PASS | PASS |
+| Embedded SRT track in MKV | PASS | PASS |
+| External SRT after `stop()` and `play()` | PASS | — |
+| External SRT after a switch to `surface` while playing | — | PASS |
+| Embedded SRT after a switch to `texture` while playing | PASS | — |
+| External SRT after the video track goes off and on | PASS | — |
+
+Run on 2026-10-20 on two emulators. Api35_GoogleApis (Android 15) decodes with MediaCodec opaque
+frames. A new Android 17 emulator (Pixel 9 profile, same system image as Pixel_10a) falls back to
+software decoding in the test app, because MediaCodec `queueInputBuffer` fails there. All 28
+instrumented tests pass on both. The example app on Android 15 also draws the SRT in texture view,
+in surface view, after a switch while playing, and on the Apple HLS stream.
+
+Before the fix, the last four rows failed with 0 subtitle pixels. The first four rows passed before
+the fix too: the default setup draws subtitles in both view types. The failures came from these
+causes:
+
+- **A fresh player lost added subtitles.** `play()` after `stop()` or after the end, `loop`, and a
+  seek after the end replace the player with the same media. The new media did not get the
+  `addSubtitle` files. The engine now adds them to each fresh media as subtitle slaves. A new source,
+  `Reload` and `play()` after an error still start without them.
+- **A surface type switch while playing left the video black.** The view removed the old layout
+  before libVLC detached from it. Then libVLC's `VideoHelper` turned the video track off and on
+  again at once, and the "on" step read a stale track id and did nothing. The engine now detaches
+  first, then swaps the layout, then turns the video track on again when the old video output is
+  gone and the new surfaces exist.
+- **A rebuilt video output lost the current cue.** VLC sends each cue to the video output once. When
+  the video output is rebuilt during playback (surface switch, video track off and on, a new view),
+  the cue on screen is gone until the next cue starts. After the library rebuilds the video output,
+  it now seeks to the current time once, if a subtitle track is selected and the media is seekable.
+  This sends the current cue again.
+
+The `libvlc vout display: can't get Subtitles Surface` log is not a failure. With opaque MediaCodec
+frames, the Android display module asks for a separate subtitle surface. There is none in texture
+view, so VLC uses its OpenGL output, which draws the subtitles.
+
+Not fixed here:
+
+- Re-added subtitles are selected on the fresh player, also when the app later chose another
+  subtitle track or added the file with `select: false`.
+- In surface view, the example app draws the video smaller than the view. Subtitles still draw on the
+  video.
+- The example app can start playback before the view's surface exists. VLC then logs
+  `can't get Video Surface` and decodes in software until the view is ready.
 
 ## Leak check
 
