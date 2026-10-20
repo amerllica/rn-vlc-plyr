@@ -28,6 +28,10 @@ const SUBTITLES: MediaBadge = { label: 'subtitles', tone: 'info' };
 const BLENDER = 'Blender Foundation';
 const BIG_BUCK_BUNNY_POSTER =
   'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/500px-Big_buck_bunny_poster_big.jpg';
+const MATROSKA_LOGO =
+  'https://upload.wikimedia.org/wikipedia/commons/thumb/3/39/Matroska.svg/500px-Matroska.svg.png';
+const APPLE_LOGO =
+  'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/500px-Apple_logo_black.svg.png';
 
 export const LIVE_BADGE: MediaBadge = { label: 'live', tone: 'accent' };
 
@@ -49,6 +53,8 @@ export const MEDIA: MediaItem[] = [
       'IETF CELLAR test file with several audio tracks and subtitle languages.',
     format: 'MKV',
     uri: 'https://github.com/ietf-wg-cellar/matroska-test-files/raw/master/test_files/test5.mkv',
+    artist: 'IETF CELLAR',
+    artworkUri: MATROSKA_LOGO,
     badges: [container('MKV'), codec('H.264'), MULTI_AUDIO, SUBTITLES],
   },
   {
@@ -57,6 +63,8 @@ export const MEDIA: MediaItem[] = [
     description: 'Apple bip-bop adaptive HTTP Live Streaming test stream.',
     format: 'HLS',
     uri: 'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8',
+    artist: 'Apple',
+    artworkUri: APPLE_LOGO,
     badges: [container('HLS'), codec('H.264')],
   },
   {

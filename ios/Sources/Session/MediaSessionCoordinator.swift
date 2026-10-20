@@ -16,6 +16,7 @@ final class MediaSessionCoordinator {
   private var background = BackgroundPolicy()
   private var interruption = InterruptionPolicy()
   private var staysActiveInBackground = false
+  private var lastNowPlaying: NowPlayingInfo?
   private var observers: [NotificationObservers] = []
   private var isShutDown = false
 
@@ -65,6 +66,7 @@ final class MediaSessionCoordinator {
   }
 
   func settingsDidChange() {
+    resetArtworkIfNowPlayingChanged()
     let staysActive = store.settings.staysActiveInBackground
     if staysActive != staysActiveInBackground {
       staysActiveInBackground = staysActive
@@ -100,6 +102,15 @@ final class MediaSessionCoordinator {
     case .skipBackward: control.seek(byMs: -skipInterval)
     case .next: store.emit(\.remoteNext, ())
     case .previous: store.emit(\.remotePrevious, ())
+    }
+  }
+
+  private func resetArtworkIfNowPlayingChanged() {
+    let nowPlaying = store.settings.nowPlaying
+    guard nowPlaying != lastNowPlaying else { return }
+    lastNowPlaying = nowPlaying
+    if let uri = nowPlaying?.artworkUri {
+      MediaSessionOwner.shared.resetArtwork(uri)
     }
   }
 

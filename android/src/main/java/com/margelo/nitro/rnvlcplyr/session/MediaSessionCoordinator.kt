@@ -3,6 +3,7 @@ package com.margelo.nitro.rnvlcplyr.session
 import android.content.Context
 import android.graphics.Bitmap
 import android.media.AudioManager
+import com.margelo.nitro.rnvlcplyr.VlcNowPlaying
 import com.margelo.nitro.rnvlcplyr.VlcStatus
 import com.margelo.nitro.rnvlcplyr.contract.BackgroundEffect
 import com.margelo.nitro.rnvlcplyr.contract.BackgroundPolicy
@@ -18,8 +19,9 @@ class MediaSessionCoordinator(context: Context, private val host: SessionHost) {
   private val interruption = InterruptionPolicy()
   private val focus = AudioFocusController(this.context, ::onFocusChange, ::onBecomingNoisy)
   private val lifecycle = AppLifecycleObserver(::onEnterBackground, ::onEnterForeground)
-  private var artworkUri: String? = null
-  private var artwork: Bitmap? = null
+  private val artworkLoader = ArtworkLoader.shared
+  private val republishOnArtworkSettled: () -> Unit = { onMain { if (MediaSessionOwner.isOwner(this)) publish() } }
+  private var lastNowPlaying: VlcNowPlaying? = null
 
   @Volatile
   private var released = false
@@ -89,6 +91,7 @@ class MediaSessionCoordinator(context: Context, private val host: SessionHost) {
     val snapshot = host.sessionSnapshot()
     val state = snapshot.sessionState
     val nowPlaying = snapshot.nowPlaying
+    resetArtworkIfNowPlayingChanged(nowPlaying)
     if (!state.isActive || nowPlaying == null) return giveUp()
     if (!MediaSessionOwner.isOwner(this)) {
       if (snapshot.status != VlcStatus.PLAYING) return
@@ -108,19 +111,13 @@ class MediaSessionCoordinator(context: Context, private val host: SessionHost) {
     if (MediaSessionOwner.relinquish(this)) SystemMediaSession.clear(context)
   }
 
-  private fun artworkFor(uri: String?): Bitmap? {
-    if (uri == artworkUri) return artwork
-    artworkUri = uri
-    artwork = uri?.let(ArtworkLoader::cached)
-    if (uri != null && artwork == null) ArtworkLoader.load(context, uri) { loaded -> onMain { applyArtwork(uri, loaded) } }
-    return artwork
+  private fun resetArtworkIfNowPlayingChanged(nowPlaying: VlcNowPlaying?) {
+    if (nowPlaying == lastNowPlaying) return
+    lastNowPlaying = nowPlaying
+    nowPlaying?.artworkUri?.let(artworkLoader::reset)
   }
 
-  private fun applyArtwork(uri: String, loaded: Bitmap?) {
-    if (loaded == null || uri != artworkUri) return
-    artwork = loaded
-    if (MediaSessionOwner.isOwner(this)) publish()
-  }
+  private fun artworkFor(uri: String?): Bitmap? = uri?.let { artworkLoader.image(context, it, republishOnArtworkSettled) }
 
   private fun togglePlayPause() {
     val status = host.sessionSnapshot().status
