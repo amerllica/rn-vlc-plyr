@@ -20,13 +20,16 @@ class SubtitleRenderingTest {
   private lateinit var controller: PlayerController
   private lateinit var scenario: ActivityScenario<VideoHostActivity>
   private val statuses = CopyOnWriteArrayList<VlcStatus>()
+  private val tracks = CopyOnWriteArrayList<VlcTracksInfo>()
   private var output: HostVideoOutput? = null
 
   @Before
   fun setUp() {
     TestMedia.warmLibVLC()
+    warmSubtitleRendererOnce()
     controller = PlayerController(TestMedia.targetContext)
     controller.events.statusChange.add { statuses.add(it) }
+    controller.events.tracksChange.add { tracks.add(it) }
     scenario = ActivityScenario.launch(VideoHostActivity::class.java)
   }
 
@@ -92,12 +95,14 @@ class SubtitleRenderingTest {
 
   private fun assertExternalSubtitleDraws(usesTextureView: Boolean, name: String) {
     play(TestMedia.PLAIN_VIDEO_ASSET, usesTextureView)
-    controller.addSubtitle(TestMedia.copyToCache(TestMedia.LONG_CUE_SUBTITLE_ASSET).absolutePath, true)
+    controller.addSubtitle(TestMedia.copyToCache(TestMedia.LONG_CUE_SUBTITLE_ASSET, SUBTITLE_FOLDER).absolutePath, true)
     assertSubtitleOnScreen(name)
   }
 
   private fun assertEmbeddedSubtitleDraws(usesTextureView: Boolean, name: String) {
     play(TestMedia.EMBEDDED_SUBTITLE_ASSET, usesTextureView)
+    awaitCondition("embedded subtitle track") { tracks.any { it.subtitleTracks.isNotEmpty() } }
+    controller.setSubtitleTrack(tracks.first { it.subtitleTracks.isNotEmpty() }.subtitleTracks.first().id)
     assertSubtitleOnScreen(name)
   }
 
@@ -111,7 +116,13 @@ class SubtitleRenderingTest {
   }
 
   private fun assertSubtitleOnScreen(name: String) {
-    val deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(SUBTITLE_TIMEOUT_SECONDS)
+    val (subtitlePixels, screenshot) = waitForSubtitlePixels(SUBTITLE_TIMEOUT_SECONDS)
+    screenshot?.let { save(it, name) }
+    assertTrue("$name: $subtitlePixels subtitle pixels on screen; statuses=$statuses", subtitlePixels >= MIN_SUBTITLE_PIXELS)
+  }
+
+  private fun waitForSubtitlePixels(timeoutSeconds: Long): Pair<Int, Bitmap?> {
+    val deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(timeoutSeconds)
     var subtitlePixels = 0
     var screenshot: Bitmap? = null
     while (System.currentTimeMillis() < deadline && subtitlePixels < MIN_SUBTITLE_PIXELS) {
@@ -119,8 +130,25 @@ class SubtitleRenderingTest {
       screenshot = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
       subtitlePixels = screenshot?.let(::countSubtitlePixels) ?: 0
     }
-    screenshot?.let { save(it, name) }
-    assertTrue("$name: $subtitlePixels subtitle pixels on screen; statuses=$statuses", subtitlePixels >= MIN_SUBTITLE_PIXELS)
+    return subtitlePixels to screenshot
+  }
+
+  private fun warmSubtitleRendererOnce() {
+    if (subtitleRendererWarm) return
+    val warmController = PlayerController(TestMedia.targetContext)
+    val warmScenario = ActivityScenario.launch(VideoHostActivity::class.java)
+    try {
+      warmScenario.onActivity { activity -> warmController.attachOutput(activity.createOutput(usesTextureView = true)) }
+      warmController.setLoop(true)
+      warmController.setSource(VlcSource(TestMedia.copyToCache(TestMedia.PLAIN_VIDEO_ASSET).absolutePath, null, null, null, null))
+      warmController.play()
+      warmController.addSubtitle(TestMedia.copyToCache(TestMedia.LONG_CUE_SUBTITLE_ASSET, SUBTITLE_FOLDER).absolutePath, true)
+      waitForSubtitlePixels(WARM_UP_SECONDS)
+      subtitleRendererWarm = true
+    } finally {
+      warmController.release()
+      warmScenario.close()
+    }
   }
 
   private fun countSubtitlePixels(bitmap: Bitmap): Int {
@@ -149,11 +177,16 @@ class SubtitleRenderingTest {
   private companion object {
     const val TIMEOUT_SECONDS = 15L
     const val SUBTITLE_TIMEOUT_SECONDS = 6L
+    const val WARM_UP_SECONDS = 30L
     const val POLL_MS = 50L
     const val SCREENSHOT_INTERVAL_MS = 250L
     const val VIDEO_OFF_MS = 1000L
+    const val SUBTITLE_FOLDER = "subtitles"
     const val MIN_SUBTITLE_PIXELS = 200
     const val CHANNEL_HIGH = 190
     const val CHANNEL_LOW = 90
+
+    @Volatile
+    private var subtitleRendererWarm = false
   }
 }
