@@ -1,21 +1,18 @@
 import { useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
 import type { VlcPlayer } from 'rn-vlc-plyr';
 import { DEFAULT_SUBTITLE_URI } from '../media';
 import { SubtitlesIcon } from '../icons';
-import { colors, typography } from '../theme';
-import { ActionButton } from '../ui/ActionButton';
+import { colors } from '../theme';
 import { PickerRow } from '../ui/PickerRow';
 import { SectionCard } from '../ui/SectionCard';
 import { Stepper } from '../ui/Stepper';
-import { TextField } from '../ui/TextField';
 import { TrackPickerSheet } from '../ui/TrackPickerSheet';
+import { ExternalTrackField } from './ExternalTrackField';
 import { DELAY_STEP_MS } from './options';
 import { SubtitleStyleControls } from './SubtitleStyleControls';
 import { trackName } from './playback';
 import type { MediaState } from './useMediaState';
 import type { PlayerSettings, UpdatePlayerSetting } from './usePlayerSettings';
-import { errorMessage } from '../errorMessage';
 
 interface SubtitleSectionProps {
   player: VlcPlayer;
@@ -31,17 +28,6 @@ export function SubtitleSection({
   onUpdateSetting,
 }: SubtitleSectionProps) {
   const [pickerVisible, setPickerVisible] = useState(false);
-  const [subtitleUri, setSubtitleUri] = useState(DEFAULT_SUBTITLE_URI);
-  const [feedback, setFeedback] = useState<string>();
-
-  const addSubtitle = () => {
-    try {
-      player.addSubtitle(subtitleUri.trim(), true);
-      setFeedback('Added. The track appears once VLC parses it.');
-    } catch (reason) {
-      setFeedback(errorMessage(reason));
-    }
-  };
 
   return (
     <SectionCard
@@ -54,20 +40,13 @@ export function SubtitleSection({
         icon={<SubtitlesIcon size={18} color={colors.textSecondary} />}
         onPress={() => setPickerVisible(true)}
       />
-      <TextField
+      <ExternalTrackField
         label="External subtitle URL"
-        value={subtitleUri}
-        onChangeText={setSubtitleUri}
+        actionLabel="Add external subtitle"
         placeholder="https://…/subtitles.srt"
+        initialUri={DEFAULT_SUBTITLE_URI}
+        onAdd={(uri) => player.addSubtitle(uri, true)}
       />
-      <ActionButton
-        label="Add external subtitle"
-        disabled={subtitleUri.trim() === ''}
-        onPress={addSubtitle}
-      />
-      {feedback ? (
-        <Text style={[typography.caption, styles.feedback]}>{feedback}</Text>
-      ) : null}
       <Stepper
         label="Subtitle delay"
         value={settings.subtitleDelay}
@@ -90,9 +69,3 @@ export function SubtitleSection({
     </SectionCard>
   );
 }
-
-const styles = StyleSheet.create({
-  feedback: {
-    marginTop: -4,
-  },
-});

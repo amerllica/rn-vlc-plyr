@@ -3,12 +3,14 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { VlcPlayer } from 'rn-vlc-plyr';
 import { AudioIcon, MuteIcon, VolumeIcon } from '../icons';
+import { DEFAULT_AUDIO_URI } from '../media';
 import { colors, spacing, typography } from '../theme';
 import { IconButton } from '../ui/IconButton';
 import { PickerRow } from '../ui/PickerRow';
 import { SectionCard } from '../ui/SectionCard';
 import { Stepper } from '../ui/Stepper';
 import { TrackPickerSheet } from '../ui/TrackPickerSheet';
+import { ExternalTrackField } from './ExternalTrackField';
 import { DELAY_STEP_MS } from './options';
 import { trackName } from './playback';
 import type { MediaState } from './useMediaState';
@@ -70,6 +72,13 @@ export function AudioSection({
         value={trackName(media.audioTracks, media.selectedAudioTrack)}
         icon={<AudioIcon size={18} color={colors.textSecondary} />}
         onPress={() => setPickerVisible(true)}
+      />
+      <ExternalTrackField
+        label="External audio URL"
+        actionLabel="Add external audio"
+        placeholder="https://…/audio.m4a"
+        initialUri={DEFAULT_AUDIO_URI}
+        onAdd={(uri) => player.addAudio(uri, true)}
       />
       <Stepper
         label="Audio delay"
