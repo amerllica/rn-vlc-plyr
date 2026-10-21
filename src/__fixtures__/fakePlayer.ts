@@ -93,6 +93,7 @@ export class FakePlayer implements VlcPlayer {
   seekBy() {}
   setAudioTrack() {}
   setSubtitleTrack() {}
+  addAudio() {}
   addSubtitle() {}
   snapshot() {
     return Promise.resolve('/tmp/snapshot.png');

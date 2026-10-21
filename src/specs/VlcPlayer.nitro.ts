@@ -130,6 +130,7 @@ export interface VlcPlayer extends HybridObject<{
   seekBy(deltaMs: number): void;
   setAudioTrack(id: number): void;
   setSubtitleTrack(id: number): void;
+  addAudio(uri: string, select: boolean): void;
   addSubtitle(uri: string, select: boolean): void;
   snapshot(): Promise<string>;
   release(): void;
