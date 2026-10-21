@@ -126,6 +126,33 @@ describe('PlayerScreen', () => {
     expect(player.subtitleStyle).toBeUndefined();
   });
 
+  it('adds an external audio file from the audio section', async () => {
+    const player = await renderPlayer();
+    const addAudio = jest.spyOn(player, 'addAudio');
+
+    await fireEvent.changeText(
+      screen.getByLabelText('External audio URL'),
+      '  https://example.com/dub.m4a  '
+    );
+    await fireEvent.press(screen.getByLabelText('Add external audio'));
+
+    expect(addAudio).toHaveBeenCalledWith('https://example.com/dub.m4a', true);
+    expect(
+      screen.getByText('Added. The track appears once VLC parses it.')
+    ).toBeTruthy();
+  });
+
+  it('shows the error when adding external audio fails', async () => {
+    const player = await renderPlayer();
+    jest.spyOn(player, 'addAudio').mockImplementation(() => {
+      throw new Error('addAudio requires a source');
+    });
+
+    await fireEvent.press(screen.getByLabelText('Add external audio'));
+
+    expect(screen.getByText('addAudio requires a source')).toBeTruthy();
+  });
+
   it('shows the error panel and retries with play', async () => {
     const player = await renderPlayer();
     const play = jest.spyOn(player, 'play');
