@@ -6,9 +6,11 @@ import com.margelo.nitro.rnvlcplyr.VlcTracksInfo
 class TrackSelectionRestore private constructor(
   private var audio: Pending?,
   private var subtitle: Pending?,
-  val selectedExternalSubtitle: Int?
+  val reopenSlaves: List<PlaybackSlave>
 ) {
   private data class Pending(val index: Int, val expectedCount: Int)
+
+  private data class Split(val pending: Pending?, val selectedExternal: Int?)
 
   fun takeAudioTrack(tracks: Array<VlcTrack>): Int? = take(audio, tracks).also { if (it != null) audio = null }
 
@@ -20,15 +22,26 @@ class TrackSelectionRestore private constructor(
   }
 
   companion object {
-    fun none(): TrackSelectionRestore = TrackSelectionRestore(null, null, null)
+    fun none(): TrackSelectionRestore = TrackSelectionRestore(null, null, emptyList())
 
-    fun capture(info: VlcTracksInfo, externalSubtitleCount: Int): TrackSelectionRestore {
-      val audio = pending(info.selectedAudioTrack.toInt(), info.audioTracks)
-      val embeddedCount = (info.subtitleTracks.size - externalSubtitleCount).coerceAtLeast(0)
-      val selectedIndex = info.subtitleTracks.indexOfFirst { it.id == info.selectedSubtitleTrack }
-      if (selectedIndex >= embeddedCount) return TrackSelectionRestore(audio, null, selectedIndex - embeddedCount)
-      val embedded = info.subtitleTracks.copyOfRange(0, embeddedCount)
-      return TrackSelectionRestore(audio, pending(info.selectedSubtitleTrack.toInt(), embedded), null)
+    fun capture(info: VlcTracksInfo, slaves: List<PlaybackSlave>): TrackSelectionRestore {
+      val audio = split(info.selectedAudioTrack.toInt(), info.audioTracks, slaves.count { it.kind == PlaybackSlave.Kind.AUDIO })
+      val subtitle = split(info.selectedSubtitleTrack.toInt(), info.subtitleTracks, slaves.count { it.kind == PlaybackSlave.Kind.SUBTITLE })
+      val selectedExternal = mapOf(PlaybackSlave.Kind.AUDIO to audio.selectedExternal, PlaybackSlave.Kind.SUBTITLE to subtitle.selectedExternal)
+      val seen = mutableMapOf<PlaybackSlave.Kind, Int>()
+      val reopenSlaves = slaves.map { slave ->
+        val index = seen.getOrDefault(slave.kind, 0)
+        seen[slave.kind] = index + 1
+        slave.copy(select = selectedExternal[slave.kind] == index)
+      }
+      return TrackSelectionRestore(audio.pending, subtitle.pending, reopenSlaves)
+    }
+
+    private fun split(selectedId: Int, tracks: Array<VlcTrack>, externalCount: Int): Split {
+      val embeddedCount = (tracks.size - externalCount).coerceAtLeast(0)
+      val selectedIndex = tracks.indexOfFirst { it.id.toInt() == selectedId }
+      if (selectedIndex >= embeddedCount) return Split(Pending(selectedIndex, tracks.size), selectedIndex - embeddedCount)
+      return Split(pending(selectedId, tracks.copyOfRange(0, embeddedCount)), null)
     }
 
     private fun pending(selectedId: Int, tracks: Array<VlcTrack>): Pending? {

@@ -3,6 +3,7 @@ package com.margelo.nitro.rnvlcplyr.engine
 import android.net.Uri
 import com.margelo.nitro.rnvlcplyr.VlcTracksInfo
 import com.margelo.nitro.rnvlcplyr.contract.EngineTrack
+import com.margelo.nitro.rnvlcplyr.contract.PlaybackSlave
 import com.margelo.nitro.rnvlcplyr.contract.TrackList
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
@@ -27,7 +28,7 @@ data class EngineMediaInfo(
 private data class MediaRequest(
   val uri: String,
   val options: List<String>,
-  val subtitleUris: List<String> = emptyList()
+  val slaves: List<PlaybackSlave> = emptyList()
 )
 
 class PlayerEngine(
@@ -134,9 +135,9 @@ class PlayerEngine(
     player?.setSpuTrack(id)
   }
 
-  fun addSubtitle(uri: String, select: Boolean) {
-    mediaRequest = mediaRequest?.let { it.copy(subtitleUris = it.subtitleUris + uri) }
-    player?.addSlave(IMedia.Slave.Type.Subtitle, Uri.parse(uri), select)
+  fun addSlave(slave: PlaybackSlave) {
+    mediaRequest = mediaRequest?.let { it.copy(slaves = it.slaves + slave) }
+    player?.addSlave(slave.kind.vlcType, Uri.parse(slave.uri), slave.select)
   }
 
   fun readMediaInfo(): EngineMediaInfo? {
@@ -233,7 +234,7 @@ class PlayerEngine(
     val request = mediaRequest ?: return
     val media = Media(libVLC, Uri.parse(request.uri))
     request.options.forEach(media::addOption)
-    request.subtitleUris.forEach { uri -> media.addSlave(IMedia.Slave(IMedia.Slave.Type.Subtitle, USER_SLAVE_PRIORITY, uri)) }
+    request.slaves.forEach { slave -> media.addSlave(IMedia.Slave(slave.kind.vlcType, USER_SLAVE_PRIORITY, slave.uri)) }
     target.media = media
     media.release()
   }
@@ -248,6 +249,12 @@ class PlayerEngine(
 
   private fun Array<MediaPlayer.TrackDescription>?.toEngineTracks(): List<EngineTrack> =
     this?.map { EngineTrack(it.id, it.name) }.orEmpty()
+
+  private val PlaybackSlave.Kind.vlcType: Int
+    get() = when (this) {
+      PlaybackSlave.Kind.AUDIO -> IMedia.Slave.Type.Audio
+      PlaybackSlave.Kind.SUBTITLE -> IMedia.Slave.Type.Subtitle
+    }
 
   private companion object {
     const val ENABLE_SUBTITLES = true
