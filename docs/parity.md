@@ -43,6 +43,7 @@ cd example/android && ./gradlew :rn-vlc-plyr:testDebugUnitTest :rn-vlc-plyr:conn
 | `stop()` | PASS | PASS | `statusChange('stopped')`, then `timeUpdate` with 0 |
 | `seek` and `seekBy` | PASS | PASS | Clamped. Works while paused. From stopped or ended it restarts and then seeks. One `timeUpdate` with the target |
 | Audio and subtitle tracks | PASS | PASS | Matroska test file: 2 audio and 8 subtitle tracks. `-1` disables. Unknown ids are ignored |
+| `addAudio` | PASS | PASS | The new track appears after the embedded one and is selected. Throws without a source. A subtitle style reload adds it again and keeps it selected |
 | `addSubtitle` | PASS | PASS | The new track appears and is selected. Throws without a source |
 | Volume and mute events | PASS | PASS | Repeated values send no event. Android mutes through engine volume 0 |
 | `snapshot()` | PASS | PASS | `file://` PNG at video resolution. Rejects with `No video frame available` |

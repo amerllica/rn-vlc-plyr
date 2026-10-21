@@ -100,6 +100,7 @@ Status values: `idle`, `opening`, `buffering`, `playing`, `paused`, `stopped`, `
 | `stop()` | engine stop, `currentTime` 0, status `stopped`. Works from every status except `idle`, including `ended` and `error` |
 | `seek(ms)` | no-op unless `isSeekable`. In `ended` or `stopped`: restart playback, then seek. Emits one `timeUpdate` right after the seek with the target time |
 | `setAudioTrack(id)` / `setSubtitleTrack(id)` | `-1` disables. Unknown id → no-op. A real change emits `tracksChange` |
+| `addAudio(uri, select)` | no source → throws `Error('addAudio requires a source')` (Nitro prefixes synchronous errors with `VlcPlayer.addAudio(...): `). Otherwise adds an audio slave; the new track arrives through `tracksChange` after the embedded audio tracks. `select` true selects it once it appears. The file should hold one audio track and be as long as the media. While it is selected, the media must keep a video track on: with the video track off (background audio, `:no-video`) or with an audio-only source, libVLC 3 ends playback at once. On Android, a fresh player (`loop`, `play()` after `stop()` or the end) keeps the track in the list but VLC selects the first audio track again |
 | `addSubtitle(uri, select)` | no source → throws `Error('addSubtitle requires a source')` (Nitro prefixes synchronous errors with `VlcPlayer.addSubtitle(...): `). Otherwise adds a subtitle slave; the new track arrives through `tracksChange`. `select` true selects it once it appears |
 | `snapshot()` | resolves with a `file://` URI of a PNG of the current frame at video resolution. Rejects with `Error('No video frame available')` when no view is attached or nothing has rendered |
 | `release()` | idempotent. Stops, detaches all views, frees the engine. Afterwards every command is a no-op, getters return defaults, no event fires. `dispose()` calls `release()` |
@@ -180,11 +181,13 @@ The style becomes libVLC instance options. Order and format are identical on bot
 - A change to a different normalised style:
   - `opening`, `buffering`, `playing` or `paused`: the media reloads on a new engine. Status goes
     to `opening` and back. Position is restored with a seek once the media is seekable; a paused
-    player pauses again after that seek. Subtitles added with `addSubtitle` are added again, and the
-    selected one stays selected. iOS attaches them to the new media before it plays. Android adds
-    them one second after playback resumes, because libVLC 3 on Android does not draw a subtitle
-    attached before playback. Audio and embedded subtitle
-    selections are restored by position in the track list. `loaded` is not emitted again.
+    player pauses again after that seek. Audio and subtitles added with `addAudio` and `addSubtitle`
+    are added again, and the selected one of each kind stays selected. iOS attaches them to the new
+    media before it plays. Android adds them one second after playback resumes, because libVLC 3 on
+    Android does not draw a subtitle attached before playback. Audio and subtitle selections are
+    restored by position in the track list. Added tracks are taken to be the last ones in their
+    list, so a selected embedded track is restored once the embedded tracks are back, and a
+    selected added track once the added tracks are back too. `loaded` is not emitted again.
   - `idle`, `stopped` or `ended`: the engine is rebuilt without playing, so the next `play()` uses
     the style.
   - `error` or no source: nothing happens until the next load.

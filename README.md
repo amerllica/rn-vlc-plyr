@@ -223,6 +223,7 @@ Methods:
 | `seekBy(ms)` | Relative, for example `seekBy(-10000)` |
 | `setAudioTrack(id)` | `-1` disables audio |
 | `setSubtitleTrack(id)` | `-1` hides subtitles |
+| `addAudio(uri, select)` | Adds an external audio file, such as `.m4a`, `.mp3`, `.aac`, `.ogg` or `.flac`, with one audio track |
 | `addSubtitle(uri, select)` | Adds an external `.srt`, `.ass`, `.ssa` or `.vtt` file |
 | `snapshot()` | `Promise<string>` with a `file://` PNG of the current frame |
 | `release()` | Frees the native player. `useVlcPlayer` does this for you |
@@ -312,13 +313,18 @@ tracks?.subtitleTracks.map((track) => (
 ));
 ```
 
-### External subtitles and sync
+### External audio, subtitles and sync
 
 ```ts
+player.addAudio('https://example.com/movie.de.m4a', true);
 player.addSubtitle('https://example.com/movie.en.srt', true);
 player.subtitleDelay = 250;
 player.audioDelay = -100;
 ```
+
+An added audio file should be as long as the video. While it is selected, keep the video track on:
+libVLC 3 ends playback when the video is off, as in background audio, or when the source has no
+video.
 
 ### Subtitle style
 
@@ -348,8 +354,8 @@ player.subtitleStyle = {
   the normalised style, for example `#ff0` reads back as `#FFFF00`.
 - `undefined` or a style with no valid field restores the defaults.
 - The style persists across sources. Setting it on a loaded source reloads the media in place. The
-  player keeps the position, the pause state, the audio and subtitle choices and the subtitles added
-  with `addSubtitle`. `statusChange` goes through `opening` again; `loaded` does not fire again.
+  player keeps the position, the pause state, the audio and subtitle choices and the files added
+  with `addAudio` and `addSubtitle`. `statusChange` goes through `opening` again; `loaded` does not fire again.
 - It styles text subtitles: SRT, WebVTT and plain text tracks. ASS and SSA keep their own styling.
 
 ### Snapshot
