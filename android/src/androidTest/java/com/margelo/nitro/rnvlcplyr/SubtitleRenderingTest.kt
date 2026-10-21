@@ -85,6 +85,32 @@ class SubtitleRenderingTest {
     assertSubtitleOnScreen("after-video-on")
   }
 
+  @Test
+  fun externalSubtitleDrawsAfterTheVideoTrackComesBackWithExternalAudio() {
+    assertExternalSubtitleDraws(usesTextureView = true, name = "before-video-off-with-audio")
+    controller.addAudio(TestMedia.copyToCache(TestMedia.AUDIO_ASSET).absolutePath, true)
+    awaitCondition("external audio selected") {
+      tracks.any { it.audioTracks.size == 2 && it.selectedAudioTrack == it.audioTracks.last().id }
+    }
+    controller.setVideoTrackEnabled(false)
+    Thread.sleep(VIDEO_OFF_MS)
+    controller.setVideoTrackEnabled(true)
+    assertSubtitleOnScreen("after-video-on-with-audio")
+    assertTrue("statuses=$statuses", statuses.last() == VlcStatus.PLAYING)
+  }
+
+  @Test
+  fun newVideoLayoutKeepsPlayingWithExternalAudio() {
+    play(TestMedia.PLAIN_VIDEO_ASSET, usesTextureView = true)
+    controller.addAudio(TestMedia.copyToCache(TestMedia.AUDIO_ASSET).absolutePath, true)
+    awaitCondition("external audio selected") {
+      tracks.any { it.audioTracks.size == 2 && it.selectedAudioTrack == it.audioTracks.last().id }
+    }
+    scenario.onActivity { controller.renewOutput(output ?: return@onActivity) }
+    Thread.sleep(LAYOUT_SETTLE_MS)
+    assertTrue("statuses=$statuses", VlcStatus.ENDED !in statuses && statuses.last() == VlcStatus.PLAYING)
+  }
+
   private fun switchSurfaceType(usesTextureView: Boolean) {
     scenario.onActivity {
       val shown = output ?: return@onActivity
@@ -181,6 +207,7 @@ class SubtitleRenderingTest {
     const val POLL_MS = 50L
     const val SCREENSHOT_INTERVAL_MS = 250L
     const val VIDEO_OFF_MS = 1000L
+    const val LAYOUT_SETTLE_MS = 2500L
     const val SUBTITLE_FOLDER = "subtitles"
     const val MIN_SUBTITLE_PIXELS = 200
     const val CHANNEL_HIGH = 190

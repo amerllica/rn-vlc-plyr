@@ -12,6 +12,10 @@ class TrackSelectionRestore private constructor(
 
   private data class Split(val pending: Pending?, val selectedExternal: Int?)
 
+  fun forgetAudioSelection() {
+    audio = null
+  }
+
   fun takeAudioTrack(tracks: Array<VlcTrack>): Int? = take(audio, tracks).also { if (it != null) audio = null }
 
   fun takeSubtitleTrack(tracks: Array<VlcTrack>): Int? = take(subtitle, tracks).also { if (it != null) subtitle = null }

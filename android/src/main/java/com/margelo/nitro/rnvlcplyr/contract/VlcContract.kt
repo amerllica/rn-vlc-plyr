@@ -13,6 +13,7 @@ object VlcContract {
   const val NO_TRACK_ID = -1
   const val DEFAULT_REMOTE_SKIP_INTERVAL_MS = 10_000
   const val SLAVE_REATTACH_DELAY_MS = 1_000L
+  const val ADDED_AUDIO_READER_OPTION = ":demux=avformat"
 
   private const val MIN_VOLUME = 0
   private const val MAX_VOLUME = 100
@@ -68,11 +69,13 @@ object VlcContract {
     else -> null
   }
 
-  fun mediaOptions(source: VlcSource): List<String> =
-    listOfNotNull(
+  fun mediaOptions(source: VlcSource, hasAddedAudio: Boolean): List<String> {
+    val options = listOfNotNull(
       source.userAgent?.let { USER_AGENT_OPTION + it },
       source.referrer?.let { REFERRER_OPTION + it }
     ) + source.vlcOptions.orEmpty()
+    return if (hasAddedAudio && ADDED_AUDIO_READER_OPTION !in options) options + ADDED_AUDIO_READER_OPTION else options
+  }
 
   fun classifyEngineError(uri: String?, hasReachedPlaying: Boolean): VlcError {
     val scheme = uri?.let(::schemeOf)?.lowercase()
