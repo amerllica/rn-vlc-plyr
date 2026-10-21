@@ -8,6 +8,7 @@ import java.io.File
 
 object TestMedia {
   const val VIDEO_ASSET = "two-seconds.mp4"
+  const val AUDIO_ASSET = "grey-ten-seconds.m4a"
   const val SUBTITLE_ASSET = "subtitles.srt"
   const val PLAIN_VIDEO_ASSET = "grey-ten-seconds.mp4"
   const val EMBEDDED_SUBTITLE_ASSET = "embedded-subtitle.mkv"

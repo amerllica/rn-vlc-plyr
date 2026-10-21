@@ -141,6 +141,25 @@ class PlayerControllerTest {
   }
 
   @Test
+  fun addedAudioArrivesThroughTracksChangeAndIsSelected() {
+    controller.setLoop(true)
+    controller.setSource(localSource())
+    awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
+    controller.addAudio(TestMedia.copyToCache(TestMedia.AUDIO_ASSET).absolutePath, true)
+    awaitCondition("external audio selected") { tracks.any(::selectsExternalAudio) }
+  }
+
+  @Test
+  fun addAudioWithoutSourceThrows() {
+    try {
+      controller.addAudio("file:///nothing.m4a", true)
+      fail("expected addAudio to throw")
+    } catch (error: VlcPlayerError) {
+      assertEquals("addAudio requires a source", error.message)
+    }
+  }
+
+  @Test
   fun addSubtitleWithoutSourceThrows() {
     try {
       controller.addSubtitle("file:///nothing.srt", true)
@@ -233,6 +252,24 @@ class PlayerControllerTest {
   }
 
   @Test
+  fun subtitleStyleChangeWhilePlayingReattachesExternalAudio() {
+    controller.setLoop(true)
+    controller.setSource(localSource())
+    awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
+    controller.addAudio(TestMedia.copyToCache(TestMedia.AUDIO_ASSET).absolutePath, true)
+    awaitCondition("external audio selected") { tracks.any(::selectsExternalAudio) }
+    statuses.clear()
+    tracks.clear()
+    controller.setSubtitleStyle(YELLOW_SUBTITLES)
+    awaitCondition("playing again") { statuses.contains(VlcStatus.PLAYING) }
+    awaitCondition("external audio selected again after the reload") {
+      val reload = tracks.indexOfFirst { it.audioTracks.size < 2 }
+      reload >= 0 && tracks.drop(reload).any(::selectsExternalAudio)
+    }
+    assertEquals(1, loaded.size)
+  }
+
+  @Test
   fun subtitleStyleChangeWhilePausedStaysPaused() {
     controller.setLoop(true)
     controller.setSource(localSource())
@@ -282,6 +319,9 @@ class PlayerControllerTest {
   private fun assertNoRepeatedStatus() {
     statuses.zipWithNext().forEach { (previous, next) -> assertFalse("repeated $next", previous == next) }
   }
+
+  private fun selectsExternalAudio(info: VlcTracksInfo): Boolean =
+    info.audioTracks.size == 2 && info.selectedAudioTrack == info.audioTracks.last().id
 
   private fun awaitCondition(label: String, condition: () -> Boolean) {
     val deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(TIMEOUT_SECONDS)

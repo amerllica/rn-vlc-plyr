@@ -114,6 +114,8 @@ class HybridVlcPlayer : HybridVlcPlayerSpec() {
 
   override fun setSubtitleTrack(id: Double) = controller.setSubtitleTrack(id)
 
+  override fun addAudio(uri: String, select: Boolean) = controller.addAudio(uri, select)
+
   override fun addSubtitle(uri: String, select: Boolean) = controller.addSubtitle(uri, select)
 
   override fun snapshot(): Promise<String> {
