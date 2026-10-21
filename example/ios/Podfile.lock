@@ -1787,7 +1787,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - RnVlcPlyr (1.1.0):
+  - RnVlcPlyr (1.2.0):
     - hermes-engine
     - MobileVLCKit (~> 3.7.4)
     - NitroModules
@@ -1812,7 +1812,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - RnVlcPlyr/Tests (1.1.0):
+  - RnVlcPlyr/Tests (1.2.0):
     - hermes-engine
     - MobileVLCKit (~> 3.7.4)
     - NitroModules
@@ -2212,7 +2212,7 @@ SPEC CHECKSUMS:
   ReactCommon: 749169e12aa3461a3df3656a00e48dbe0456b2d6
   ReactNativeDependencies: 94c922c39e0e6150ee9ad05e2ca1946e0ef55783
   RNSVG: 6c9bcbf53822153be6f6c1484f6b0b57c0040d21
-  RnVlcPlyr: 67bf955071c8cb3ee7844da94477e037161ffc23
+  RnVlcPlyr: 149dda95cbd8b70ac7dbfaed438f03a94b86fff3
   SocketRocket: 37aec555668fb852ec12e3c0de59a86ca58f0871
   Yoga: d1c536142c5ff8ec8cd856ab2a7c227a1d875c8e
 
