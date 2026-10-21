@@ -20,7 +20,7 @@ final class PlaybackController {
   private var addedSlaves: [PlaybackSlave] = []
   private var reopenSlaves: [PlaybackSlave] = []
   private var trackRestore = TrackSelectionRestore()
-  private var isReopeningForStyle = false
+  private var isReloadingInPlace = false
   private var tracksBeforeReopen: TracksSnapshot?
   private var pausesOnceStarted = false
   private var isShutDown = false
@@ -90,7 +90,7 @@ final class PlaybackController {
     guard isActive, machine.canStop else { return }
     session.userDidCommand()
     pausesOnceStarted = false
-    isReopeningForStyle = false
+    isReloadingInPlace = false
     pendingSeekMs = nil
     engineInstance?.stop()
     store.updateMedia { $0.currentTime = 0 }
@@ -135,20 +135,50 @@ final class PlaybackController {
   func addSlave(_ kind: PlaybackSlave.Kind, uri: String, select: Bool) {
     guard isActive, let url = MediaUri.resolve(uri) else { return }
     let slave = PlaybackSlave(kind: kind, url: url, select: select)
+    guard kind == .audio, !hasAddedAudio else {
+      keepAddedSlave(slave)
+      return
+    }
+    reload(adding: slave)
+  }
+
+  func subtitleStyleDidChange() {
+    reload(adding: nil)
+  }
+
+  private var hasAddedAudio: Bool {
+    addedSlaves.contains { $0.kind == .audio }
+  }
+
+  private var mediaRequest: MediaRequest? {
+    currentRequest?.readingAddedAudio(hasAddedAudio)
+  }
+
+  private func keepAddedSlave(_ slave: PlaybackSlave) {
     addedSlaves.append(slave)
     attachSlave(slave)
   }
 
-  func subtitleStyleDidChange() {
-    guard isActive, engineInstance != nil, let request = currentRequest, machine.status != .error else { return }
-    guard Self.mediaActiveStatuses.contains(machine.status) else {
-      replaceEngine().load(request)
+  private func reload(adding slave: PlaybackSlave?) {
+    guard isActive, engineInstance != nil, currentRequest != nil, machine.status != .error else {
+      slave.map(keepAddedSlave)
       return
     }
-    if !isReopeningForStyle {
-      captureStateForReopen()
-      isReopeningForStyle = true
+    guard Self.mediaActiveStatuses.contains(machine.status) else {
+      slave.map(keepAddedSlave)
+      mediaRequest.map { replaceEngine().load($0) }
+      return
     }
+    if !isReloadingInPlace {
+      captureStateForReopen()
+      isReloadingInPlace = true
+    }
+    if let slave {
+      addedSlaves.append(slave)
+      pendingSlaves.append(slave)
+      if slave.select { trackRestore.forgetAudioSelection() }
+    }
+    guard let request = mediaRequest else { return }
     let fresh = replaceEngine()
     fresh.load(request)
     reopenSlaves.forEach { _ = fresh.addSlave($0) }
@@ -252,7 +282,7 @@ final class PlaybackController {
 
   private func reloadAndPlay() {
     resetMediaState()
-    guard let request = currentRequest else {
+    guard let request = mediaRequest else {
       failInvalidSource()
       return
     }
@@ -300,7 +330,7 @@ final class PlaybackController {
     pendingSlaves.removeAll()
     reopenSlaves.removeAll()
     trackRestore = TrackSelectionRestore()
-    isReopeningForStyle = false
+    isReloadingInPlace = false
     tracksBeforeReopen = nil
     throttle.reset()
     videoSizeGate.reset()
@@ -345,7 +375,7 @@ final class PlaybackController {
 
   private func didEnterPlaying() {
     guard let engineInstance else { return }
-    isReopeningForStyle = false
+    isReloadingInPlace = false
     engineInstance.apply(store.settings)
     surface.applyResize(force: true)
     refreshReadout()

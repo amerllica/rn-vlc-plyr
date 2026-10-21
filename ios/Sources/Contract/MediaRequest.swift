@@ -1,8 +1,15 @@
 import Foundation
 
 struct MediaRequest: Equatable {
+  static let addedAudioReaderOption = ":demux=avformat"
+
   let url: URL
   let options: [String]
+
+  func readingAddedAudio(_ hasAddedAudio: Bool) -> MediaRequest {
+    guard hasAddedAudio, !options.contains(Self.addedAudioReaderOption) else { return self }
+    return MediaRequest(url: url, options: options + [Self.addedAudioReaderOption])
+  }
 
   static func make(uri: String, userAgent: String? = nil, referrer: String? = nil, vlcOptions: [String]? = nil) -> MediaRequest? {
     guard let url = MediaUri.resolve(uri) else { return nil }

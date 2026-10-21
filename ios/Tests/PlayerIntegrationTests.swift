@@ -1,4 +1,5 @@
 import MediaPlayer
+import UIKit
 import XCTest
 @testable import RnVlcPlyr
 
@@ -38,6 +39,7 @@ final class PlayerIntegrationTests: XCTestCase {
 
   private static let audioOnlyOption = ":no-video"
   private static let engineTimeout: TimeInterval = 30
+  private static let backgroundPlaySeconds: TimeInterval = 3
   private static let nowPlayingTitle = "Two seconds"
 
   private static let lateSeekMs = 1500.0
@@ -88,6 +90,23 @@ final class PlayerIntegrationTests: XCTestCase {
       if externalAudioIsSelected { selected.fulfill() }
     })
     wait(for: [selected], timeout: Self.engineTimeout)
+  }
+
+  private func assertKeepsPlaying() throws {
+    let ended = expectation(description: "playback ended")
+    ended.isInverted = true
+    subscriptions.append(try player.addOnStatusChangeListener { status in
+      if status == .ended { ended.fulfill() }
+    })
+    let start = player.currentTime
+    wait(for: [ended], timeout: Self.backgroundPlaySeconds)
+    XCTAssertEqual(player.status, .playing)
+    XCTAssertGreaterThan(player.currentTime, start)
+  }
+
+  private func postAppState(_ name: Notification.Name) {
+    NotificationCenter.default.post(name: name, object: nil)
+    drainMainQueue()
   }
 
   private func playWithNowPlaying() throws {
@@ -487,5 +506,25 @@ final class PlayerIntegrationTests: XCTestCase {
     })
     player.subtitleStyle = Self.yellowSubtitles
     wait(for: [restored], timeout: Self.engineTimeout)
+  }
+
+  func testBackgroundKeepsPlayingWhileExternalAudioIsSelected() throws {
+    player.staysActiveInBackground = true
+    try playVideoWithAudio()
+    try player.addAudio(uri: audioFixtureUri, select: true)
+    try waitUntilExternalAudioIsSelected("external audio selected")
+    postAppState(UIApplication.didEnterBackgroundNotification)
+    try assertKeepsPlaying()
+    postAppState(UIApplication.willEnterForegroundNotification)
+  }
+
+  func testSelectingExternalAudioInBackgroundKeepsPlaying() throws {
+    player.staysActiveInBackground = true
+    try playVideoWithAudio()
+    postAppState(UIApplication.didEnterBackgroundNotification)
+    try player.addAudio(uri: audioFixtureUri, select: true)
+    try waitUntilExternalAudioIsSelected("external audio selected in the background")
+    try assertKeepsPlaying()
+    postAppState(UIApplication.willEnterForegroundNotification)
   }
 }

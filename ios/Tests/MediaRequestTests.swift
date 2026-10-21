@@ -26,6 +26,13 @@ final class MediaRequestTests: XCTestCase {
     XCTAssertEqual(request?.options, [":http-user-agent=UA/1", ":http-referrer=http://ref", ":network-caching=300", "--no-audio"])
   }
 
+  func testAddedAudioAppendsTheReaderOptionOnce() {
+    let request = MediaRequest.make(uri: "http://host/a", vlcOptions: [":network-caching=300"])
+    XCTAssertEqual(request?.readingAddedAudio(false).options, [":network-caching=300"])
+    XCTAssertEqual(request?.readingAddedAudio(true).options, [":network-caching=300", ":demux=avformat"])
+    XCTAssertEqual(request?.readingAddedAudio(true).readingAddedAudio(true).options, [":network-caching=300", ":demux=avformat"])
+  }
+
   func testOptionsAreEmptyWhenNothingGiven() {
     XCTAssertEqual(MediaRequest.make(uri: "http://host/a")?.options, [])
   }
