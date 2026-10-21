@@ -16,7 +16,8 @@ both platforms ship libVLC 3.
 - A player with a style owns a private libVLC instance: `VLCMediaPlayer(options:)` on iOS and
   `LibVLC(context, options)` on Android. A player without a style keeps the shared instance.
 - A style change on a loaded source reloads the media on a new engine and restores the position,
-  the pause state, the added subtitles and the track selections. `loaded` is not emitted again.
+  the pause state, the added subtitle and audio files ([ADR 0020](0020-external-audio.md)) and the
+  track selections. `loaded` is not emitted again.
 
 ## Consequences
 

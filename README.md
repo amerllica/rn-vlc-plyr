@@ -22,6 +22,8 @@ and more) with **the same API and the same behaviour on iOS and Android**.
   the media.
 - **Background audio and system controls.** Lock screen, Control Center, the Android notification
   shade and headset buttons, with one API on both platforms.
+- **External audio and subtitle files.** Add a dub, a commentary track or a subtitle file next to
+  the video, and style the subtitles with font size, colours, outline, shadow and margin.
 
 ## Contents
 
@@ -223,8 +225,8 @@ Methods:
 | `seekBy(ms)` | Relative, for example `seekBy(-10000)` |
 | `setAudioTrack(id)` | `-1` disables audio |
 | `setSubtitleTrack(id)` | `-1` hides subtitles |
-| `addAudio(uri, select)` | Adds an external audio file, such as `.m4a`, `.mp3`, `.aac`, `.ogg` or `.flac`, with one audio track |
-| `addSubtitle(uri, select)` | Adds an external `.srt`, `.ass`, `.ssa` or `.vtt` file |
+| `addAudio(uri, select)` | Adds an external audio file, such as `.m4a`, `.mp3`, `.aac`, `.ogg` or `.flac`, with one audio track. Throws without a source |
+| `addSubtitle(uri, select)` | Adds an external `.srt`, `.ass`, `.ssa` or `.vtt` file. Throws without a source |
 | `snapshot()` | `Promise<string>` with a `file://` PNG of the current frame |
 | `release()` | Frees the native player. `useVlcPlayer` does this for you |
 
@@ -413,6 +415,12 @@ const player = useVlcPlayer({
 - **Subtitle style is not live.** libVLC 3 reads the style when the engine starts, so a change
   reloads the media in place. A player with a style uses its own libVLC instance, which costs extra
   memory and builds its own font list the first time it draws text.
+- **Added audio changes the reader.** The first `addAudio` reloads the media in place and opens it
+  with VLC's FFmpeg reader from then on. An adaptive stream such as HLS loses VLC's adaptive reader.
+- **Added files after a restart on Android.** After `loop`, or `play()` after `stop()` or the end,
+  the added files stay in the track list, but VLC selects the first audio track again and selects
+  the added subtitle file again, even if another track was chosen or it was added with
+  `select: false`.
 - **Picture-in-Picture and casting** are not supported.
 
 ## Troubleshooting
