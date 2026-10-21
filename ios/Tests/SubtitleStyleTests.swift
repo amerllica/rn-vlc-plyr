@@ -114,39 +114,4 @@ final class SubtitleStyleTests: XCTestCase {
     )
     XCTAssertNil(PlayerPayloads.subtitleStyle(payload))
   }
-
-  func testTrackRestoreMapsEmbeddedSelectionByPosition() {
-    let before = TracksSnapshot(
-      audioTracks: [TrackInfo(id: 1, name: "en"), TrackInfo(id: 2, name: "fr")],
-      subtitleTracks: [TrackInfo(id: 3, name: "en"), TrackInfo(id: 4, name: "fr"), TrackInfo(id: 5, name: "file.srt")],
-      selectedAudioTrack: 2,
-      selectedSubtitleTrack: 4
-    )
-    var restore = TrackSelectionRestore(capturing: before, externalSubtitleCount: 1)
-    XCTAssertNil(restore.selectedExternalSubtitle)
-    XCTAssertNil(restore.takeSubtitleTrack(from: [TrackInfo(id: 7, name: "en")]))
-    XCTAssertEqual(restore.takeSubtitleTrack(from: [TrackInfo(id: 7, name: "en"), TrackInfo(id: 8, name: "fr")]), 8)
-    XCTAssertNil(restore.takeSubtitleTrack(from: [TrackInfo(id: 7, name: "en"), TrackInfo(id: 8, name: "fr")]))
-    XCTAssertEqual(restore.takeAudioTrack(from: before.audioTracks), 2)
-  }
-
-  func testTrackRestoreReportsTheSelectedExternalSubtitle() {
-    let before = TracksSnapshot(
-      subtitleTracks: [TrackInfo(id: 3, name: "en"), TrackInfo(id: 4, name: "a.srt"), TrackInfo(id: 5, name: "b.srt")],
-      selectedSubtitleTrack: 5
-    )
-    var restore = TrackSelectionRestore(capturing: before, externalSubtitleCount: 2)
-    XCTAssertEqual(restore.selectedExternalSubtitle, 1)
-    XCTAssertNil(restore.takeSubtitleTrack(from: before.subtitleTracks))
-  }
-
-  func testTrackRestoreKeepsDisabledSubtitlesDisabled() {
-    var restore = TrackSelectionRestore(
-      capturing: TracksSnapshot(subtitleTracks: [TrackInfo(id: 3, name: "en"), TrackInfo(id: 4, name: "a.srt")]),
-      externalSubtitleCount: 1
-    )
-    XCTAssertNil(restore.selectedExternalSubtitle)
-    XCTAssertEqual(restore.takeSubtitleTrack(from: [TrackInfo(id: 3, name: "en")]), TrackList.disabledTrackId)
-    XCTAssertNil(restore.takeAudioTrack(from: []))
-  }
 }

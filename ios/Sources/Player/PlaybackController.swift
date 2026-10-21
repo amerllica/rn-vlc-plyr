@@ -16,9 +16,9 @@ final class PlaybackController {
   private var engineInstance: VlcEngine?
   private var currentRequest: MediaRequest?
   private var pendingSeekMs: Int?
-  private var pendingSubtitles: [(url: URL, select: Bool)] = []
-  private var addedSubtitles: [(url: URL, select: Bool)] = []
-  private var reopenSubtitles: [(url: URL, select: Bool)] = []
+  private var pendingSlaves: [PlaybackSlave] = []
+  private var addedSlaves: [PlaybackSlave] = []
+  private var reopenSlaves: [PlaybackSlave] = []
   private var trackRestore = TrackSelectionRestore()
   private var isReopeningForStyle = false
   private var tracksBeforeReopen: TracksSnapshot?
@@ -48,7 +48,7 @@ final class PlaybackController {
     guard isActive else { return }
     defer { session.sourceDidChange() }
     resetMediaState()
-    addedSubtitles.removeAll()
+    addedSlaves.removeAll()
     guard let source else {
       currentRequest = nil
       retireEngine()
@@ -132,10 +132,11 @@ final class PlaybackController {
     refreshReadout()
   }
 
-  func addSubtitle(uri: String, select: Bool) {
+  func addSlave(_ kind: PlaybackSlave.Kind, uri: String, select: Bool) {
     guard isActive, let url = MediaUri.resolve(uri) else { return }
-    addedSubtitles.append((url, select))
-    attachSubtitle(url, select: select)
+    let slave = PlaybackSlave(kind: kind, url: url, select: select)
+    addedSlaves.append(slave)
+    attachSlave(slave)
   }
 
   func subtitleStyleDidChange() {
@@ -150,7 +151,7 @@ final class PlaybackController {
     }
     let fresh = replaceEngine()
     fresh.load(request)
-    reopenSubtitles.forEach { _ = fresh.addSubtitle($0.url, select: $0.select) }
+    reopenSlaves.forEach { _ = fresh.addSlave($0) }
     audioSession.activate()
     apply(machine.beginPlayback())
     engine.play()
@@ -164,19 +165,16 @@ final class PlaybackController {
     pausesOnceStarted = pausesOnceStarted || machine.status == .paused
     let tracks = tracksBeforeReopen.flatMap { TrackList.isStillLoading(media.tracks, comparedTo: $0) ? $0 : nil } ?? media.tracks
     tracksBeforeReopen = tracks
-    let restore = TrackSelectionRestore(capturing: tracks, externalSubtitleCount: addedSubtitles.count)
-    reopenSubtitles = addedSubtitles.enumerated().map { index, subtitle in
-      (subtitle.url, index == restore.selectedExternalSubtitle)
-    }
-    trackRestore = restore
+    trackRestore = TrackSelectionRestore(capturing: tracks, slaves: addedSlaves)
+    reopenSlaves = trackRestore.reopenSlaves
   }
 
-  private func attachSubtitle(_ url: URL, select: Bool) {
+  private func attachSlave(_ slave: PlaybackSlave) {
     let isMediaOpen = Self.mediaActiveStatuses.contains(machine.status)
-    if isMediaOpen && engine.addSubtitle(url, select: select) {
+    if isMediaOpen && engine.addSlave(slave) {
       return
     }
-    pendingSubtitles.append((url, select))
+    pendingSlaves.append(slave)
   }
 
   func snapshot(_ promise: Promise<String>) {
@@ -299,8 +297,8 @@ final class PlaybackController {
   private func resetMediaState() {
     pendingSeekMs = nil
     pausesOnceStarted = false
-    pendingSubtitles.removeAll()
-    reopenSubtitles.removeAll()
+    pendingSlaves.removeAll()
+    reopenSlaves.removeAll()
     trackRestore = TrackSelectionRestore()
     isReopeningForStyle = false
     tracksBeforeReopen = nil
@@ -351,9 +349,9 @@ final class PlaybackController {
     engineInstance.apply(store.settings)
     surface.applyResize(force: true)
     refreshReadout()
-    let subtitles = pendingSubtitles
-    pendingSubtitles.removeAll()
-    subtitles.forEach { attachSubtitle($0.url, select: $0.select) }
+    let slaves = pendingSlaves
+    pendingSlaves.removeAll()
+    slaves.forEach(attachSlave)
     if pausesOnceStarted && pendingSeekMs == nil {
       pausesOnceStarted = false
       engineInstance.pause()
@@ -409,7 +407,7 @@ final class PlaybackController {
     if let before = tracksBeforeReopen, !TrackList.isStillLoading(tracks, comparedTo: before) {
       tracksBeforeReopen = nil
     }
-    guard let engineInstance else { return }
+    guard let engineInstance, machine.status == .playing else { return }
     if let id = trackRestore.takeAudioTrack(from: tracks.audioTracks), id != tracks.selectedAudioTrack {
       engineInstance.selectAudioTrack(id)
     }

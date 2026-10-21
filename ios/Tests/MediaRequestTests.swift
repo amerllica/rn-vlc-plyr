@@ -50,6 +50,7 @@ final class PlayerErrorsTests: XCTestCase {
 
   func testFixedMessages() {
     XCTAssertEqual(PlayerErrors.invalidSourceMessage, "Invalid source uri")
+    XCTAssertEqual(PlayerErrors.addAudioWithoutSource, "addAudio requires a source")
     XCTAssertEqual(PlayerErrors.addSubtitleWithoutSource, "addSubtitle requires a source")
     XCTAssertEqual(PlayerErrors.noVideoFrame, "No video frame available")
   }

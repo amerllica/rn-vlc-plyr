@@ -23,6 +23,15 @@ final class PlayerIntegrationTests: XCTestCase {
     Bundle(for: Self.self).url(forResource: "two-seconds", withExtension: "mp4")?.absoluteString ?? ""
   }
 
+  private var audioFixtureUri: String {
+    Bundle(for: Self.self).url(forResource: "grey-ten-seconds", withExtension: "m4a")?.absoluteString ?? ""
+  }
+
+  private var videoWithAudioSource: VlcSource {
+    let uri = Bundle(for: Self.self).url(forResource: "grey-ten-seconds", withExtension: "mp4")?.absoluteString ?? ""
+    return VlcSource(uri: uri, userAgent: nil, referrer: nil, vlcOptions: nil, title: nil)
+  }
+
   private var fixtureSource: VlcSource {
     VlcSource(uri: fixtureUri, userAgent: nil, referrer: nil, vlcOptions: [Self.audioOnlyOption], title: nil)
   }
@@ -51,6 +60,34 @@ final class PlayerIntegrationTests: XCTestCase {
     let drained = expectation(description: "main queue drained")
     DispatchQueue.main.async { drained.fulfill() }
     wait(for: [drained], timeout: 5)
+  }
+
+  private var externalAudioIsSelected: Bool {
+    let tracks = player.audioTracks
+    return tracks.count == 2 && player.selectedAudioTrack == tracks.last?.id
+  }
+
+  private func playVideoWithAudio() throws {
+    let playing = expectation(description: "playing")
+    playing.assertForOverFulfill = false
+    subscriptions.append(try player.addOnStatusChangeListener { status in
+      if status == .playing { playing.fulfill() }
+    })
+    player.source = videoWithAudioSource
+    wait(for: [playing], timeout: Self.engineTimeout)
+    drainMainQueue()
+  }
+
+  private func waitUntilExternalAudioIsSelected(_ description: String) throws {
+    let selected = expectation(description: description)
+    selected.assertForOverFulfill = false
+    subscriptions.append(try player.addOnTracksChangeListener { [unowned self] _ in
+      if externalAudioIsSelected { selected.fulfill() }
+    })
+    subscriptions.append(try player.addOnTimeUpdateListener { [unowned self] _ in
+      if externalAudioIsSelected { selected.fulfill() }
+    })
+    wait(for: [selected], timeout: Self.engineTimeout)
   }
 
   private func playWithNowPlaying() throws {
@@ -204,6 +241,18 @@ final class PlayerIntegrationTests: XCTestCase {
 
   func testAddSubtitleWithoutSourceThrows() {
     XCTAssertThrowsError(try player.addSubtitle(uri: "file:///a.srt", select: true))
+  }
+
+  func testAddAudioWithoutSourceThrows() {
+    XCTAssertThrowsError(try player.addAudio(uri: "file:///a.m4a", select: true))
+  }
+
+  func testAddedAudioArrivesThroughTracksChangeAndIsSelected() throws {
+    XCTAssertFalse(audioFixtureUri.isEmpty)
+    try playVideoWithAudio()
+    XCTAssertEqual(player.audioTracks.count, 1)
+    try player.addAudio(uri: audioFixtureUri, select: true)
+    try waitUntilExternalAudioIsSelected("external audio selected")
   }
 
   func testReleaseIsIdempotentAndResetsGettersAndSilencesEvents() throws {
@@ -421,5 +470,22 @@ final class PlayerIntegrationTests: XCTestCase {
     })
     wait(for: [restored], timeout: Self.engineTimeout)
     XCTAssertEqual(player.subtitleStyle?.fontScale, 50)
+  }
+
+  func testSubtitleStyleChangeWhilePlayingKeepsExternalAudioSelected() throws {
+    try playVideoWithAudio()
+    try player.addAudio(uri: audioFixtureUri, select: true)
+    try waitUntilExternalAudioIsSelected("external audio selected")
+    subscriptions.forEach { $0.remove() }
+    subscriptions.removeAll()
+    let restored = expectation(description: "external audio selected again after the audio list reloaded")
+    restored.assertForOverFulfill = false
+    var audioReloaded = false
+    subscriptions.append(try player.addOnTracksChangeListener { [unowned self] tracks in
+      audioReloaded = audioReloaded || tracks.audioTracks.count < 2
+      if audioReloaded && externalAudioIsSelected { restored.fulfill() }
+    })
+    player.subtitleStyle = Self.yellowSubtitles
+    wait(for: [restored], timeout: Self.engineTimeout)
   }
 }

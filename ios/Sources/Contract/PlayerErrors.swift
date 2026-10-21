@@ -9,6 +9,7 @@ enum PlayerErrors {
   static let invalidSourceMessage = "Invalid source uri"
   static let networkMessage = "Could not open the media over the network"
   static let mediaMessage = "The media could not be played"
+  static let addAudioWithoutSource = "addAudio requires a source"
   static let addSubtitleWithoutSource = "addSubtitle requires a source"
   static let noVideoFrame = "No video frame available"
 

@@ -138,12 +138,20 @@ final class HybridVlcPlayer: HybridVlcPlayerSpec {
     onMain { $0.selectSubtitleTrack(Int(id)) }
   }
 
+  func addAudio(uri: String, select: Bool) throws {
+    try addSlave(.audio, uri: uri, select: select, missingSourceMessage: PlayerErrors.addAudioWithoutSource)
+  }
+
   func addSubtitle(uri: String, select: Bool) throws {
+    try addSlave(.subtitle, uri: uri, select: select, missingSourceMessage: PlayerErrors.addSubtitleWithoutSource)
+  }
+
+  private func addSlave(_ kind: PlaybackSlave.Kind, uri: String, select: Bool, missingSourceMessage: String) throws {
     guard !store.isReleased else { return }
     guard store.source != nil else {
-      throw RuntimeError.error(withMessage: PlayerErrors.addSubtitleWithoutSource)
+      throw RuntimeError.error(withMessage: missingSourceMessage)
     }
-    onMain { $0.addSubtitle(uri: uri, select: select) }
+    onMain { $0.addSlave(kind, uri: uri, select: select) }
   }
 
   func snapshot() throws -> Promise<String> {
