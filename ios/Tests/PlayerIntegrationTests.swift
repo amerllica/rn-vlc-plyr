@@ -30,7 +30,7 @@ final class PlayerIntegrationTests: XCTestCase {
 
   private var videoWithAudioSource: VlcSource {
     let uri = Bundle(for: Self.self).url(forResource: "grey-ten-seconds", withExtension: "mp4")?.absoluteString ?? ""
-    return VlcSource(uri: uri, userAgent: nil, referrer: nil, vlcOptions: nil, title: nil)
+    return VlcSource(uri: uri, userAgent: nil, referrer: nil, vlcOptions: [Self.discardedVideoOutputOption], title: nil)
   }
 
   private var fixtureSource: VlcSource {
@@ -38,6 +38,7 @@ final class PlayerIntegrationTests: XCTestCase {
   }
 
   private static let audioOnlyOption = ":no-video"
+  private static let discardedVideoOutputOption = ":vout=dummy"
   private static let engineTimeout: TimeInterval = 30
   private static let backgroundPlaySeconds: TimeInterval = 3
   private static let nowPlayingTitle = "Two seconds"
