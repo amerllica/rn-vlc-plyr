@@ -19,3 +19,4 @@
 - [0017. Public names](0017-naming.md)
 - [0018. Background audio and media session stack](0018-media-session-stack.md)
 - [0019. Subtitle style through libVLC instance options](0019-subtitle-style.md)
+- [0020. External audio through playback slaves](0020-external-audio.md)
