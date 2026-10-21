@@ -60,6 +60,8 @@
     "nitro",
     "mkv",
     "subtitles",
+    "audio",
+    "audio-tracks",
     "expo"
   ],
   "repository": {
