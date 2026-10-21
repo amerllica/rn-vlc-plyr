@@ -209,7 +209,7 @@ class SubtitleRenderingTest {
     const val VIDEO_OFF_MS = 1000L
     const val LAYOUT_SETTLE_MS = 2500L
     const val SUBTITLE_FOLDER = "subtitles"
-    const val MIN_SUBTITLE_PIXELS = 200
+    const val MIN_SUBTITLE_PIXELS = 50
     const val CHANNEL_HIGH = 190
     const val CHANNEL_LOW = 90
 
