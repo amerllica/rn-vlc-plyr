@@ -101,7 +101,7 @@ class MediaSessionTest {
     controller.seek(LATE_SEEK_MS)
     awaitCondition("late position published") { session.publishedPosition() >= LATE_SEEK_MS.toLong() }
     awaitCondition("loop restart published") { session.publishedPosition() < LATE_SEEK_MS.toLong() }
-    assertEquals(PlaybackStateCompat.STATE_PLAYING, session.playbackState?.state)
+    assertEquals("statuses=$statuses", PlaybackStateCompat.STATE_PLAYING, session.playbackState?.state)
   }
 
   @Test
