@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { VlcPlayer } from 'rn-vlc-plyr';
 import { AudioIcon, MuteIcon, VolumeIcon } from '../icons';
-import { DEFAULT_AUDIO_URI } from '../media';
 import { colors, spacing, typography } from '../theme';
 import { IconButton } from '../ui/IconButton';
 import { PickerRow } from '../ui/PickerRow';
@@ -77,7 +76,7 @@ export function AudioSection({
         label="External audio URL"
         actionLabel="Add external audio"
         placeholder="https://…/audio.m4a"
-        initialUri={DEFAULT_AUDIO_URI}
+        initialUri=""
         onAdd={(uri) => player.addAudio(uri, true)}
       />
       <Stepper
