@@ -322,9 +322,9 @@ player.subtitleDelay = 250;
 player.audioDelay = -100;
 ```
 
-An added audio file should be as long as the video. While it is selected, keep the video track on:
-libVLC 3 ends playback when the video is off, as in background audio, or when the source has no
-video.
+An added audio file should be as long as the video. The first added audio file reloads the media in
+place and keeps the position: from then on the media opens with VLC's FFmpeg reader, so playback
+continues with the added track selected in the background and in fullscreen.
 
 ### Subtitle style
 

@@ -22,6 +22,9 @@ the selection when a subtitle style reloads the media.
   true and is also restored by its position once the whole list is back, because libVLC drops the
   `select` flag of a slave added before the media opens, as iOS does after a style reload.
 - Android keeps no queue for calls made before the player exists, as for subtitles.
+- A media with an added audio file opens with `:demux=avformat`. The first added audio file reloads
+  the media in place through the subtitle style reload path, then attaches the file with its
+  `select` flag once playback starts again.
 
 ## Consequences
 
@@ -31,7 +34,15 @@ media already has, so this holds for local files. An adaptive stream that adds t
 break the position restore after a mid-stream style change. A file with more than one audio track
 counts as one added file, so `addAudio` expects a file with one audio track.
 
-libVLC 3 ends playback when none of the media's own tracks is selected. With an added audio track
-selected, that happens when the video track is off: background audio, the `:no-video` option, or an
-audio-only source. Both platforms show it with an MP4 source. On Android, a fresh player after
-`loop` or `stop()` keeps the added file but selects the first audio track again.
+libVLC 3's MP4 reader runs to the end when none of the media's own tracks is selected. With an
+added audio track selected, that happens whenever the video track is off: background audio, the
+`:no-video` option, an audio-only source, and on Android every video layout change, because libVLC
+turns the video track off when its surface goes away. Both platforms show it. Keeping the video
+track on in the background was tried first: it fixed iOS but not Android, where the layout change
+still ends playback. The FFmpeg reader keeps the media clock running with no selected track, so
+both platforms keep playing and the background still turns the video off. The cost is one reload
+when the first audio file is added, and the FFmpeg reader in place of VLC's own reader for that
+media, which for an adaptive stream means losing VLC's adaptive reader.
+
+On Android, a fresh player after `loop` or `stop()` keeps the added file but selects the first
+audio track again.
