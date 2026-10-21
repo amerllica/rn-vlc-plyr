@@ -97,7 +97,7 @@ Run the native tests:
 
 ```sh
 cd example/android && ./gradlew :rn-vlc-plyr:testDebugUnitTest :rn-vlc-plyr:connectedDebugAndroidTest
-xcodebuild test -workspace example/ios/RnVlcPlyrExample.xcworkspace -scheme RnVlcPlyr-Unit-Tests -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+xcodebuild test -workspace example/ios/RnVlcPlyrExample.xcworkspace -scheme RnVlcPlyr-Unit-Tests -destination 'platform=iOS Simulator,name=iPhone 18 Pro'
 ```
 
 Make sure your code passes TypeScript:
@@ -158,7 +158,11 @@ Releases are published by GitHub Actions, never from a laptop:
 
 1. Set `version` in `package.json` (for example `1.0.0` or `1.0.0-beta.1`) and commit it on `main`.
 2. Tag the commit with the same version and push the tag: `git tag v1.0.0 && git push origin v1.0.0`.
-3. The workflow runs every check, then publishes to npm with provenance through trusted publishing.
+   The tag must be on `main` and must equal `v` plus the `package.json` version, or the release job
+   stops.
+3. The workflow runs every check, then publishes to npm with provenance through trusted publishing,
+   and creates a GitHub release with notes generated from the commits. A version that is already on
+   npm is not published again.
    Versions with `-beta.N` go to the `beta` dist-tag and become a GitHub pre-release.
 
 ### Sending a pull request
