@@ -148,6 +148,10 @@ describe('PlayerScreen', () => {
       throw new Error('addAudio requires a source');
     });
 
+    await fireEvent.changeText(
+      screen.getByLabelText('External audio URL'),
+      'https://example.com/dub.m4a'
+    );
     await fireEvent.press(screen.getByLabelText('Add external audio'));
 
     expect(screen.getByText('addAudio requires a source')).toBeTruthy();

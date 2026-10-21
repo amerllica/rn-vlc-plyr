@@ -18,8 +18,6 @@ export interface MediaItem {
   badges: MediaBadge[];
 }
 
-export const DEFAULT_AUDIO_URI = '/data/data/rnvlcplyr.example/cache/audio.m4a';
-
 export const DEFAULT_SUBTITLE_URI =
   'https://raw.githubusercontent.com/andreyvit/subtitle-tools/master/sample.srt';
 
