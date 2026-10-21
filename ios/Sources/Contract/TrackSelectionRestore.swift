@@ -34,6 +34,10 @@ struct TrackSelectionRestore: Equatable {
     }
   }
 
+  mutating func forgetAudioSelection() {
+    audio = nil
+  }
+
   mutating func takeAudioTrack(from tracks: [TrackInfo]) -> Int? {
     Self.take(&audio, from: tracks)
   }
