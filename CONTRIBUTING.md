@@ -100,6 +100,10 @@ cd example/android && ./gradlew :rn-vlc-plyr:testDebugUnitTest :rn-vlc-plyr:conn
 xcodebuild test -workspace example/ios/RnVlcPlyrExample.xcworkspace -scheme RnVlcPlyr-Unit-Tests -destination 'platform=iOS Simulator,name=iPhone 18 Pro'
 ```
 
+The XCTest bundle runs without a host app. The playback tests open media with `:no-video`, or `:vout=dummy` when they need a video track, so no test draws video.
+
+In CI, each XCTest test has 60 seconds. A test that fails or hangs runs once more in a new test process (`-retry-tests-on-failure -test-iterations 2`). The Android instrumented tests are not retried. When a native test job fails, CI uploads the `.xcresult` bundle or the Android test reports as a run artifact.
+
 Make sure your code passes TypeScript:
 
 ```sh
