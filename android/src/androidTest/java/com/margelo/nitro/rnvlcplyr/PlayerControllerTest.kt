@@ -44,6 +44,16 @@ class PlayerControllerTest {
 
   private fun localSource() = VlcSource(TestMedia.copyToCache(TestMedia.VIDEO_ASSET).absolutePath, null, null, null, null)
 
+  private fun tenSecondSource() = VlcSource(TestMedia.copyToCache(TestMedia.PLAIN_VIDEO_ASSET).absolutePath, null, null, null, null)
+
+  private fun assertKeepsPlaying() {
+    val start = controller.read { media.currentTimeMs }
+    Thread.sleep(BACKGROUND_PLAY_MS)
+    assertFalse("ended with the video off; statuses=$statuses", statuses.contains(VlcStatus.ENDED))
+    assertEquals(VlcStatus.PLAYING, controller.read { status })
+    assertTrue(controller.read { media.currentTimeMs } > start)
+  }
+
   @Test
   fun playsLocalFileAndEmitsLoadedOnceAfterPlaying() {
     controller.setSource(localSource())
@@ -150,6 +160,26 @@ class PlayerControllerTest {
   }
 
   @Test
+  fun videoOffKeepsPlayingWhileExternalAudioIsSelected() {
+    controller.setSource(tenSecondSource())
+    awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
+    controller.addAudio(TestMedia.copyToCache(TestMedia.AUDIO_ASSET).absolutePath, true)
+    awaitCondition("external audio selected") { tracks.any(::selectsExternalAudio) }
+    controller.setVideoTrackEnabled(false)
+    assertKeepsPlaying()
+  }
+
+  @Test
+  fun selectingExternalAudioWithVideoOffKeepsPlaying() {
+    controller.setSource(tenSecondSource())
+    awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
+    controller.setVideoTrackEnabled(false)
+    controller.addAudio(TestMedia.copyToCache(TestMedia.AUDIO_ASSET).absolutePath, true)
+    awaitCondition("external audio selected with the video off") { tracks.any(::selectsExternalAudio) }
+    assertKeepsPlaying()
+  }
+
+  @Test
   fun addAudioWithoutSourceThrows() {
     try {
       controller.addAudio("file:///nothing.m4a", true)
@@ -253,8 +283,7 @@ class PlayerControllerTest {
 
   @Test
   fun subtitleStyleChangeWhilePlayingReattachesExternalAudio() {
-    controller.setLoop(true)
-    controller.setSource(localSource())
+    controller.setSource(tenSecondSource())
     awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
     controller.addAudio(TestMedia.copyToCache(TestMedia.AUDIO_ASSET).absolutePath, true)
     awaitCondition("external audio selected") { tracks.any(::selectsExternalAudio) }
@@ -334,6 +363,7 @@ class PlayerControllerTest {
 
   private companion object {
     const val TIMEOUT_SECONDS = 15L
+    const val BACKGROUND_PLAY_MS = 3_000L
     const val POLL_MS = 50L
     const val FAST_TIME_UPDATE_MS = 50.0
     const val RELEASE_OBSERVATION_MS = 1000L

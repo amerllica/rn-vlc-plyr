@@ -83,9 +83,17 @@ class VlcContractTest {
     val source = VlcSource("https://x", "UA/1", "https://ref", arrayOf(":network-caching=300", "--no-audio"), null)
     assertEquals(
       listOf(":http-user-agent=UA/1", ":http-referrer=https://ref", ":network-caching=300", "--no-audio"),
-      VlcContract.mediaOptions(source)
+      VlcContract.mediaOptions(source, hasAddedAudio = false)
     )
-    assertEquals(emptyList<String>(), VlcContract.mediaOptions(VlcSource("https://x", null, null, null, null)))
+    assertEquals(emptyList<String>(), VlcContract.mediaOptions(VlcSource("https://x", null, null, null, null), hasAddedAudio = false))
+  }
+
+  @Test
+  fun addedAudioAppendsTheReaderOptionOnce() {
+    val source = VlcSource("https://x", null, null, arrayOf(":network-caching=300"), null)
+    assertEquals(listOf(":network-caching=300", ":demux=avformat"), VlcContract.mediaOptions(source, hasAddedAudio = true))
+    val alreadySet = VlcSource("https://x", null, null, arrayOf(":demux=avformat"), null)
+    assertEquals(listOf(":demux=avformat"), VlcContract.mediaOptions(alreadySet, hasAddedAudio = true))
   }
 
   @Test
