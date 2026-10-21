@@ -95,8 +95,8 @@ final class VlcEngine: NSObject, VLCMediaPlayerDelegate {
     player.currentVideoTrackIndex = disabledVideoTrack
   }
 
-  func addSubtitle(_ url: URL, select: Bool) -> Bool {
-    player.addPlaybackSlave(url, type: .subtitle, enforce: select) == 0
+  func addSlave(_ slave: PlaybackSlave) -> Bool {
+    player.addPlaybackSlave(slave.url, type: slave.kind.vlcType, enforce: slave.select) == 0
   }
 
   func saveSnapshot(toPath path: String) -> Bool {
@@ -176,6 +176,15 @@ final class VlcEngine: NSObject, VLCMediaPlayerDelegate {
     case .paused: return .paused
     case .esAdded: return .esAdded
     @unknown default: return .esAdded
+    }
+  }
+}
+
+private extension PlaybackSlave.Kind {
+  var vlcType: VLCMediaPlaybackSlaveType {
+    switch self {
+    case .audio: return .audio
+    case .subtitle: return .subtitle
     }
   }
 }
