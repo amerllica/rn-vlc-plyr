@@ -54,6 +54,10 @@ export interface VlcVolumeInfo {
   muted: boolean;
 }
 
+export interface VlcBufferingInfo {
+  percent: number;
+}
+
 export interface VlcTracksInfo {
   audioTracks: VlcTrack[];
   subtitleTracks: VlcTrack[];
@@ -109,6 +113,9 @@ export interface VlcPlayer extends HybridObject<{
   staysActiveInBackground: boolean;
   nowPlaying?: VlcNowPlaying;
   remoteSkipInterval: number;
+  reconnectOnResumeAfterMs: number;
+  reloadOnStallAfterMs: number;
+  libvlcOptions: string[];
   androidNotification?: VlcAndroidNotification;
 
   readonly status: VlcStatus;
@@ -156,6 +163,9 @@ export interface VlcPlayer extends HybridObject<{
   ): VlcListenerSubscription;
   addOnVideoSizeChangeListener(
     listener: (size: VlcVideoSize) => void
+  ): VlcListenerSubscription;
+  addOnBufferingListener(
+    listener: (event: VlcBufferingInfo) => void
   ): VlcListenerSubscription;
   addOnRemoteNextListener(listener: () => void): VlcListenerSubscription;
   addOnRemotePreviousListener(listener: () => void): VlcListenerSubscription;

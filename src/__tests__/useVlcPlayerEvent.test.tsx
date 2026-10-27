@@ -44,6 +44,18 @@ describe('useVlcPlayerEvent', () => {
     expect(received).toEqual([undefined]);
   });
 
+  it('passes the buffering percent through', async () => {
+    const player = new FakePlayer();
+    const received: number[] = [];
+    addVlcPlayerListener(player, 'buffering', ({ percent }) =>
+      received.push(percent)
+    );
+
+    player.channels.buffering.emit({ percent: 42 });
+
+    expect(received).toEqual([42]);
+  });
+
   it('maps the remote next and previous events to payload-less callbacks', async () => {
     const player = new FakePlayer();
     const received: string[] = [];

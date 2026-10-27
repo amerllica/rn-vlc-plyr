@@ -23,6 +23,7 @@ export type {
   VlcLoadedInfo,
   VlcVolumeInfo,
   VlcTracksInfo,
+  VlcBufferingInfo,
   VlcNowPlaying,
   VlcAndroidNotification,
   VlcSubtitleStyle,

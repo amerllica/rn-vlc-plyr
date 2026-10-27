@@ -1,4 +1,5 @@
 import type {
+  VlcBufferingInfo,
   VlcError,
   VlcListenerSubscription,
   VlcLoadedInfo,
@@ -19,6 +20,7 @@ export interface VlcPlayerEventPayloads {
   volumeChange: VlcVolumeInfo;
   tracksChange: VlcTracksInfo;
   videoSizeChange: VlcVideoSize;
+  buffering: VlcBufferingInfo;
   remoteNext: undefined;
   remotePrevious: undefined;
 }
@@ -50,6 +52,7 @@ const subscribers: Subscribers = {
     player.addOnTracksChangeListener(listener),
   videoSizeChange: (player, listener) =>
     player.addOnVideoSizeChangeListener(listener),
+  buffering: (player, listener) => player.addOnBufferingListener(listener),
   remoteNext: (player, listener) =>
     player.addOnRemoteNextListener(() => listener(undefined)),
   remotePrevious: (player, listener) =>

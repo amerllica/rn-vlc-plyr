@@ -1,5 +1,6 @@
 import type {
   VlcAndroidNotification,
+  VlcBufferingInfo,
   VlcError,
   VlcListenerSubscription,
   VlcLoadedInfo,
@@ -41,6 +42,7 @@ export class FakePlayer implements VlcPlayer {
     volumeChange: new Channel<VlcVolumeInfo>(),
     tracksChange: new Channel<VlcTracksInfo>(),
     videoSizeChange: new Channel<VlcVideoSize>(),
+    buffering: new Channel<VlcBufferingInfo>(),
     remoteNext: new Channel<void>(),
     remotePrevious: new Channel<void>(),
   };
@@ -59,6 +61,9 @@ export class FakePlayer implements VlcPlayer {
   staysActiveInBackground = false;
   nowPlaying: VlcNowPlaying | undefined = undefined;
   remoteSkipInterval = 10000;
+  reconnectOnResumeAfterMs = 0;
+  reloadOnStallAfterMs = 0;
+  libvlcOptions: string[] = [];
   androidNotification: VlcAndroidNotification | undefined = undefined;
   status: VlcStatus = 'idle';
   error: VlcError | undefined = undefined;
@@ -133,6 +138,9 @@ export class FakePlayer implements VlcPlayer {
   }
   addOnVideoSizeChangeListener(listener: Listener<VlcVideoSize>) {
     return this.channels.videoSizeChange.add(listener);
+  }
+  addOnBufferingListener(listener: Listener<VlcBufferingInfo>) {
+    return this.channels.buffering.add(listener);
   }
   addOnRemoteNextListener(listener: () => void) {
     return this.channels.remoteNext.add(listener);
