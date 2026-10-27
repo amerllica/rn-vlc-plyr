@@ -48,7 +48,8 @@
     "nitrogen": "nitrogen",
     "typecheck": "tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
-    "test": "jest"
+    "test": "jest",
+    "release-notes": "node scripts/release-notes.js"
   },
   "keywords": [
     "react-native",

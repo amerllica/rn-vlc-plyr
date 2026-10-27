@@ -45,6 +45,9 @@ jobs:
       - name: Typecheck files
         run: yarn typecheck
 
+      - name: Check the changelog has notes for the package version
+        run: yarn release-notes > /dev/null
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -395,6 +398,9 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
+      - name: Build the release notes from CHANGELOG.md
+        run: yarn release-notes > "$RUNNER_TEMP/release-notes.md"
+
       - name: Update npm for trusted publishing
         run: npm install --global npm@^11.5.1
 
@@ -414,7 +420,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if [[ "$GITHUB_REF_NAME" == *-beta.* ]]; then
-            gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --prerelease
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md" --prerelease
           else
-            gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md"
           fi
