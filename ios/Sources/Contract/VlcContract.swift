@@ -29,6 +29,26 @@ enum VlcContract {
     roundedClamp(value, to: skipIntervalRange)
   }
 
+  static func clampRecoveryDelay(_ value: Double) -> Int {
+    guard value.isFinite, value > 0 else { return 0 }
+    return Int(min(jsRound(value), Double(Int32.max)))
+  }
+
+  static func libvlcOptions(_ values: [String]) -> [String] {
+    values
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+  }
+
+  static func instanceOptions(libvlcOptions: [String], subtitleStyle: SubtitleStyle?) -> [String] {
+    libvlcOptions + subtitleStyleOptions(subtitleStyle)
+  }
+
+  static func bufferingPercent(fromEngineCache cache: Float) -> Int? {
+    guard cache.isFinite else { return nil }
+    return Int(min(max(jsRound(Double(cache)), 0), 100))
+  }
+
   static func engineDelay(fromMilliseconds milliseconds: Int) -> Int {
     milliseconds * microsecondsPerMillisecond
   }

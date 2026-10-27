@@ -5,6 +5,7 @@ protocol VlcEngineDelegate: AnyObject {
   func engineDidChangeState(_ state: EngineState, isPlaying: Bool)
   func engineDidChangeTime()
   func engineDidTakeSnapshot()
+  func engineDidReportBuffering(percent: Float)
 }
 
 struct EngineReadout {
@@ -23,12 +24,20 @@ final class VlcEngine: NSObject, VLCMediaPlayerDelegate {
   weak var delegate: VlcEngineDelegate?
   private let player: VLCMediaPlayer
   private var disabledVideoTrack: Int32?
+  private var bufferingObserver: VlcBufferingObserver?
 
   init(drawable: UIView, libraryOptions: [String]) {
     player = libraryOptions.isEmpty ? VLCMediaPlayer() : VLCMediaPlayer(options: libraryOptions)
     super.init()
     player.delegate = self
     player.drawable = drawable
+    bufferingObserver = VlcBufferingObserver.observe(player, onBuffering: { [weak self] percent in
+      self?.delegate?.engineDidReportBuffering(percent: percent)
+    })
+  }
+
+  deinit {
+    bufferingObserver?.stop()
   }
 
   func load(_ request: MediaRequest) {
@@ -119,6 +128,8 @@ final class VlcEngine: NSObject, VLCMediaPlayerDelegate {
   }
 
   func retire() {
+    bufferingObserver?.stop()
+    bufferingObserver = nil
     delegate = nil
     player.delegate = nil
     Self.stopAndReleaseOffMainThread(player)

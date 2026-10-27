@@ -17,6 +17,7 @@ final class PlayerEvents {
   let volumeChange = ListenerRegistry<VlcVolumeInfo>()
   let tracksChange = ListenerRegistry<VlcTracksInfo>()
   let videoSizeChange = ListenerRegistry<VlcVideoSize>()
+  let buffering = ListenerRegistry<VlcBufferingInfo>()
   let remoteNext = ListenerRegistry<Void>()
   let remotePrevious = ListenerRegistry<Void>()
 
@@ -29,6 +30,7 @@ final class PlayerEvents {
     volumeChange.removeAll()
     tracksChange.removeAll()
     videoSizeChange.removeAll()
+    buffering.removeAll()
     remoteNext.removeAll()
     remotePrevious.removeAll()
   }

@@ -257,6 +257,66 @@ final class PlayerIntegrationTests: XCTestCase {
     XCTAssertEqual(player.remoteSkipInterval, 10_000)
     XCTAssertNil(player.androidNotification)
     XCTAssertNil(player.subtitleStyle)
+    XCTAssertEqual(player.reconnectOnResumeAfterMs, 0)
+    XCTAssertEqual(player.reloadOnStallAfterMs, 0)
+    XCTAssertEqual(player.libvlcOptions, [])
+  }
+
+  func testRecoverySettersNormaliseImmediately() {
+    player.reconnectOnResumeAfterMs = 30_000.4
+    player.reloadOnStallAfterMs = -1
+    player.libvlcOptions = [" --network-caching=1500 ", ""]
+    XCTAssertEqual(player.reconnectOnResumeAfterMs, 30_000)
+    XCTAssertEqual(player.reloadOnStallAfterMs, 0)
+    XCTAssertEqual(player.libvlcOptions, ["--network-caching=1500"])
+    player.reloadOnStallAfterMs = .nan
+    XCTAssertEqual(player.reloadOnStallAfterMs, 0)
+  }
+
+  func testBufferingPercentArrivesWhileOpening() throws {
+    var percents: [Double] = []
+    let buffered = expectation(description: "buffering percent")
+    buffered.assertForOverFulfill = false
+    subscriptions.append(try player.addOnBufferingListener { event in
+      percents.append(event.percent)
+      buffered.fulfill()
+    })
+    player.source = fixtureSource
+    wait(for: [buffered], timeout: Self.engineTimeout)
+    XCTAssertTrue(percents.allSatisfy { (0...100).contains($0) && $0 == $0.rounded() })
+    XCTAssertEqual(percents, percents.reduce(into: [Double]()) { if $0.last != $1 { $0.append($1) } })
+  }
+
+  func testLibvlcOptionsSetBeforeLoadReachesPlaying() throws {
+    player.libvlcOptions = ["--network-caching=1500"]
+    try playWithNowPlaying()
+    XCTAssertEqual(player.status, .playing)
+  }
+
+  func testLibvlcOptionsChangeWhilePlayingReopensAndKeepsPosition() throws {
+    player.loop = true
+    try playWithNowPlaying()
+    try player.seek(timeMs: Self.restyleSeekMs)
+    drainMainQueue()
+    var statuses: [VlcStatus] = []
+    var loadedEvents = 0
+    let replaying = expectation(description: "playing again after the options change")
+    replaying.assertForOverFulfill = false
+    subscriptions.append(try player.addOnLoadedListener { _ in loadedEvents += 1 })
+    subscriptions.append(try player.addOnStatusChangeListener { status in
+      statuses.append(status)
+      if status == .playing { replaying.fulfill() }
+    })
+    let restored = expectation(description: "position restored after the options change")
+    restored.assertForOverFulfill = false
+    player.libvlcOptions = ["--network-caching=1500"]
+    wait(for: [replaying], timeout: Self.engineTimeout)
+    subscriptions.append(try player.addOnTimeUpdateListener { event in
+      if event.currentTime >= Self.restyleSeekMs - Self.restylePositionTolerance { restored.fulfill() }
+    })
+    wait(for: [restored], timeout: Self.engineTimeout)
+    XCTAssertEqual(statuses.first, .opening)
+    XCTAssertEqual(loadedEvents, 0)
   }
 
   func testAddSubtitleWithoutSourceThrows() {

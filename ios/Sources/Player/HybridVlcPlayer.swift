@@ -93,6 +93,21 @@ final class HybridVlcPlayer: HybridVlcPlayerSpec {
     set { updateSetting(VlcContract.clampSkipInterval(newValue)) { $0.remoteSkipInterval = $1 } }
   }
 
+  var reconnectOnResumeAfterMs: Double {
+    get { Double(store.settings.reconnectOnResumeAfterMs) }
+    set { updateSetting(VlcContract.clampRecoveryDelay(newValue)) { $0.reconnectOnResumeAfterMs = $1 } }
+  }
+
+  var reloadOnStallAfterMs: Double {
+    get { Double(store.settings.reloadOnStallAfterMs) }
+    set { updateSetting(VlcContract.clampRecoveryDelay(newValue)) { $0.reloadOnStallAfterMs = $1 } }
+  }
+
+  var libvlcOptions: [String] {
+    get { store.settings.libvlcOptions }
+    set { updateSetting(VlcContract.libvlcOptions(newValue)) { $0.libvlcOptions = $1 } }
+  }
+
   var androidNotification: VlcAndroidNotification? {
     get { store.androidNotification }
     set { store.setAndroidNotification(newValue) }
@@ -208,6 +223,10 @@ final class HybridVlcPlayer: HybridVlcPlayerSpec {
     store.events.videoSizeChange.add(listener)
   }
 
+  func addOnBufferingListener(listener: @escaping (VlcBufferingInfo) -> Void) throws -> VlcListenerSubscription {
+    store.events.buffering.add(listener)
+  }
+
   func addOnRemoteNextListener(listener: @escaping () -> Void) throws -> VlcListenerSubscription {
     store.events.remoteNext.add { listener() }
   }
@@ -255,6 +274,8 @@ final class HybridVlcPlayer: HybridVlcPlayerSpec {
     }
     if change.before.subtitleStyle != change.after.subtitleStyle {
       onMain { $0.subtitleStyleDidChange() }
+    } else if change.before.libvlcOptions != change.after.libvlcOptions {
+      onMain { $0.libvlcOptionsDidChange() }
     }
     onMain { $0.applySettings() }
   }

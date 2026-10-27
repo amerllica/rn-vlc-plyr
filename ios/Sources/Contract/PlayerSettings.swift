@@ -13,6 +13,9 @@ struct PlayerSettings: Equatable {
   var staysActiveInBackground = false
   var nowPlaying: NowPlayingInfo?
   var remoteSkipInterval = 10_000
+  var reconnectOnResumeAfterMs = 0
+  var reloadOnStallAfterMs = 0
+  var libvlcOptions: [String] = []
 
   var volumeState: VolumeState {
     VolumeState(volume: volume, muted: muted)

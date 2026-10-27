@@ -56,4 +56,37 @@ final class VlcContractTests: XCTestCase {
     XCTAssertFalse(VlcContract.isLive(duration: 0, isSeekable: true, hasReachedPlaying: true))
     XCTAssertFalse(VlcContract.isLive(duration: 1000, isSeekable: false, hasReachedPlaying: true))
   }
+
+  func testRecoveryDelaysRoundAndTurnOffForInvalidValues() {
+    XCTAssertEqual(VlcContract.clampRecoveryDelay(30_000.4), 30_000)
+    XCTAssertEqual(VlcContract.clampRecoveryDelay(0.5), 1)
+    XCTAssertEqual(VlcContract.clampRecoveryDelay(0), 0)
+    XCTAssertEqual(VlcContract.clampRecoveryDelay(-5), 0)
+    XCTAssertEqual(VlcContract.clampRecoveryDelay(.nan), 0)
+    XCTAssertEqual(VlcContract.clampRecoveryDelay(.infinity), 0)
+  }
+
+  func testLibvlcOptionsAreTrimmedAndBlanksDropped() {
+    XCTAssertEqual(
+      VlcContract.libvlcOptions([" --network-caching=1500 ", "", "  ", "--http-reconnect"]),
+      ["--network-caching=1500", "--http-reconnect"]
+    )
+  }
+
+  func testInstanceOptionsPutLibvlcOptionsBeforeTheSubtitleStyle() {
+    var style = SubtitleStyle()
+    style.bold = true
+    XCTAssertEqual(
+      VlcContract.instanceOptions(libvlcOptions: ["--network-caching=1500"], subtitleStyle: style),
+      ["--network-caching=1500", "--freetype-bold"]
+    )
+    XCTAssertEqual(VlcContract.instanceOptions(libvlcOptions: [], subtitleStyle: nil), [])
+  }
+
+  func testBufferingPercentRoundsAndClamps() {
+    XCTAssertEqual(VlcContract.bufferingPercent(fromEngineCache: 42.5), 43)
+    XCTAssertEqual(VlcContract.bufferingPercent(fromEngineCache: -1), 0)
+    XCTAssertEqual(VlcContract.bufferingPercent(fromEngineCache: 100.4), 100)
+    XCTAssertNil(VlcContract.bufferingPercent(fromEngineCache: .nan))
+  }
 }

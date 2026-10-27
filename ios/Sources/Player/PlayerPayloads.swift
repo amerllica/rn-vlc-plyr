@@ -39,6 +39,10 @@ enum PlayerPayloads {
     VlcTimeUpdate(currentTime: Double(media.currentTime), duration: Double(media.duration))
   }
 
+  static func buffering(_ percent: Int) -> VlcBufferingInfo {
+    VlcBufferingInfo(percent: Double(percent))
+  }
+
   static func volume(_ state: VolumeState) -> VlcVolumeInfo {
     VlcVolumeInfo(volume: Double(state.volume), muted: state.muted)
   }
