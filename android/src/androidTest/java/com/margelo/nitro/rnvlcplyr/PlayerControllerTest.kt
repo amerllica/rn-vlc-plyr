@@ -23,6 +23,7 @@ class PlayerControllerTest {
   private val tracks = CopyOnWriteArrayList<VlcTracksInfo>()
   private val volumes = CopyOnWriteArrayList<VlcVolumeInfo>()
   private val endings = CopyOnWriteArrayList<Unit>()
+  private val bufferings = CopyOnWriteArrayList<VlcBufferingInfo>()
 
   @Before
   fun setUp() {
@@ -35,6 +36,7 @@ class PlayerControllerTest {
     controller.events.tracksChange.add { tracks.add(it) }
     controller.events.volumeChange.add { volumes.add(it) }
     controller.events.ended.add { endings.add(it) }
+    controller.events.buffering.add { bufferings.add(it) }
   }
 
   @After
@@ -325,6 +327,31 @@ class PlayerControllerTest {
     awaitCondition("playing again") { statuses.contains(VlcStatus.PLAYING) }
     awaitCondition("position restored") { controller.read { media.currentTimeMs } >= SEEK_TARGET_MS - POSITION_TOLERANCE_MS }
     assertEquals(50.0, controller.read { settings.subtitleStyle?.fontScale })
+  }
+
+  @Test
+  fun emitsBufferingPercentWithoutRepeats() {
+    controller.setSource(localSource())
+    awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
+    awaitCondition("buffering percent") { bufferings.isNotEmpty() }
+
+    assertTrue(bufferings.all { it.percent in 0.0..100.0 && it.percent == Math.rint(it.percent) })
+    bufferings.zipWithNext().forEach { (previous, next) -> assertFalse("repeated ${next.percent}", previous.percent == next.percent) }
+  }
+
+  @Test
+  fun libvlcOptionsChangeWhilePlayingReopensAndRestoresPosition() {
+    controller.setLoop(true)
+    controller.setSource(localSource())
+    awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
+    controller.seek(SEEK_TARGET_MS.toDouble())
+    statuses.clear()
+    controller.setLibvlcOptions(listOf("--network-caching=1500"))
+    awaitCondition("playing again") { statuses.contains(VlcStatus.PLAYING) }
+    awaitCondition("position restored") { controller.read { media.currentTimeMs } >= SEEK_TARGET_MS - POSITION_TOLERANCE_MS }
+    assertEquals(VlcStatus.OPENING, statuses.first())
+    assertEquals(listOf("--network-caching=1500"), controller.read { settings.libvlcOptions })
+    assertEquals(1, loaded.size)
   }
 
   private fun subtitleStyle(

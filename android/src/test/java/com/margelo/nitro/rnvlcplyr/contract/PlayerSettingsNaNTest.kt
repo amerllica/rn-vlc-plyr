@@ -2,6 +2,7 @@ package com.margelo.nitro.rnvlcplyr.contract
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PlayerSettingsNaNTest {
@@ -26,5 +27,27 @@ class PlayerSettingsNaNTest {
     assertEquals(-200, settings.audioDelayMs)
     assertEquals(40, settings.volumeControl.volume)
     assertFalse(volumeChanged)
+  }
+
+  @Test
+  fun notANumberTurnsTheResumeLimitsOff() {
+    val settings = PlayerSettings()
+    settings.setReconnectOnResumeAfter(5000.0)
+    settings.setReloadOnStallAfter(8000.0)
+
+    settings.setReconnectOnResumeAfter(Double.NaN)
+    settings.setReloadOnStallAfter(Double.NaN)
+
+    assertEquals(0L, settings.reconnectOnResumeAfterMs)
+    assertEquals(0L, settings.reloadOnStallAfterMs)
+  }
+
+  @Test
+  fun libvlcOptionsAreTrimmedAndReportOnlyRealChanges() {
+    val settings = PlayerSettings()
+
+    assertTrue(settings.setLibvlcOptions(listOf(" --network-caching=1500", "")))
+    assertFalse(settings.setLibvlcOptions(listOf("--network-caching=1500 ")))
+    assertEquals(listOf("--network-caching=1500"), settings.libvlcOptions)
   }
 }

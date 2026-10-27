@@ -3,6 +3,7 @@ package com.margelo.nitro.rnvlcplyr.contract
 import com.margelo.nitro.rnvlcplyr.VlcError
 import com.margelo.nitro.rnvlcplyr.VlcErrorCode
 import com.margelo.nitro.rnvlcplyr.VlcSource
+import com.margelo.nitro.rnvlcplyr.VlcSubtitleStyle
 import kotlin.math.floor
 
 object VlcContract {
@@ -24,6 +25,8 @@ object VlcContract {
   private const val MAX_DELAY_MS = 60_000
   private const val MIN_REMOTE_SKIP_INTERVAL_MS = 1_000
   private const val MAX_REMOTE_SKIP_INTERVAL_MS = 60_000
+  private const val MIN_BUFFERING_PERCENT = 0L
+  private const val MAX_BUFFERING_PERCENT = 100L
   private const val MICROS_PER_MILLI = 1000L
   private const val FILE_SCHEME_PREFIX = "file://"
   private const val USER_AGENT_OPTION = ":http-user-agent="
@@ -54,6 +57,17 @@ object VlcContract {
       .coerceIn(MIN_REMOTE_SKIP_INTERVAL_MS.toLong(), MAX_REMOTE_SKIP_INTERVAL_MS.toLong())
       .toInt()
 
+  fun clampDelayMs(value: Double): Long = roundHalfUp(value).coerceAtLeast(0L)
+
+  fun bufferingPercent(value: Float): Int =
+    roundHalfUp(value.toDouble()).coerceIn(MIN_BUFFERING_PERCENT, MAX_BUFFERING_PERCENT).toInt()
+
+  fun normalizeInstanceOptions(options: List<String>): List<String> =
+    options.map(String::trim).filter(String::isNotEmpty)
+
+  fun instanceOptions(libvlcOptions: List<String>, subtitleStyle: VlcSubtitleStyle?): List<String> =
+    normalizeInstanceOptions(libvlcOptions) + SubtitleStyles.options(subtitleStyle)
+
   fun delayToMicros(delayMs: Int): Long = delayMs * MICROS_PER_MILLI
 
   fun clampSeek(targetMs: Double, durationMs: Long): Long {
@@ -77,11 +91,10 @@ object VlcContract {
     return if (hasAddedAudio && ADDED_AUDIO_READER_OPTION !in options) options + ADDED_AUDIO_READER_OPTION else options
   }
 
-  fun classifyEngineError(uri: String?, hasReachedPlaying: Boolean): VlcError {
-    val scheme = uri?.let(::schemeOf)?.lowercase()
-    val isNetworkSource = scheme != null && scheme in NETWORK_SCHEMES
-    return if (isNetworkSource && !hasReachedPlaying) NETWORK_ERROR else MEDIA_ERROR
-  }
+  fun isNetworkSource(uri: String?): Boolean = uri?.let(::schemeOf)?.lowercase()?.let { it in NETWORK_SCHEMES } == true
+
+  fun classifyEngineError(uri: String?, hasReachedPlaying: Boolean): VlcError =
+    if (isNetworkSource(uri) && !hasReachedPlaying) NETWORK_ERROR else MEDIA_ERROR
 
   private fun schemeOf(uri: String): String? = SCHEME_PATTERN.find(uri)?.groupValues?.get(1)
 }

@@ -2,6 +2,7 @@ package com.margelo.nitro.rnvlcplyr.contract
 
 import com.margelo.nitro.rnvlcplyr.VlcErrorCode
 import com.margelo.nitro.rnvlcplyr.VlcSource
+import com.margelo.nitro.rnvlcplyr.VlcSubtitleStyle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -116,5 +117,41 @@ class VlcContractTest {
     assertEquals(VlcErrorCode.INVALIDSOURCE, VlcContract.INVALID_SOURCE_ERROR.code)
     assertEquals("Could not open the media over the network", VlcContract.NETWORK_ERROR.message)
     assertEquals("The media could not be played", VlcContract.MEDIA_ERROR.message)
+  }
+
+  @Test
+  fun networkSourcesAreRecognisedByScheme() {
+    assertEquals(true, VlcContract.isNetworkSource("https://example.com/video.m3u8"))
+    assertEquals(true, VlcContract.isNetworkSource("RTSP://camera/stream"))
+    assertEquals(false, VlcContract.isNetworkSource("file:///sdcard/video.mp4"))
+    assertEquals(false, VlcContract.isNetworkSource("content://media/video"))
+    assertEquals(false, VlcContract.isNetworkSource("/sdcard/video.mp4"))
+    assertEquals(false, VlcContract.isNetworkSource(null))
+  }
+
+  @Test
+  fun resumeLimitsAreRoundedAndNeverNegative() {
+    assertEquals(1500L, VlcContract.clampDelayMs(1499.6))
+    assertEquals(0L, VlcContract.clampDelayMs(-20.0))
+    assertEquals(0L, VlcContract.clampDelayMs(Double.NaN))
+  }
+
+  @Test
+  fun bufferingPercentIsRoundedAndClamped() {
+    assertEquals(43, VlcContract.bufferingPercent(42.5f))
+    assertEquals(0, VlcContract.bufferingPercent(-3f))
+    assertEquals(100, VlcContract.bufferingPercent(140f))
+    assertEquals(0, VlcContract.bufferingPercent(Float.NaN))
+  }
+
+  @Test
+  fun instanceOptionsPutAppOptionsBeforeTheSubtitleStyle() {
+    val style = VlcSubtitleStyle(null, 150.0, null, null, null, null, null, null, null, null)
+
+    val options = VlcContract.instanceOptions(listOf(" --network-caching=1500 ", "", "  "), style)
+
+    assertEquals("--network-caching=1500", options.first())
+    assertEquals(listOf("--network-caching=1500") + SubtitleStyles.options(style), options)
+    assertEquals(emptyList<String>(), VlcContract.instanceOptions(emptyList(), null))
   }
 }

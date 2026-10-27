@@ -23,6 +23,12 @@ class PlayerSettings {
   var androidNotification: VlcAndroidNotification? = null
   var remoteSkipIntervalMs: Int = VlcContract.DEFAULT_REMOTE_SKIP_INTERVAL_MS
     private set
+  var reconnectOnResumeAfterMs: Long = 0L
+    private set
+  var reloadOnStallAfterMs: Long = 0L
+    private set
+  var libvlcOptions: List<String> = emptyList()
+    private set
 
   fun setRate(value: Double) {
     if (value.isNaN()) return
@@ -54,5 +60,20 @@ class PlayerSettings {
   fun setRemoteSkipInterval(value: Double) {
     if (value.isNaN()) return
     remoteSkipIntervalMs = VlcContract.clampSkipInterval(value)
+  }
+
+  fun setReconnectOnResumeAfter(value: Double) {
+    reconnectOnResumeAfterMs = VlcContract.clampDelayMs(value)
+  }
+
+  fun setReloadOnStallAfter(value: Double) {
+    reloadOnStallAfterMs = VlcContract.clampDelayMs(value)
+  }
+
+  fun setLibvlcOptions(value: List<String>): Boolean {
+    val normalized = VlcContract.normalizeInstanceOptions(value)
+    if (normalized == libvlcOptions) return false
+    libvlcOptions = normalized
+    return true
   }
 }

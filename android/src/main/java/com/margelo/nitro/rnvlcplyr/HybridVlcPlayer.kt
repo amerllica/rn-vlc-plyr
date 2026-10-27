@@ -63,6 +63,18 @@ class HybridVlcPlayer : HybridVlcPlayerSpec() {
     get() = controller.read { settings.remoteSkipIntervalMs.toDouble() }
     set(value) = controller.updateSessionSettings { setRemoteSkipInterval(value) }
 
+  override var reconnectOnResumeAfterMs: Double
+    get() = controller.read { settings.reconnectOnResumeAfterMs.toDouble() }
+    set(value) = controller.setReconnectOnResumeAfter(value)
+
+  override var reloadOnStallAfterMs: Double
+    get() = controller.read { settings.reloadOnStallAfterMs.toDouble() }
+    set(value) = controller.setReloadOnStallAfter(value)
+
+  override var libvlcOptions: Array<String>
+    get() = controller.read { settings.libvlcOptions.toTypedArray() }
+    set(value) = controller.setLibvlcOptions(value.toList())
+
   override var androidNotification: VlcAndroidNotification?
     get() = controller.read { settings.androidNotification }
     set(value) = controller.updateSessionSettings { androidNotification = value }
@@ -156,6 +168,9 @@ class HybridVlcPlayer : HybridVlcPlayerSpec() {
 
   override fun addOnVideoSizeChangeListener(listener: (size: VlcVideoSize) -> Unit) =
     events.subscribe(events.videoSizeChange, listener)
+
+  override fun addOnBufferingListener(listener: (event: VlcBufferingInfo) -> Unit) =
+    events.subscribe(events.buffering, listener)
 
   override fun addOnRemoteNextListener(listener: () -> Unit) =
     events.subscribe(events.remoteNext) { listener() }

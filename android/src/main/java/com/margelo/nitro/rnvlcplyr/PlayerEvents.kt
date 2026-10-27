@@ -12,11 +12,13 @@ class PlayerEvents(private val onRemoteListenerPresenceChange: () -> Unit = {}) 
   val volumeChange = registry<VlcVolumeInfo>()
   val tracksChange = registry<VlcTracksInfo>()
   val videoSizeChange = registry<VlcVideoSize>()
+  val buffering = registry<VlcBufferingInfo>()
   val remoteNext = presenceTrackedRegistry()
   val remotePrevious = presenceTrackedRegistry()
 
   private val all = listOf(
-    statusChange, timeUpdate, loaded, ended, error, volumeChange, tracksChange, videoSizeChange, remoteNext, remotePrevious
+    statusChange, timeUpdate, loaded, ended, error, volumeChange, tracksChange, videoSizeChange, buffering, remoteNext,
+    remotePrevious
   )
 
   fun <T> subscribe(registry: ListenerRegistry<T>, listener: (T) -> Unit): VlcListenerSubscription =

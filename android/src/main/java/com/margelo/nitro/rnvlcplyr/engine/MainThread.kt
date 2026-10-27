@@ -16,4 +16,8 @@ object MainThread {
   fun post(block: () -> Unit) {
     handler.post(block)
   }
+
+  fun postDelayed(delayMs: Long, block: () -> Unit) {
+    handler.postDelayed(block, delayMs)
+  }
 }

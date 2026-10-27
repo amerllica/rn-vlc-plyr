@@ -11,7 +11,8 @@ import com.margelo.nitro.rnvlcplyr.contract.PlaybackEffect
 import com.margelo.nitro.rnvlcplyr.contract.PlaybackSlave
 import com.margelo.nitro.rnvlcplyr.contract.PlaybackStateMachine
 import com.margelo.nitro.rnvlcplyr.contract.PlayerSettings
-import com.margelo.nitro.rnvlcplyr.contract.SubtitleStyles
+import com.margelo.nitro.rnvlcplyr.contract.ResumeReconnect
+import com.margelo.nitro.rnvlcplyr.contract.StallWatchdog
 import com.margelo.nitro.rnvlcplyr.contract.TimeUpdateThrottle
 import com.margelo.nitro.rnvlcplyr.contract.TrackList
 import com.margelo.nitro.rnvlcplyr.contract.TrackSelectionRestore
@@ -39,6 +40,9 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   private val throttle = TimeUpdateThrottle()
   private val tracksFilter = ChangeFilter(TrackList.EMPTY_INFO)
   private val videoSizeFilter = ChangeFilter(MediaState.EMPTY_VIDEO_SIZE)
+  private val bufferingFilter = ChangeFilter(NO_BUFFERING_PERCENT)
+  private val reconnect = ResumeReconnect()
+  private val watchdog = StallWatchdog()
   private val outputs = AttachmentStack<VideoOutput>()
   private val engine = PlayerEngine(VlcEngine.libVLC(context)) { event -> onEngineEvent(event) }
   private val session = MediaSessionCoordinator(context, this)
@@ -50,7 +54,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   private var reopenSlaves: List<PlaybackSlave> = emptyList()
   private var reopenSlavesAtMs: Long? = null
   private var trackRestore = TrackSelectionRestore.none()
-  private var styledLibVLC: LibVLC? = null
+  private var privateLibVLC: LibVLC? = null
   private var reloadingInPlace = false
   private var tracksBeforeReopen: VlcTracksInfo? = null
   private var released = false
@@ -95,12 +99,20 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     add { onMain { engine.setSubtitleDelay(micros) } }
   }
 
-  fun setSubtitleStyle(value: VlcSubtitleStyle?) {
+  fun setSubtitleStyle(value: VlcSubtitleStyle?) = updateInstanceOptions { setSubtitleStyle(value) }
+
+  fun setLibvlcOptions(value: List<String>) = updateInstanceOptions { setLibvlcOptions(value) }
+
+  fun setReconnectOnResumeAfter(value: Double) = mutate { settings.setReconnectOnResumeAfter(value) }
+
+  fun setReloadOnStallAfter(value: Double) = mutate { settings.setReloadOnStallAfter(value) }
+
+  private fun updateInstanceOptions(change: PlayerSettings.() -> Boolean) {
     val options = locked {
-      if (released || !settings.setSubtitleStyle(value)) return
-      SubtitleStyles.options(settings.subtitleStyle)
+      if (released || !settings.change()) return
+      VlcContract.instanceOptions(settings.libvlcOptions, settings.subtitleStyle)
     }
-    onMain { applySubtitleStyle(options) }
+    onMain { applyInstanceOptions(options) }
   }
 
   fun setAudioDelay(value: Double) = mutate {
@@ -131,10 +143,37 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     locked { pendingSessionPause = false }
     when (action) {
       PlayAction.NONE -> Unit
-      PlayAction.RESUME -> engine.play()
+      PlayAction.RESUME -> resume()
       PlayAction.RESTART -> restartFromBeginning()
       PlayAction.RELOAD -> loadSource(locked { source }, forcePlay = true)
     }
+  }
+
+  private fun resume() {
+    val now = SystemClock.elapsedRealtime()
+    val plan = locked { planResume(now) }
+    plan.reconnectAtMs?.let(engine::setTime)
+    engine.play()
+    plan.stallCheck?.let { (generation, delayMs) -> MainThread.postDelayed(delayMs) { onMain { checkStall(generation) } } }
+  }
+
+  private fun planResume(nowMs: Long): ResumePlan {
+    val fromPause = machine.status == VlcStatus.PAUSED
+    val reconnects = fromPause && reconnect.shouldReconnect(
+      nowMs,
+      settings.reconnectOnResumeAfterMs,
+      VlcContract.isNetworkSource(source?.uri),
+      media.isLive,
+      media.isSeekable
+    )
+    reconnect.clear()
+    val stallDelayMs = settings.reloadOnStallAfterMs
+    val stallCheck = if (fromPause && stallDelayMs > 0L) watchdog.arm(media.currentTimeMs) to stallDelayMs else null
+    return ResumePlan(media.currentTimeMs.takeIf { reconnects }, stallCheck)
+  }
+
+  private fun checkStall(generation: Int) = mutate {
+    if (watchdog.fire(generation, machine.status, media.currentTimeMs)) reopenWithCurrentState()
   }
 
   override fun pause() = onMain {
@@ -159,6 +198,8 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
       pendingSeekMs = null
       pendingSessionPause = false
       reloadingInPlace = false
+      reconnect.clear()
+      watchdog.disarm()
       media = media.copy(currentTimeMs = 0L)
       val update = media.timeUpdate
       add { engine.stop() }
@@ -254,6 +295,8 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
       media = MediaState()
       source = null
       pendingSeekMs = null
+      reconnect.clear()
+      watchdog.disarm()
       previous
     }
     if (wasReleased) return
@@ -262,8 +305,8 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     MainThread.run {
       outputs.clear()
       engine.release()
-      styledLibVLC?.release()
-      styledLibVLC = null
+      privateLibVLC?.release()
+      privateLibVLC = null
     }
   }
 
@@ -302,6 +345,9 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     tracksBeforeReopen = null
     throttle.reset()
     videoSizeFilter.reset()
+    bufferingFilter.reset()
+    reconnect.clear()
+    watchdog.disarm()
     queueTracks(TrackList.EMPTY_INFO)
     when {
       value == null -> {
@@ -328,10 +374,10 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     add { engine.restart() }
   }
 
-  private fun applySubtitleStyle(options: List<String>) {
-    val previous = styledLibVLC
+  private fun applyInstanceOptions(options: List<String>) {
+    val previous = privateLibVLC
     val next = if (options.isEmpty()) null else VlcEngine.create(context, options)
-    styledLibVLC = next
+    privateLibVLC = next
     engine.useLibVLC(next ?: VlcEngine.libVLC(context))
     mutate {
       when {
@@ -355,6 +401,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
       reopenSlaves = reopenSlaves + adding
       if (adding.select) trackRestore.forgetAudioSelection()
     }
+    bufferingFilter.reset()
     val options = VlcContract.mediaOptions(current, hasAddedAudio)
     add { engine.load(uri, options) }
     applyEffects(machine.reopen())
@@ -392,7 +439,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   private fun onEngineEvent(event: MediaPlayer.Event) {
     when (event.type) {
       MediaPlayer.Event.Opening -> onStatusEvent(EngineEvent.OPENING)
-      MediaPlayer.Event.Buffering -> onStatusEvent(EngineEvent.BUFFERING)
+      MediaPlayer.Event.Buffering -> onBuffering(event.buffering)
       MediaPlayer.Event.Playing -> onPlaying()
       MediaPlayer.Event.Paused -> onStatusEvent(EngineEvent.PAUSED)
       MediaPlayer.Event.Stopped -> onStatusEvent(EngineEvent.STOPPED)
@@ -411,6 +458,20 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   private fun onStatusEvent(event: EngineEvent) {
     val engineIsPlaying = engine.isPlaying
     mutate { applyEffects(machine.onEngineEvent(event, engineIsPlaying)) }
+  }
+
+  private fun onBuffering(percent: Float) {
+    val engineIsPlaying = engine.isPlaying
+    mutate {
+      applyEffects(machine.onEngineEvent(EngineEvent.BUFFERING, engineIsPlaying))
+      queueBufferingPercent(percent)
+    }
+  }
+
+  private fun Outbox.queueBufferingPercent(percent: Float) {
+    if (!machine.isPlaybackActive()) return
+    val value = VlcContract.bufferingPercent(percent)
+    if (bufferingFilter.offer(value)) add { events.buffering.emit(VlcBufferingInfo(value.toDouble())) }
   }
 
   private fun onPlaying() {
@@ -529,6 +590,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     effects.forEach { effect ->
       when (effect) {
         is PlaybackEffect.StatusChanged -> {
+          trackResumeState(effect.status)
           add { events.statusChange.emit(effect.status) }
           add(session::onStatusChanged)
         }
@@ -550,6 +612,11 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
         }
       }
     }
+  }
+
+  private fun trackResumeState(status: VlcStatus) {
+    if (status == VlcStatus.PAUSED) reconnect.pausedAt(SystemClock.elapsedRealtime())
+    if (status in STALL_DISARMING_STATUSES) watchdog.disarm()
   }
 
   private fun currentEngineSettings() = EngineSettings(
@@ -579,6 +646,17 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
 
   private companion object {
     const val NO_FRAME_MESSAGE = SnapshotCapture.NO_FRAME_MESSAGE
+    const val NO_BUFFERING_PERCENT = -1
     val TIME_TRACKING_STATUSES = setOf(VlcStatus.BUFFERING, VlcStatus.PLAYING, VlcStatus.PAUSED)
+    val STALL_DISARMING_STATUSES = setOf(
+      VlcStatus.IDLE,
+      VlcStatus.OPENING,
+      VlcStatus.PAUSED,
+      VlcStatus.STOPPED,
+      VlcStatus.ENDED,
+      VlcStatus.ERROR
+    )
   }
+
+  private data class ResumePlan(val reconnectAtMs: Long?, val stallCheck: Pair<Int, Long>?)
 }
