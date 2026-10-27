@@ -438,6 +438,7 @@ const player = useVlcPlayer({
 
 ## Project documents
 
+- [Changelog](CHANGELOG.md): what changed in each version.
 - [Behaviour contract](docs/player-contract.md): exact behaviour shared by iOS and Android.
 - [Parity report](docs/parity.md): results of the cross-platform checklist.
 - [Architecture decisions](docs/adr/README.md).
