@@ -3,16 +3,22 @@ import { colors, radii, spacing } from '../theme';
 
 interface ChipProps {
   label: string;
+  accessibilityLabel?: string;
   selected: boolean;
   onPress: () => void;
 }
 
-export function Chip({ label, selected, onPress }: ChipProps) {
+export function Chip({
+  label,
+  accessibilityLabel = label,
+  selected,
+  onPress,
+}: ChipProps) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel}
       onPress={onPress}
       style={({ pressed }) => [
         styles.chip,

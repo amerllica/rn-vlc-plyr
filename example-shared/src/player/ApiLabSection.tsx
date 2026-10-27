@@ -43,6 +43,9 @@ export function ApiLabSection({
     ['autoPlay', String(settings.autoPlay)],
     ['isLive', String(media.isLive)],
     ['isSeekable', String(media.isSeekable)],
+    ['buffering', `${media.bufferingPercent} %`],
+    ['reconnectOnResumeAfterMs', String(settings.reconnectOnResumeAfterMs)],
+    ['reloadOnStallAfterMs', String(settings.reloadOnStallAfterMs)],
     ['videoSize', `${media.videoSize.width}×${media.videoSize.height}`],
     [
       'selectedAudioTrack',

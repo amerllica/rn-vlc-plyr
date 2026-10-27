@@ -216,6 +216,41 @@ describe('PlayerScreen', () => {
     expect(player.nowPlaying).toBeUndefined();
   });
 
+  it('writes the network settings to the player', async () => {
+    const player = await renderPlayer();
+
+    await fireEvent.press(
+      screen.getByLabelText('Reconnect on resume after: 15 s')
+    );
+    await fireEvent.press(screen.getByLabelText('Reload on stall after: 10 s'));
+    await fireEvent(
+      screen.getByLabelText('Large network cache'),
+      'valueChange',
+      true
+    );
+
+    expect(player.reconnectOnResumeAfterMs).toBe(15_000);
+    expect(player.reloadOnStallAfterMs).toBe(10_000);
+    expect(player.libvlcOptions).toEqual(['--network-caching=3000']);
+
+    await fireEvent(
+      screen.getByLabelText('Large network cache'),
+      'valueChange',
+      false
+    );
+
+    expect(player.libvlcOptions).toEqual([]);
+  });
+
+  it('shows the buffering percent in the API lab', async () => {
+    const player = await renderPlayer();
+    await fireEvent.press(screen.getByLabelText('Expand API lab'));
+
+    await act(() => player.channels.buffering.emit({ percent: 37 }));
+
+    expect(screen.getByText('37 %')).toBeTruthy();
+  });
+
   it('listens for next and previous only while the toggle is on', async () => {
     const player = await renderPlayer();
     await fireEvent.press(screen.getByLabelText('Expand API lab'));

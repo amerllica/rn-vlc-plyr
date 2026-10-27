@@ -14,6 +14,7 @@ import { ApiLabSection } from './ApiLabSection';
 import { AudioSection } from './AudioSection';
 import { BackgroundSection } from './BackgroundSection';
 import { FullscreenPlayer } from './FullscreenPlayer';
+import { NetworkSection } from './NetworkSection';
 import { TIME_UPDATE_INTERVAL_MS } from './options';
 import { PlaybackSection } from './PlaybackSection';
 import { PlayerHeader } from './PlayerHeader';
@@ -84,6 +85,7 @@ export function PlayerScreen({ route, onBack }: PlayerScreenProps) {
           settings={settings}
           onUpdateSetting={updateSetting}
         />
+        <NetworkSection settings={settings} onUpdateSetting={updateSetting} />
         <BackgroundSection
           player={player}
           nowPlaying={route.nowPlaying}

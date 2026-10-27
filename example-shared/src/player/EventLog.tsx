@@ -17,6 +17,7 @@ const EVENT_COLORS: Record<VlcPlayerEvent, string> = {
   volumeChange: colors.info,
   tracksChange: colors.info,
   videoSizeChange: colors.info,
+  buffering: colors.textSecondary,
   remoteNext: colors.accent,
   remotePrevious: colors.accent,
 };

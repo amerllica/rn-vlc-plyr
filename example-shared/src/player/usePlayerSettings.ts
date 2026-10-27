@@ -10,7 +10,10 @@ export type PlayerSettingKey =
   | 'subtitleStyle'
   | 'staysActiveInBackground'
   | 'nowPlaying'
-  | 'remoteSkipInterval';
+  | 'remoteSkipInterval'
+  | 'reconnectOnResumeAfterMs'
+  | 'reloadOnStallAfterMs'
+  | 'libvlcOptions';
 
 export type PlayerSettings = Pick<VlcPlayer, PlayerSettingKey>;
 
@@ -29,6 +32,9 @@ const readSettings = (player: VlcPlayer): PlayerSettings => ({
   staysActiveInBackground: player.staysActiveInBackground,
   nowPlaying: player.nowPlaying,
   remoteSkipInterval: player.remoteSkipInterval,
+  reconnectOnResumeAfterMs: player.reconnectOnResumeAfterMs,
+  reloadOnStallAfterMs: player.reloadOnStallAfterMs,
+  libvlcOptions: player.libvlcOptions,
 });
 
 export function usePlayerSettings(

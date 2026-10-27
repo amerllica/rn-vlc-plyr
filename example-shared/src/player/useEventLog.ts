@@ -15,7 +15,10 @@ export interface EventLogEntry {
 
 export const EVENT_LOG_LIMIT = 30;
 const DETAIL_LIMIT = 160;
-const COALESCED_EVENTS: ReadonlySet<VlcPlayerEvent> = new Set(['timeUpdate']);
+const COALESCED_EVENTS: ReadonlySet<VlcPlayerEvent> = new Set([
+  'timeUpdate',
+  'buffering',
+]);
 
 const pad = (value: number, length = 2) => String(value).padStart(length, '0');
 
@@ -78,6 +81,9 @@ export function useEventLog(player: VlcPlayer) {
   );
   useVlcPlayerEvent(player, 'videoSizeChange', (payload) =>
     record('videoSizeChange', payload)
+  );
+  useVlcPlayerEvent(player, 'buffering', (payload) =>
+    record('buffering', payload)
   );
 
   return { entries, clear, record };

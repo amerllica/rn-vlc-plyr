@@ -20,6 +20,7 @@ export interface MediaState {
   selectedAudioTrack: number;
   selectedSubtitleTrack: number;
   error: VlcError | undefined;
+  bufferingPercent: number;
 }
 
 const readMediaState = (player: VlcPlayer): MediaState => ({
@@ -35,6 +36,7 @@ const readMediaState = (player: VlcPlayer): MediaState => ({
   selectedAudioTrack: player.selectedAudioTrack,
   selectedSubtitleTrack: player.selectedSubtitleTrack,
   error: player.error,
+  bufferingPercent: 0,
 });
 
 export function useMediaState(player: VlcPlayer): MediaState {
@@ -58,6 +60,9 @@ export function useMediaState(player: VlcPlayer): MediaState {
     merge({ videoSize })
   );
   useVlcPlayerEvent(player, 'error', (error) => merge({ error }));
+  useVlcPlayerEvent(player, 'buffering', ({ percent }) =>
+    merge({ bufferingPercent: percent })
+  );
 
   return state;
 }
