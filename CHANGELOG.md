@@ -6,8 +6,49 @@ All notable changes to rn-vlc-plyr. The format follows
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-27
+
+### Highlights
+
+Faster play after a long pause on a slow network, and a buffering percent you can show instead of
+an endless spinner. The player can open a fresh connection when you resume, and can reload a stream
+that never comes back. All of it is off by default and works the same on iOS and Android.
+
+### Added
+
+- `player.reconnectOnResumeAfterMs`: after a pause at least this long, `play()` seeks to the
+  current position before it plays, so VLC opens a new connection at once instead of waiting on the
+  one the server closed. It covers every resume, also from the lock screen, the notification and
+  remote commands, and skips local files, live streams and sources that are not seekable.
+  See [ADR 0022](docs/adr/0022-resume-reconnect.md).
+- `player.reloadOnStallAfterMs`: when playback has not moved this long after a resume, the media
+  reloads once at the same position, with the added files and the selected tracks.
+- `player.libvlcOptions`: libVLC instance options such as `--network-caching=3000`. They merge with
+  the subtitle style options, and a change reloads the media in place.
+- `buffering` event with `{ percent }`, the buffer fill from 0 to 100.
+- Example apps: a network section with the reconnect and stall delays and a large cache switch, and
+  the buffering percent in the API lab and the event log.
+
+### Known limits
+
+- VLC 3 reports live HLS as seekable, so `reconnectOnResumeAfterMs` does not skip it. Keep it at `0`
+  for live HLS.
+- iOS: MobileVLCKit has no public buffering percent. The library reads it from the libVLC player
+  under MobileVLCKit. If a MobileVLCKit update removes that access, `buffering` stops firing on iOS.
+- A player with `libvlcOptions` uses its own libVLC instance, which costs extra memory.
+
+### Docs
+
+- README: the new properties and event, `libvlcOptions` next to `vlcOptions`, and a recipe for
+  resuming after a long pause.
+- Player contract: instance options, resume and stalls, and the `buffering` event.
+- [ADR 0022](docs/adr/0022-resume-reconnect.md): reconnect on resume and instance options.
+- Parity report: the iOS buffering percent and the 1.3 test counts.
+
 ### Internal
 
+- GitHub releases take their notes from this changelog, and CI fails when the package version has
+  no section. See [ADR 0021](docs/adr/0021-release-notes.md).
 - CI runs a failed iOS test once more before it fails the job.
 - CI uploads the Android instrumented test reports and the iOS XCTest result bundle when a native
   test job fails.
@@ -176,7 +217,8 @@ same on iOS and Android.
 - Releases are published only by GitHub Actions on a version tag, with npm trusted publishing and
   provenance. See [ADR 0012](docs/adr/0012-release-pipeline.md).
 
-[Unreleased]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.0.0...v1.0.1
