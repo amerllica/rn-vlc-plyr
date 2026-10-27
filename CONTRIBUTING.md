@@ -160,14 +160,39 @@ The `package.json` file contains various scripts for common tasks:
 
 Releases are published by GitHub Actions, never from a laptop:
 
-1. Set `version` in `package.json` (for example `1.0.0` or `1.0.0-beta.1`) and commit it on `main`.
-2. Tag the commit with the same version and push the tag: `git tag v1.0.0 && git push origin v1.0.0`.
+1. In [`CHANGELOG.md`](CHANGELOG.md), rename the `## [Unreleased]` entries to
+   `## [1.0.0] - YYYY-MM-DD`, add a new empty `## [Unreleased]` above it, and update the compare
+   links at the end of the file. A beta can skip this step: it uses the `Unreleased` section.
+2. Set `version` in `package.json` (for example `1.0.0` or `1.0.0-beta.1`) and commit both files on
+   `main`. The lint job fails when the changelog has no section for the package version.
+3. Preview the GitHub release body with `yarn release-notes`, or `yarn release-notes 1.0.0` for
+   another version.
+4. Tag the commit with the same version and push the tag: `git tag v1.0.0 && git push origin v1.0.0`.
    The tag must be on `main` and must equal `v` plus the `package.json` version, or the release job
    stops.
-3. The workflow runs every check, then publishes to npm with provenance through trusted publishing,
-   and creates a GitHub release with notes generated from the commits. A version that is already on
-   npm is not published again.
+5. The workflow runs every check, builds the release notes from `CHANGELOG.md`, then publishes to
+   npm with provenance through trusted publishing, and creates a GitHub release with those notes.
+   A version that is already on npm is not published again.
    Versions with `-beta.N` go to the `beta` dist-tag and become a GitHub pre-release.
+
+#### Writing a changelog section
+
+Add entries to `## [Unreleased]` in the same commit as the change, or before the version bump.
+Each section is the body of a GitHub release, so write it for the people who use the library, not
+from the commit list. Use these subsections in this order and leave out the empty ones:
+
+- `### Highlights`: one to three sentences on what this version gives the user.
+- `### Breaking`: what broke and what to do instead.
+- `### Added`, `### Fixed`, `### Changed`: user-facing changes. Put public API names in backticks.
+  Start a line with `iOS:` or `Android:` when it applies to one platform only. Link an issue or a
+  pull request when there is one.
+- `### Known limits`: limits a user can hit with the new features.
+- `### Setup`: steps an app must take, such as config plugin or manifest changes.
+- `### Docs`: README sections, contract changes and ADRs a user should read.
+- `### Internal`: CI, tests, example apps and tooling. Keep it short.
+
+The release job adds the install command, the npm link, the native engine versions and the full
+changelog link under the section.
 
 ### Sending a pull request
 
