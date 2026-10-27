@@ -196,6 +196,9 @@ Settable properties. They persist across source changes and are clamped natively
 | `staysActiveInBackground` | `boolean` | `false` | Keep playing audio in the background and on the lock screen. Needs [app setup](#background-audio-and-lock-screen-controls) |
 | `nowPlaying` | `VlcNowPlaying \| undefined` | `undefined` | `{ title, artist?, album?, artworkUri? }`. Shows the media on the lock screen, in Control Center and in the notification shade |
 | `remoteSkipInterval` | `number` | `10000` | 1000–60000 ms. Step for the skip back and skip forward buttons |
+| `reconnectOnResumeAfterMs` | `number` | `0` | ms, `0` turns it off. After a pause this long, `play()` seeks to the current position first, so VLC opens a new connection. See [Resume after a long pause](#resume-after-a-long-pause) |
+| `reloadOnStallAfterMs` | `number` | `0` | ms, `0` turns it off. When playback has not moved this long after a resume, the media reloads once at the same position |
+| `libvlcOptions` | `string[]` | `[]` | libVLC instance options, for example `['--network-caching=3000']`. A change reloads the media in place |
 | `androidNotification` | `VlcAndroidNotification \| undefined` | `undefined` | Android only. `{ color?, smallIcon? }`: a hex colour and a drawable resource name. The default icon is the app icon |
 
 Read-only properties:
@@ -245,6 +248,7 @@ Subscribe with `useVlcPlayerEvent(player, event, listener)` in components, or
 | `volumeChange` | `{ volume, muted }` | `volume` or `muted` changed |
 | `tracksChange` | `{ audioTracks, subtitleTracks, selectedAudioTrack, selectedSubtitleTrack }` | Tracks or selection changed |
 | `videoSizeChange` | `{ width, height }` | Decoded size changed |
+| `buffering` | `{ percent }` | VLC's buffer fill changed, 0–100. Comes while the media is open, also while the status stays `playing` |
 | `remoteNext` | none | The next button was pressed on the lock screen, notification, headset or car |
 | `remotePrevious` | none | The previous button was pressed |
 
@@ -400,21 +404,52 @@ const player = useVlcPlayer({
 });
 ```
 
+`vlcOptions` on the source are media options and start with `:`. `libvlcOptions` on the player are
+libVLC instance options and start with `--`. Some modules read their settings only from the instance.
+A player with `libvlcOptions` or a subtitle style uses its own libVLC instance, which costs extra
+memory.
+
+### Resume after a long pause
+
+While a stream is paused, the server or a proxy can close the idle HTTP connection. On `play()`,
+VLC 3 first drains its buffer and then waits on the dead connection before it opens a new one
+([VideoLAN issue 5093](https://trac.videolan.org/vlc/ticket/5093)). A seek opens a new connection at
+once.
+
+```ts
+const player = useVlcPlayer(source, (p) => {
+  p.reconnectOnResumeAfterMs = 15000;
+  p.reloadOnStallAfterMs = 10000;
+});
+
+useVlcPlayerEvent(player, 'buffering', ({ percent }) => setBufferPercent(percent));
+```
+
+- `reconnectOnResumeAfterMs` applies to `play()` from `paused`, also from the lock screen, the
+  notification and remote commands. It skips local files, live streams and sources that are not
+  seekable. VLC 3 reports live HLS as seekable, so set it to `0` for live HLS.
+- `reloadOnStallAfterMs` counts a stall when the status is still `buffering`, or `playing` with no
+  progress since the resume. It reloads at most once per resume. The reload keeps the position, the added
+  files and the selected tracks, and does not emit `loaded` again.
+- `:http-reconnect` does not help. The HTTP module that VLC 3 uses for `http://` and `https://`
+  ignores it.
+
 ## Limitations
 
 - **HTTP headers.** libvlc 3 can send only a user agent and a referrer. Arbitrary headers such as
   `Authorization` are not supported; use signed URLs instead.
 - **`autoPlay = false`.** The media is prepared but stays `idle`, and `duration` and tracks are known
   only after `play()`.
-- **Buffering progress.** There is no buffering percentage, because iOS does not report one. Use
-  `status === 'buffering'`.
+- **Buffering percent on iOS.** MobileVLCKit has no public API for it. The library reads it from
+  the libVLC player under MobileVLCKit. If a MobileVLCKit update removes that access, `buffering`
+  stops firing on iOS and the player keeps working.
 - **Lock screen styling.** iOS has no styling hooks; the artwork is the only visual. Android allows a
   notification colour and small icon.
 - **One system player.** The OS shows one Now Playing entry. With several players, the last one that
   started playing with `nowPlaying` set owns it.
-- **Subtitle style is not live.** libVLC 3 reads the style when the engine starts, so a change
-  reloads the media in place. A player with a style uses its own libVLC instance, which costs extra
-  memory and builds its own font list the first time it draws text.
+- **Subtitle style and `libvlcOptions` are not live.** libVLC 3 reads them when the engine starts,
+  so a change reloads the media in place. A player with either one uses its own libVLC instance,
+  which costs extra memory and builds its own font list the first time it draws text.
 - **Added audio changes the reader.** The first `addAudio` reloads the media in place and opens it
   with VLC's FFmpeg reader from then on. An adaptive stream such as HLS loses VLC's adaptive reader.
 - **Added files after a restart on Android.** After `loop`, or `play()` after `stop()` or the end,

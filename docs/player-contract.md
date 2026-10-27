@@ -20,6 +20,8 @@ and Android disagree, this file decides.
 | `staysActiveInBackground` | `false` |
 | `nowPlaying` | `undefined` |
 | `remoteSkipInterval` | `10000` |
+| `reconnectOnResumeAfterMs`, `reloadOnStallAfterMs` | `0` |
+| `libvlcOptions` | `[]` |
 | `androidNotification` | `undefined` |
 | `status` | `'idle'` |
 | `error` | `undefined` |
@@ -42,6 +44,8 @@ Native clamps every input. The getter returns the clamped value immediately afte
 | `timeUpdateInterval` | round, clamp 50–5000 ms |
 | `subtitleDelay`, `audioDelay` | round, clamp −60000–60000 ms. Engine takes microseconds: multiply by 1000 |
 | `remoteSkipInterval` | round, clamp 1000–60000 ms |
+| `reconnectOnResumeAfterMs`, `reloadOnStallAfterMs` | round; `NaN` and negative become 0. `0` turns the feature off |
+| `libvlcOptions` | each entry trimmed, empty entries dropped, order kept |
 | `subtitleStyle.fontScale` | round, clamp 25–400 %. Engine size: `--freetype-rel-fontsize=round(1600 / fontScale)` |
 | `subtitleStyle.shadowDistance` | clamp 0–1 |
 | `subtitleStyle.marginBottom` | round, clamp 0–1000 px |
@@ -55,8 +59,8 @@ Native clamps every input. The getter returns the clamped value immediately afte
 ## Persistence across sources
 
 `volume`, `muted`, `rate`, `loop`, `autoPlay`, `timeUpdateInterval`, `subtitleDelay`,
-`subtitleStyle`, `audioDelay`, `staysActiveInBackground`, `nowPlaying`, `remoteSkipInterval` and
-`androidNotification` belong to the player, not to the media. They survive every source change and are
+`subtitleStyle`, `audioDelay`, `staysActiveInBackground`, `nowPlaying`, `remoteSkipInterval`,
+`reconnectOnResumeAfterMs`, `reloadOnStallAfterMs`, `libvlcOptions` and `androidNotification` belong to the player, not to the media. They survive every source change and are
 re-applied to the engine each time a new media reaches `playing`.
 
 ## Source
@@ -117,6 +121,7 @@ Status values: `idle`, `opening`, `buffering`, `playing`, `paused`, `stopped`, `
 | `volumeChange` | when `volume` or `muted` actually changes | `{ volume, muted }` |
 | `tracksChange` | when either track list or either selection differs from the last emitted value | `{ audioTracks, subtitleTracks, selectedAudioTrack, selectedSubtitleTrack }` |
 | `videoSizeChange` | when the decoded size changes and both sides are > 0 | `{ width, height }` |
+| `buffering` | when the engine buffer fill changes to a new whole percent while the status is `opening`, `buffering`, `playing` or `paused` | `{ percent }`, integer 0–100 |
 | `remoteNext` | the system next command fires (lock screen, notification, headset, car) | none |
 | `remotePrevious` | the system previous command fires | none |
 
@@ -129,6 +134,8 @@ Ordering rules:
 - `tracksChange` is evaluated on every load, so an empty list is emitted when the previous list was
   not empty. Track info is not refreshed while `ended`, `stopped` or during a loop restart.
 - `videoSizeChange` deduplication resets on every new source.
+- `buffering` deduplication resets on every new source and every in-place reload. It does not
+  change `status`: VLC reports buffer fill while it plays too.
 
 Listeners may be added at any time. `remove()` is idempotent. Native may emit from any thread;
 Nitro delivers callbacks on the JS thread.
@@ -159,6 +166,31 @@ Nitro delivers callbacks on the JS thread.
 Messages are fixed strings so they match across OSes: `Invalid source uri`,
 `Could not open the media over the network`, `The media could not be played`.
 
+## Instance options
+
+`libvlcOptions` and the subtitle style both become libVLC instance options. The instance gets
+`libvlcOptions` first, then the subtitle style options below.
+
+- No options → the player uses the shared libVLC instance. Any option → the player owns a private
+  instance, created when the options change and released with the player or the next change.
+- A change to a different list follows the subtitle style reload rules below.
+
+## Resume and stalls
+
+- Each `statusChange('paused')` records the time of the pause.
+- `play()` from `paused` reconnects when all of these hold: `reconnectOnResumeAfterMs > 0`, the
+  pause lasted at least that long, the uri scheme is a network scheme (see [Errors](#errors)),
+  `isLive` is false and `isSeekable` is true. Reconnect means a seek to `currentTime` right before
+  the engine plays. It emits no extra `timeUpdate`.
+- This covers every resume: `play()`, remote commands, the lock screen, the notification and the
+  end of an interruption.
+- After a resume with `reloadOnStallAfterMs > 0`, the player checks once that many ms later. The
+  check counts as a stall when the status is `buffering`, or when it is `playing` and `currentTime`
+  has not moved past the position at the resume. VLC can report `playing` while it still waits on
+  the network. A stall reloads the media in place once, with the subtitle style reload rules below.
+  `idle`, `opening`, `paused`, `stopped`, `ended`, `error`, a new source, `stop()` and `release()`
+  cancel the check.
+
 ## Subtitle style
 
 The style becomes libVLC instance options. Order and format are identical on both platforms:
@@ -176,8 +208,7 @@ The style becomes libVLC instance options. Order and format are identical on bot
 | `shadowDistance` | `--freetype-shadow-distance=<float>` |
 | `marginBottom` | `--sub-margin=<px>` |
 
-- No options → the player uses the shared libVLC instance. Any option → the player owns a private
-  instance, created when the style changes and released with the player or the next style.
+- The instance rules are in [Instance options](#instance-options).
 - A change to a different normalised style:
   - `opening`, `buffering`, `playing` or `paused`: the media reloads on a new engine. Status goes
     to `opening` and back. Position is restored with a seek once the media is seekable; a paused

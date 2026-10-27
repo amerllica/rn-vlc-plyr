@@ -21,3 +21,4 @@
 - [0019. Subtitle style through libVLC instance options](0019-subtitle-style.md)
 - [0020. External audio through playback slaves](0020-external-audio.md)
 - [0021. Release notes from the changelog](0021-release-notes.md)
+- [0022. Reconnect on resume and instance options](0022-resume-reconnect.md)

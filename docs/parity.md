@@ -13,11 +13,11 @@ Results of the cross-platform checklist against [the player contract](player-con
 
 | Suite | iOS | Android |
 |---|---|---|
-| Pure contract rules | XCTest, pass | JUnit on the JVM, 100 pass |
-| Real playback | XCTest with bundled MP4 and M4A files, pass | Instrumented tests on the emulator with bundled MP4, M4A, MKV and SRT files, 43 pass |
-| Total | 147 pass | 143 pass |
+| Pure contract rules | XCTest, pass | JUnit on the JVM, 116 pass |
+| Real playback | XCTest with bundled MP4 and M4A files, pass | Instrumented tests on the emulator with bundled MP4, M4A, MKV and SRT files, 45 pass |
+| Total | 168 pass | 161 pass |
 
-Counts from 2026-10-21 for 1.2, on the iPhone 18 Pro simulator (iOS 27) and the Pixel_10a emulator
+Counts from 2026-10-27 for 1.3, on the iPhone 18 Pro simulator (iOS 27) and the Pixel_10a emulator
 (API 37). The background and media session contract rules have the same 33 test names on both OSes.
 The 9 Android subtitle drawing tests are described in
 [Android subtitle drawing](#android-subtitle-drawing).
@@ -158,6 +158,9 @@ These come from VLC 3 and are the same on both platforms.
 
 ## Platform-specific workarounds
 
+- **iOS:** MobileVLCKit has no buffering percent. An Objective-C observer gets the libVLC player
+  from MobileVLCKit's private `libVLCMediaPlayer` accessor and listens to
+  `libvlc_MediaPlayerBuffering`. Android reads the percent from `MediaPlayer.Event.getBuffering()`.
 - **iOS:** releasing a `VLCMediaPlayer` on the main thread can deadlock, because libvlc waits for the
   video output, which waits for the main thread. Retired players are stopped, kept for one second
   and released on a background queue.

@@ -15,6 +15,7 @@ both platforms ship libVLC 3.
   ordered list of `--freetype-*` and `--sub-margin` options. Both platforms test the same list.
 - A player with a style owns a private libVLC instance: `VLCMediaPlayer(options:)` on iOS and
   `LibVLC(context, options)` on Android. A player without a style keeps the shared instance.
+  [ADR 0022](0022-resume-reconnect.md) adds `libvlcOptions` to the same instance.
 - A style change on a loaded source reloads the media on a new engine and restores the position,
   the pause state, the added subtitle and audio files ([ADR 0020](0020-external-audio.md)) and the
   track selections. `loaded` is not emitted again.
