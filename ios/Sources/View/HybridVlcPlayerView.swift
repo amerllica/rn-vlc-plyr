@@ -40,6 +40,11 @@ final class HybridVlcPlayerView: HybridVlcPlayerViewSpec, VideoHost {
     }
   }
 
+  deinit {
+    statusSubscription?.remove()
+    ScreenIdleTimer.keepAwake(self, false)
+  }
+
   func onDropView() {
     attach(to: nil)
   }
