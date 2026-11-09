@@ -6,6 +6,7 @@ import android.widget.FrameLayout
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
 import com.facebook.react.uimanager.ThemedReactContext
+import com.margelo.nitro.rnvlcplyr.contract.isActive
 import com.margelo.nitro.rnvlcplyr.engine.ResizeModes
 import com.margelo.nitro.rnvlcplyr.engine.VideoOutput
 import com.margelo.nitro.rnvlcplyr.view.VideoContainer
@@ -17,12 +18,14 @@ import org.videolan.libvlc.util.VLCVideoLayout
 class HybridVlcPlayerView(private val context: ThemedReactContext) : HybridVlcPlayerViewSpec(), VideoOutput {
   private val container = VideoContainer(context)
   private var attachedPlayer: HybridVlcPlayer? = null
+  private var statusSubscription: VlcListenerSubscription? = null
 
   override val view: View = container
 
   override var player: HybridVlcPlayerSpec? = null
   override var resizeMode: VlcResizeMode? = null
   override var surfaceType: VlcSurfaceType? = null
+  override var keepScreenOn: Boolean? = null
 
   override var usesTextureView: Boolean = true
     private set
@@ -36,6 +39,7 @@ class HybridVlcPlayerView(private val context: ThemedReactContext) : HybridVlcPl
   override fun afterUpdate() {
     syncSurfaceType()
     syncPlayer()
+    syncScreenOn()
   }
 
   override fun onDropView() {
@@ -64,11 +68,20 @@ class HybridVlcPlayerView(private val context: ThemedReactContext) : HybridVlcPl
     detachFromPlayer()
     attachedPlayer = target
     target?.attachOutput(this)
+    statusSubscription = target?.addOnStatusChangeListener(::syncScreenOn)
   }
 
   private fun detachFromPlayer() {
+    statusSubscription?.remove()
+    statusSubscription = null
     attachedPlayer?.detachOutput(this)
     attachedPlayer = null
+    syncScreenOn()
+  }
+
+  private fun syncScreenOn(status: VlcStatus? = attachedPlayer?.status) {
+    val on = (keepScreenOn ?: DEFAULT_KEEP_SCREEN_ON) && status?.isActive == true
+    container.post { container.keepScreenOn = on }
   }
 
   private fun createVideoLayout(): VLCVideoLayout =
@@ -78,5 +91,6 @@ class HybridVlcPlayerView(private val context: ThemedReactContext) : HybridVlcPl
 
   private companion object {
     val DEFAULT_SURFACE_TYPE = VlcSurfaceType.TEXTURE
+    const val DEFAULT_KEEP_SCREEN_ON = true
   }
 }

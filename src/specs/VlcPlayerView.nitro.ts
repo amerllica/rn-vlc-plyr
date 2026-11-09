@@ -13,6 +13,7 @@ export interface VlcPlayerViewProps extends HybridViewProps {
   player?: VlcPlayer;
   resizeMode?: VlcResizeMode;
   surfaceType?: VlcSurfaceType;
+  keepScreenOn?: boolean;
 }
 
 export interface VlcPlayerViewMethods extends HybridViewMethods {}

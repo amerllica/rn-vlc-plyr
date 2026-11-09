@@ -266,6 +266,12 @@ Accepts all `View` props plus:
 | `player` | `VlcPlayer` | | The player to show |
 | `resizeMode` | `'contain' \| 'cover' \| 'stretch' \| 'original'` | `'contain'` | |
 | `surfaceType` | `'texture' \| 'surface'` | `'texture'` | Android only. `texture` supports clipping, rounded corners and transforms. `surface` uses less GPU but always draws on top in its own layer |
+| `keepScreenOn` | `boolean` | `true` | Keep the screen on while the player is `opening`, `buffering` or `playing` |
+
+With `keepScreenOn`, a view lets the screen sleep on any other status, when the prop turns `false`
+and when the view goes away. Android sets `keepScreenOn` on the view. iOS turns off the idle timer,
+and turns it back on only if no other view needs it and the timer was not already off when playback started. Set it
+to `false` for muted previews in a feed, or when the app keeps the screen on by its own rules.
 
 ### `<VlcFullscreenModal>`
 

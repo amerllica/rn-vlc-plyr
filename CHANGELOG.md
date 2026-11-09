@@ -6,6 +6,20 @@ All notable changes to rn-vlc-plyr. The format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-09
+
+### Added
+
+- `<VlcPlayerView keepScreenOn>`, default `true`. Set it to `false` to let the screen sleep during
+  playback, for example for a muted preview.
+
+### Fixed
+
+- The screen no longer locks during playback. `<VlcPlayerView>` keeps the screen on while its
+  player is `opening`, `buffering` or `playing`, without any code in the app. Android sets
+  `keepScreenOn` on the view. iOS turns off the idle timer and turns it back on only if the timer
+  was not already off when playback started.
+
 ## [1.3.0] - 2026-10-27
 
 ### Highlights
@@ -217,7 +231,8 @@ same on iOS and Android.
 - Releases are published only by GitHub Actions on a version tag, with npm trusted publishing and
   provenance. See [ADR 0012](docs/adr/0012-release-pipeline.md).
 
-[Unreleased]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.0.1...v1.1.0

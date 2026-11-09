@@ -2,8 +2,10 @@ import NitroModules
 import UIKit
 
 final class HybridVlcPlayerView: HybridVlcPlayerViewSpec, VideoHost {
+  private static let defaultKeepScreenOn = true
   private let hostingView = VideoHostView()
   private weak var attachedPlayer: HybridVlcPlayer?
+  private var statusSubscription: VlcListenerSubscription?
 
   var view: UIView { hostingView }
   var hostView: UIView { hostingView }
@@ -26,6 +28,10 @@ final class HybridVlcPlayerView: HybridVlcPlayerViewSpec, VideoHost {
 
   var surfaceType: VlcSurfaceType?
 
+  var keepScreenOn: Bool? {
+    didSet { keepAwake(while: attachedPlayer?.status) }
+  }
+
   override init() {
     super.init()
     hostingView.onLayout = { [weak self] in
@@ -34,14 +40,30 @@ final class HybridVlcPlayerView: HybridVlcPlayerViewSpec, VideoHost {
     }
   }
 
+  deinit {
+    statusSubscription?.remove()
+    ScreenIdleTimer.keepAwake(self, false)
+  }
+
   func onDropView() {
     attach(to: nil)
   }
 
   private func attach(to next: HybridVlcPlayer?) {
     guard next !== attachedPlayer else { return }
+    statusSubscription?.remove()
+    statusSubscription = nil
     attachedPlayer?.detach(self)
     attachedPlayer = next
     next?.attach(self)
+    keepAwake(while: next?.status)
+    statusSubscription = try? next?.addOnStatusChangeListener { [weak self] status in
+      self?.keepAwake(while: status)
+    }
+  }
+
+  private func keepAwake(while status: VlcStatus?) {
+    let isActive = status.flatMap { PlayerStatus(rawValue: $0.stringValue) }?.isActive ?? false
+    ScreenIdleTimer.keepAwake(self, (keepScreenOn ?? Self.defaultKeepScreenOn) && isActive)
   }
 }
