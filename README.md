@@ -267,6 +267,11 @@ Accepts all `View` props plus:
 | `resizeMode` | `'contain' \| 'cover' \| 'stretch' \| 'original'` | `'contain'` | |
 | `surfaceType` | `'texture' \| 'surface'` | `'texture'` | Android only. `texture` supports clipping, rounded corners and transforms. `surface` uses less GPU but always draws on top in its own layer |
 
+A view keeps the screen on while its player is `opening`, `buffering` or `playing`, and lets it sleep
+on any other status and when the view goes away. Android sets `keepScreenOn` on the view. iOS turns
+off the idle timer, and turns it back on only if no other view needs it and the app had not turned it
+off itself.
+
 ### `<VlcFullscreenModal>`
 
 A full-screen `Modal` that shows the same player without reloading.
