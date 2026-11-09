@@ -6,6 +6,7 @@ import android.widget.FrameLayout
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
 import com.facebook.react.uimanager.ThemedReactContext
+import com.margelo.nitro.rnvlcplyr.contract.isActive
 import com.margelo.nitro.rnvlcplyr.engine.ResizeModes
 import com.margelo.nitro.rnvlcplyr.engine.VideoOutput
 import com.margelo.nitro.rnvlcplyr.view.VideoContainer
@@ -17,6 +18,7 @@ import org.videolan.libvlc.util.VLCVideoLayout
 class HybridVlcPlayerView(private val context: ThemedReactContext) : HybridVlcPlayerViewSpec(), VideoOutput {
   private val container = VideoContainer(context)
   private var attachedPlayer: HybridVlcPlayer? = null
+  private var statusSubscription: VlcListenerSubscription? = null
 
   override val view: View = container
 
@@ -64,11 +66,24 @@ class HybridVlcPlayerView(private val context: ThemedReactContext) : HybridVlcPl
     detachFromPlayer()
     attachedPlayer = target
     target?.attachOutput(this)
+    if (target != null) {
+      statusSubscription = target.addOnStatusChangeListener(::keepScreenOnWhile)
+      keepScreenOnWhile(target.status)
+    }
   }
 
   private fun detachFromPlayer() {
+    statusSubscription?.remove()
+    statusSubscription = null
     attachedPlayer?.detachOutput(this)
     attachedPlayer = null
+    keepScreenOn(false)
+  }
+
+  private fun keepScreenOnWhile(status: VlcStatus) = keepScreenOn(status.isActive)
+
+  private fun keepScreenOn(on: Boolean) {
+    container.post { container.keepScreenOn = on }
   }
 
   private fun createVideoLayout(): VLCVideoLayout =

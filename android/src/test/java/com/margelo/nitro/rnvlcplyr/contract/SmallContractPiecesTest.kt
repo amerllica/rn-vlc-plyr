@@ -1,5 +1,6 @@
 package com.margelo.nitro.rnvlcplyr.contract
 
+import com.margelo.nitro.rnvlcplyr.VlcStatus
 import com.margelo.nitro.rnvlcplyr.VlcTrack
 import com.margelo.nitro.rnvlcplyr.VlcTracksInfo
 import com.margelo.nitro.rnvlcplyr.VlcVideoSize
@@ -12,6 +13,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SmallContractPiecesTest {
+  @Test
+  fun onlyOpeningBufferingAndPlayingKeepTheScreenOn() {
+    val awake = VlcStatus.values().filter { it.isActive }
+    assertEquals(listOf(VlcStatus.OPENING, VlcStatus.BUFFERING, VlcStatus.PLAYING), awake)
+  }
+
   @Test
   fun trackListDropsDisableEntryAndNamesUnnamedTracks() {
     val tracks = TrackList.build(listOf(EngineTrack(-1, "Disable"), EngineTrack(1, "English"), EngineTrack(2, ""), EngineTrack(5, null)))
