@@ -25,6 +25,7 @@ class HybridVlcPlayerView(private val context: ThemedReactContext) : HybridVlcPl
   override var player: HybridVlcPlayerSpec? = null
   override var resizeMode: VlcResizeMode? = null
   override var surfaceType: VlcSurfaceType? = null
+  override var keepScreenOn: Boolean? = null
 
   override var usesTextureView: Boolean = true
     private set
@@ -38,6 +39,7 @@ class HybridVlcPlayerView(private val context: ThemedReactContext) : HybridVlcPl
   override fun afterUpdate() {
     syncSurfaceType()
     syncPlayer()
+    syncScreenOn()
   }
 
   override fun onDropView() {
@@ -66,10 +68,7 @@ class HybridVlcPlayerView(private val context: ThemedReactContext) : HybridVlcPl
     detachFromPlayer()
     attachedPlayer = target
     target?.attachOutput(this)
-    if (target != null) {
-      statusSubscription = target.addOnStatusChangeListener(::keepScreenOnWhile)
-      keepScreenOnWhile(target.status)
-    }
+    statusSubscription = target?.addOnStatusChangeListener(::syncScreenOn)
   }
 
   private fun detachFromPlayer() {
@@ -77,12 +76,11 @@ class HybridVlcPlayerView(private val context: ThemedReactContext) : HybridVlcPl
     statusSubscription = null
     attachedPlayer?.detachOutput(this)
     attachedPlayer = null
-    keepScreenOn(false)
+    syncScreenOn()
   }
 
-  private fun keepScreenOnWhile(status: VlcStatus) = keepScreenOn(status.isActive)
-
-  private fun keepScreenOn(on: Boolean) {
+  private fun syncScreenOn(status: VlcStatus? = attachedPlayer?.status) {
+    val on = (keepScreenOn ?: DEFAULT_KEEP_SCREEN_ON) && status?.isActive == true
     container.post { container.keepScreenOn = on }
   }
 
@@ -93,5 +91,6 @@ class HybridVlcPlayerView(private val context: ThemedReactContext) : HybridVlcPl
 
   private companion object {
     val DEFAULT_SURFACE_TYPE = VlcSurfaceType.TEXTURE
+    const val DEFAULT_KEEP_SCREEN_ON = true
   }
 }
