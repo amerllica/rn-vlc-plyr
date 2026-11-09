@@ -6,7 +6,7 @@ All notable changes to rn-vlc-plyr. The format follows
 
 ## [Unreleased]
 
-## [1.3.1] - 2026-11-09
+## [1.4.0] - 2026-11-09
 
 ### Added
 
@@ -231,8 +231,8 @@ same on iOS and Android.
 - Releases are published only by GitHub Actions on a version tag, with npm trusted publishing and
   provenance. See [ADR 0012](docs/adr/0012-release-pipeline.md).
 
-[Unreleased]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.3.1...HEAD
-[1.3.1]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.3.0...v1.3.1
+[Unreleased]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.0.1...v1.1.0
