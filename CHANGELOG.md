@@ -17,8 +17,8 @@ All notable changes to rn-vlc-plyr. The format follows
 
 - The screen no longer locks during playback. `<VlcPlayerView>` keeps the screen on while its
   player is `opening`, `buffering` or `playing`, without any code in the app. Android sets
-  `keepScreenOn` on the view. iOS turns off the idle timer and only turns it back on when it was the
-  one that turned it off.
+  `keepScreenOn` on the view. iOS turns off the idle timer and turns it back on only if the timer
+  was not already off when playback started.
 
 ## [1.3.0] - 2026-10-27
 

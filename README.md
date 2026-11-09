@@ -270,7 +270,7 @@ Accepts all `View` props plus:
 
 With `keepScreenOn`, a view lets the screen sleep on any other status, when the prop turns `false`
 and when the view goes away. Android sets `keepScreenOn` on the view. iOS turns off the idle timer,
-and turns it back on only if no other view needs it and the app had not turned it off itself. Set it
+and turns it back on only if no other view needs it and the timer was not already off when playback started. Set it
 to `false` for muted previews in a feed, or when the app keeps the screen on by its own rules.
 
 ### `<VlcFullscreenModal>`
