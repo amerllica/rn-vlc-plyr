@@ -8,6 +8,11 @@ All notable changes to rn-vlc-plyr. The format follows
 
 ## [1.3.1] - 2026-11-09
 
+### Added
+
+- `<VlcPlayerView keepScreenOn>`, default `true`. Set it to `false` to let the screen sleep during
+  playback, for example for a muted preview.
+
 ### Fixed
 
 - The screen no longer locks during playback. `<VlcPlayerView>` keeps the screen on while its
