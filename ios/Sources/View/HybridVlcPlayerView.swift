@@ -4,6 +4,7 @@ import UIKit
 final class HybridVlcPlayerView: HybridVlcPlayerViewSpec, VideoHost {
   private let hostingView = VideoHostView()
   private weak var attachedPlayer: HybridVlcPlayer?
+  private var statusSubscription: VlcListenerSubscription?
 
   var view: UIView { hostingView }
   var hostView: UIView { hostingView }
@@ -40,8 +41,19 @@ final class HybridVlcPlayerView: HybridVlcPlayerViewSpec, VideoHost {
 
   private func attach(to next: HybridVlcPlayer?) {
     guard next !== attachedPlayer else { return }
+    statusSubscription?.remove()
+    statusSubscription = nil
     attachedPlayer?.detach(self)
     attachedPlayer = next
     next?.attach(self)
+    keepAwake(while: next?.status)
+    statusSubscription = try? next?.addOnStatusChangeListener { [weak self] status in
+      self?.keepAwake(while: status)
+    }
+  }
+
+  private func keepAwake(while status: VlcStatus?) {
+    let isActive = status.flatMap { PlayerStatus(rawValue: $0.stringValue) }?.isActive ?? false
+    ScreenIdleTimer.keepAwake(self, isActive)
   }
 }
