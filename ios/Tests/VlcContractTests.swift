@@ -76,6 +76,11 @@ final class VlcContractTests: XCTestCase {
     XCTAssertEqual(VlcContract.clampRecoveryDelay(.infinity), 0)
   }
 
+  func testRecoveryDelayTurnsOffForInfinityAndIsCapped() {
+    XCTAssertEqual(VlcContract.clampRecoveryDelay(.infinity), 0)
+    XCTAssertEqual(VlcContract.clampRecoveryDelay(1e300), Int(Int32.max))
+  }
+
   func testLibvlcOptionsAreTrimmedAndBlanksDropped() {
     XCTAssertEqual(
       VlcContract.libvlcOptions([" --network-caching=1500 ", "", "  ", "--http-reconnect"]),

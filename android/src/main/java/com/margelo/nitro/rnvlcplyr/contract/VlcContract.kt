@@ -60,7 +60,8 @@ object VlcContract {
       .coerceIn(MIN_REMOTE_SKIP_INTERVAL_MS.toLong(), MAX_REMOTE_SKIP_INTERVAL_MS.toLong())
       .toInt()
 
-  fun clampDelayMs(value: Double): Long = roundHalfUp(value).coerceAtLeast(0L)
+  fun clampDelayMs(value: Double): Long =
+    if (value.isFinite()) roundHalfUp(value).coerceIn(0L, MAX_RECOVERY_DELAY_MS) else 0L
 
   fun bufferingPercent(value: Float): Int =
     roundHalfUp(value.toDouble()).coerceIn(MIN_BUFFERING_PERCENT, MAX_BUFFERING_PERCENT).toInt()

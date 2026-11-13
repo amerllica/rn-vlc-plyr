@@ -152,6 +152,8 @@ class VlcContractTest {
     assertEquals(1500L, VlcContract.clampDelayMs(1499.6))
     assertEquals(0L, VlcContract.clampDelayMs(-20.0))
     assertEquals(0L, VlcContract.clampDelayMs(Double.NaN))
+    assertEquals(0L, VlcContract.clampDelayMs(Double.POSITIVE_INFINITY))
+    assertEquals(Int.MAX_VALUE.toLong(), VlcContract.clampDelayMs(1e300))
   }
 
   @Test
