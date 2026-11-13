@@ -44,6 +44,13 @@ final class PlayerIntegrationTests: XCTestCase {
   private static let nowPlayingTitle = "Two seconds"
 
   private static let trackIdBeyondIntRange = 1e300
+  private static let lateReloadSeekMs = 6000.0
+  private static let earlyReloadSeekMs = 1000.0
+  private static let reloadSeekMidpointMs = 3500.0
+  private static let settledTimeUpdates = 3
+  private static let stallCheckMs = 1000.0
+  private static let stallObservationSeconds: TimeInterval = 2
+  private static let nearEndSeekMs = 9000.0
   private static let rejectedInstanceOption = "--no-such-libvlc-option"
   private static let lateSeekMs = 1500.0
   private static let restyleSeekMs = 1000.0
@@ -65,6 +72,35 @@ final class PlayerIntegrationTests: XCTestCase {
     let drained = expectation(description: "main queue drained")
     DispatchQueue.main.async { drained.fulfill() }
     wait(for: [drained], timeout: 5)
+  }
+
+  private func waitForStatus(_ wanted: VlcStatus) throws {
+    let reached = expectation(description: "status \(wanted.stringValue)")
+    reached.assertForOverFulfill = false
+    if player.status == wanted { reached.fulfill() }
+    subscriptions.append(try player.addOnStatusChangeListener { status in
+      if status == wanted { reached.fulfill() }
+    })
+    wait(for: [reached], timeout: Self.engineTimeout)
+    drainMainQueue()
+  }
+
+  private func waitForTimeUpdates(_ count: Int) throws {
+    let settled = expectation(description: "\(count) time updates")
+    settled.expectedFulfillmentCount = count
+    settled.assertForOverFulfill = false
+    subscriptions.append(try player.addOnTimeUpdateListener { _ in settled.fulfill() })
+    wait(for: [settled], timeout: Self.engineTimeout)
+  }
+
+  private func waitForExternalAudioInTheTrackList(_ description: String) throws {
+    let listed = expectation(description: description)
+    listed.assertForOverFulfill = false
+    if player.audioTracks.count == 2 { listed.fulfill() }
+    subscriptions.append(try player.addOnTracksChangeListener { tracks in
+      if tracks.audioTracks.count == 2 { listed.fulfill() }
+    })
+    wait(for: [listed], timeout: Self.engineTimeout)
   }
 
   private var externalAudioIsSelected: Bool {
@@ -402,6 +438,121 @@ final class PlayerIntegrationTests: XCTestCase {
     XCTAssertNil(player.error)
   }
 
+  func testReleaseTellsEveryAttachedHost() throws {
+    let hosts = [RecordingVideoHost(), RecordingVideoHost()]
+    hosts.forEach(player.attach)
+    drainMainQueue()
+
+    try player.release()
+    drainMainQueue()
+
+    XCTAssertEqual(hosts.map(\.releaseCount), [1, 1])
+  }
+
+  func testPlayAfterStoppingAnInvalidSourceFailsAgain() throws {
+    player.source = VlcSource(uri: "", userAgent: nil, referrer: nil, vlcOptions: nil, title: nil)
+    drainMainQueue()
+    XCTAssertEqual(player.status, .error)
+    try player.stop()
+    drainMainQueue()
+    XCTAssertEqual(player.status, .stopped)
+
+    try player.play()
+    drainMainQueue()
+
+    XCTAssertEqual(player.status, .error)
+    XCTAssertEqual(player.error?.code, .invalidsource)
+  }
+
+  func testDurationStaysKnownWhileAStyleChangeReloads() throws {
+    try playVideoWithAudio()
+    var durations: [Double] = []
+    let replaying = expectation(description: "playing again after the style change")
+    replaying.assertForOverFulfill = false
+    subscriptions.append(try player.addOnStatusChangeListener { [unowned self] status in
+      durations.append(player.duration)
+      if status == .playing { replaying.fulfill() }
+    })
+    subscriptions.append(try player.addOnBufferingListener { [unowned self] _ in durations.append(player.duration) })
+    subscriptions.append(try player.addOnTracksChangeListener { [unowned self] _ in durations.append(player.duration) })
+
+    player.subtitleStyle = Self.yellowSubtitles
+    wait(for: [replaying], timeout: Self.engineTimeout)
+
+    XCTAssertFalse(durations.isEmpty)
+    XCTAssertTrue(durations.allSatisfy { $0 > 0 }, "durations=\(durations)")
+  }
+
+  func testSeekDuringAStyleReloadIsKept() throws {
+    try playVideoWithAudio()
+    try player.seek(timeMs: Self.lateReloadSeekMs)
+    drainMainQueue()
+    player.subtitleStyle = Self.yellowSubtitles
+    drainMainQueue()
+
+    try player.seek(timeMs: Self.earlyReloadSeekMs)
+    try waitForStatus(.playing)
+    try waitForTimeUpdates(Self.settledTimeUpdates)
+
+    XCTAssertLessThan(player.currentTime, Self.reloadSeekMidpointMs)
+  }
+
+  func testBackwardSeekAfterAResumeDoesNotReload() throws {
+    player.reloadOnStallAfterMs = Self.stallCheckMs
+    try playVideoWithAudio()
+    try player.seek(timeMs: Self.lateReloadSeekMs)
+    try player.pause()
+    try waitForStatus(.paused)
+    try player.play()
+    try waitForStatus(.playing)
+    subscriptions.forEach { $0.remove() }
+    subscriptions.removeAll()
+    let reopened = expectation(description: "reloaded as a stall")
+    reopened.isInverted = true
+    subscriptions.append(try player.addOnStatusChangeListener { status in
+      if status == .opening { reopened.fulfill() }
+    })
+
+    try player.seek(timeMs: Self.earlyReloadSeekMs)
+
+    wait(for: [reopened], timeout: Self.stallObservationSeconds)
+  }
+
+  func testAddedAudioStaysInTheTrackListAfterStopAndPlay() throws {
+    try playVideoWithAudio()
+    try player.addAudio(uri: audioFixtureUri, select: true)
+    try waitUntilExternalAudioIsSelected("external audio selected")
+    subscriptions.forEach { $0.remove() }
+    subscriptions.removeAll()
+    try player.stop()
+    drainMainQueue()
+
+    try player.play()
+    try waitForStatus(.playing)
+
+    try waitForExternalAudioInTheTrackList("external audio listed after stop and play")
+  }
+
+  func testAddedAudioStaysInTheTrackListAfterALoop() throws {
+    player.loop = true
+    try playVideoWithAudio()
+    try player.addAudio(uri: audioFixtureUri, select: true)
+    try waitUntilExternalAudioIsSelected("external audio selected")
+    subscriptions.forEach { $0.remove() }
+    subscriptions.removeAll()
+    let looped = expectation(description: "time wrapped back to the start")
+    looped.assertForOverFulfill = false
+    subscriptions.append(try player.addOnTimeUpdateListener { event in
+      if event.currentTime < Self.earlyReloadSeekMs { looped.fulfill() }
+    })
+
+    try player.seek(timeMs: Self.nearEndSeekMs)
+    wait(for: [looped], timeout: Self.engineTimeout)
+    try waitForTimeUpdates(Self.settledTimeUpdates)
+
+    try waitForExternalAudioInTheTrackList("external audio listed after the loop")
+  }
+
   func testAndroidNotificationIsStoredAndReturned() {
     player.androidNotification = VlcAndroidNotification(color: "#123456", smallIcon: "ic_play")
     XCTAssertEqual(player.androidNotification?.color, "#123456")
@@ -614,5 +765,15 @@ final class PlayerIntegrationTests: XCTestCase {
     try waitUntilExternalAudioIsSelected("external audio selected in the background")
     try assertKeepsPlaying()
     postAppState(UIApplication.willEnterForegroundNotification)
+  }
+}
+
+private final class RecordingVideoHost: VideoHost {
+  let hostView = UIView()
+  let hostResizeMode = ResizeMode.contain
+  private(set) var releaseCount = 0
+
+  func playerDidRelease() {
+    releaseCount += 1
   }
 }
