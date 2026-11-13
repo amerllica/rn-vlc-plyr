@@ -40,6 +40,16 @@ All notable changes to rn-vlc-plyr. The format follows
   `invalidSource`.
 - `useVlcPlayerStatus` keeps one native listener. It no longer adds and removes one on every render.
 
+### Changed
+
+- Artwork is limited to 10 MB. A larger file or reply fails as `too large` and no longer fills the
+  memory of the app.
+- The artwork warning in the device log no longer shows the user name, password, query or fragment
+  of the artwork uri.
+- `userAgent` and `referrer` lose their line breaks, so a value cannot add an HTTP header.
+- iOS: artwork replies are no longer kept in the shared URL cache on disk.
+- iOS: the file of a rejected `snapshot()` is deleted.
+
 ## [1.4.0] - 2026-11-09
 
 ### Added

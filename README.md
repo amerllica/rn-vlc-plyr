@@ -33,6 +33,7 @@ and more) with **the same API and the same behaviour on iOS and Android**.
 - [API](#api)
 - [Recipes](#recipes)
 - [Limitations](#limitations)
+- [Security](#security)
 - [Troubleshooting](#troubleshooting)
 - [Licensing](#licensing)
 
@@ -377,6 +378,9 @@ const uri = await player.snapshot();
 <Image source={{ uri }} style={{ width: 160, height: 90 }} />;
 ```
 
+The file is yours. The library writes it to the app's temporary folder and does not delete it.
+Delete it when you no longer need it.
+
 ### Background audio with Now Playing
 
 ```tsx
@@ -463,6 +467,20 @@ useVlcPlayerEvent(player, 'buffering', ({ percent }) => setBufferPercent(percent
   the added subtitle file again, even if another track was chosen or it was added with
   `select: false`.
 - **Picture-in-Picture and casting** are not supported.
+
+## Security
+
+Give the player only values that your app controls.
+
+- **`vlcOptions` and `libvlcOptions` go to VLC as they are.** VLC options can do more than tune
+  playback. For example, a stream output option can write a file. Never build them from text that a
+  user or a server sends.
+- **`source.uri`, `addAudio`, `addSubtitle` and `nowPlaying.artworkUri` can point at local files.**
+  A `file://` uri, an absolute path or, on Android, a `content://` uri reads what your app can read.
+  The artwork then shows on the lock screen. Check a uri that comes from a server before you use it.
+- **Artwork is limited to 10 MB.** A larger file or reply fails as `too large`. The warning in the
+  device log shows the artwork uri without user name, password, query and fragment.
+- **`userAgent` and `referrer`** lose their line breaks, so a value cannot add an HTTP header.
 
 ## Troubleshooting
 
