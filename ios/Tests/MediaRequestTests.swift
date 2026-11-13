@@ -21,6 +21,11 @@ final class MediaRequestTests: XCTestCase {
     XCTAssertEqual(MediaRequest.make(uri: "file:///tmp/a.mp4")?.url.absoluteString, "file:///tmp/a.mp4")
   }
 
+  func testUriWithSpacesResolvesToAnEncodedUrl() {
+    XCTAssertEqual(MediaUri.resolve("https://host/my clip.mp4?a=1#t=2")?.absoluteString, "https://host/my%20clip.mp4?a=1#t=2")
+    XCTAssertEqual(MediaUri.resolve("https://host/my%20clip.mp4")?.absoluteString, "https://host/my%20clip.mp4")
+  }
+
   func testOptionsAreUserAgentThenReferrerThenVerbatim() {
     let request = MediaRequest.make(uri: "http://host/a", userAgent: "UA/1", referrer: "http://ref", vlcOptions: [":network-caching=300", "--no-audio"])
     XCTAssertEqual(request?.options, [":http-user-agent=UA/1", ":http-referrer=http://ref", ":network-caching=300", "--no-audio"])

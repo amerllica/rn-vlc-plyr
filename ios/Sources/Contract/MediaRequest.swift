@@ -28,6 +28,7 @@ struct MediaRequest: Equatable {
 enum MediaUri {
   static let networkSchemes: Set<String> = ["http", "https", "rtsp", "rtmp", "rtp", "udp", "mms", "ftp", "smb"]
 
+  private static let uriCharacters = CharacterSet.urlQueryAllowed.union(CharacterSet(charactersIn: "#%[]"))
   private static let schemePattern = try? NSRegularExpression(pattern: "^[A-Za-z][A-Za-z0-9+.-]*:")
 
   static func resolve(_ uri: String) -> URL? {
@@ -35,7 +36,7 @@ enum MediaUri {
       return URL(fileURLWithPath: uri)
     }
     guard scheme(of: uri) != nil else { return nil }
-    return URL(string: uri)
+    return URL(string: uri) ?? uri.addingPercentEncoding(withAllowedCharacters: uriCharacters).flatMap(URL.init(string:))
   }
 
   static func scheme(of uri: String) -> String? {
