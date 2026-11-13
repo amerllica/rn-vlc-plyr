@@ -11,8 +11,10 @@ import com.margelo.nitro.rnvlcplyr.contract.PlaybackEffect
 import com.margelo.nitro.rnvlcplyr.contract.PlaybackSlave
 import com.margelo.nitro.rnvlcplyr.contract.PlaybackStateMachine
 import com.margelo.nitro.rnvlcplyr.contract.PlayerSettings
-import com.margelo.nitro.rnvlcplyr.contract.ResumeReconnect
-import com.margelo.nitro.rnvlcplyr.contract.StallWatchdog
+import com.margelo.nitro.rnvlcplyr.contract.ReloadMode
+import com.margelo.nitro.rnvlcplyr.contract.ResumeGuard
+import com.margelo.nitro.rnvlcplyr.contract.ResumeTarget
+import com.margelo.nitro.rnvlcplyr.contract.StallCheck
 import com.margelo.nitro.rnvlcplyr.contract.TimeUpdateThrottle
 import com.margelo.nitro.rnvlcplyr.contract.TrackList
 import com.margelo.nitro.rnvlcplyr.contract.TrackSelectionRestore
@@ -41,8 +43,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   private val tracksFilter = ChangeFilter(TrackList.EMPTY_INFO)
   private val videoSizeFilter = ChangeFilter(MediaState.EMPTY_VIDEO_SIZE)
   private val bufferingFilter = ChangeFilter(NO_BUFFERING_PERCENT)
-  private val reconnect = ResumeReconnect()
-  private val watchdog = StallWatchdog()
+  private val resumeGuard = ResumeGuard()
   private val outputs = AttachmentStack<VideoOutput>()
   private val engine = PlayerEngine(VlcEngine.libVLC(context)) { event -> onEngineEvent(event) }
   private val session = MediaSessionCoordinator(context, this)
@@ -155,30 +156,26 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   }
 
   private fun resume() {
-    val now = SystemClock.elapsedRealtime()
-    val plan = locked { planResume(now) }
+    val plan = locked {
+      resumeGuard.resume(
+        nowMs = SystemClock.elapsedRealtime(),
+        fromPause = machine.status == VlcStatus.PAUSED,
+        positionMs = media.currentTimeMs,
+        settings = settings,
+        target = ResumeTarget(VlcContract.isNetworkSource(source?.uri), media.isLive, media.isSeekable)
+      )
+    }
     plan.reconnectAtMs?.let(engine::setTime)
     engine.play()
-    plan.stallCheck?.let { (generation, delayMs) -> MainThread.postDelayed(delayMs) { onMain { checkStall(generation) } } }
+    plan.stallCheck?.let(::scheduleStallCheck)
   }
 
-  private fun planResume(nowMs: Long): ResumePlan {
-    val fromPause = machine.status == VlcStatus.PAUSED
-    val reconnects = fromPause && reconnect.shouldReconnect(
-      nowMs,
-      settings.reconnectOnResumeAfterMs,
-      VlcContract.isNetworkSource(source?.uri),
-      media.isLive,
-      media.isSeekable
-    )
-    reconnect.clear()
-    val stallDelayMs = settings.reloadOnStallAfterMs
-    val stallCheck = if (fromPause && stallDelayMs > 0L) watchdog.arm(media.currentTimeMs) to stallDelayMs else null
-    return ResumePlan(media.currentTimeMs.takeIf { reconnects }, stallCheck)
+  private fun scheduleStallCheck(check: StallCheck) {
+    MainThread.postDelayed(check.delayMs) { onMain { reloadIfStalled(check.generation) } }
   }
 
-  private fun checkStall(generation: Int) = mutate {
-    if (watchdog.fire(generation, machine.status, media.currentTimeMs)) reopenWithCurrentState()
+  private fun reloadIfStalled(generation: Int) = mutate {
+    if (resumeGuard.isStalled(generation, machine.status, media.currentTimeMs)) reopenWithCurrentState()
   }
 
   override fun pause() = onMain {
@@ -203,8 +200,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
       pendingSeekMs = null
       pendingSessionPause = false
       reloadingInPlace = false
-      reconnect.clear()
-      watchdog.disarm()
+      resumeGuard.reset()
       media = media.copy(currentTimeMs = 0L)
       val update = media.timeUpdate
       add { engine.stop() }
@@ -307,8 +303,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
       media = MediaState()
       source = null
       pendingSeekMs = null
-      reconnect.clear()
-      watchdog.disarm()
+      resumeGuard.reset()
       previous
     }
     if (wasReleased) return
@@ -358,8 +353,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     throttle.reset()
     videoSizeFilter.reset()
     bufferingFilter.reset()
-    reconnect.clear()
-    watchdog.disarm()
+    resumeGuard.reset()
     queueTracks(TrackList.EMPTY_INFO)
     when {
       value == null -> {
@@ -445,17 +439,9 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
       if (reloadingInPlace || pendingSeekMs != null) pendingSeekMs = target
       add { engine.setTime(target) }
     }
-    restartStallCheck(target)
+    resumeGuard.seek(target, settings.reloadOnStallAfterMs)?.let { check -> add { scheduleStallCheck(check) } }
     add { events.timeUpdate.emit(update) }
     add(session::refresh)
-  }
-
-  private fun Outbox.restartStallCheck(positionMs: Long) {
-    if (!watchdog.isArmed) return
-    val delayMs = settings.reloadOnStallAfterMs
-    if (delayMs <= 0L) return watchdog.disarm()
-    val generation = watchdog.arm(positionMs)
-    add { MainThread.postDelayed(delayMs) { onMain { checkStall(generation) } } }
   }
 
   private fun onEngineEvent(event: MediaPlayer.Event) {
@@ -614,7 +600,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     effects.forEach { effect ->
       when (effect) {
         is PlaybackEffect.StatusChanged -> {
-          trackResumeState(effect.status)
+          resumeGuard.statusChanged(effect.status, SystemClock.elapsedRealtime())
           add { events.statusChange.emit(effect.status) }
           add(session::onStatusChanged)
         }
@@ -636,11 +622,6 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
         }
       }
     }
-  }
-
-  private fun trackResumeState(status: VlcStatus) {
-    if (status == VlcStatus.PAUSED) reconnect.pausedAt(SystemClock.elapsedRealtime())
-    if (status in STALL_DISARMING_STATUSES) watchdog.disarm()
   }
 
   private fun currentEngineSettings() = EngineSettings(
@@ -669,15 +650,5 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     const val NO_FRAME_MESSAGE = SnapshotCapture.NO_FRAME_MESSAGE
     const val NO_BUFFERING_PERCENT = -1
     val TIME_TRACKING_STATUSES = setOf(VlcStatus.BUFFERING, VlcStatus.PLAYING, VlcStatus.PAUSED)
-    val STALL_DISARMING_STATUSES = setOf(
-      VlcStatus.IDLE,
-      VlcStatus.OPENING,
-      VlcStatus.PAUSED,
-      VlcStatus.STOPPED,
-      VlcStatus.ENDED,
-      VlcStatus.ERROR
-    )
   }
-
-  private data class ResumePlan(val reconnectAtMs: Long?, val stallCheck: Pair<Int, Long>?)
 }
