@@ -210,7 +210,7 @@ final class PlaybackStateMachineTests: XCTestCase {
     XCTAssertEqual(machine.seekAction(targetMs: 5000, duration: 10_000, isSeekable: true), .restartThenSeek(5000))
   }
 
-  func testIsLiveRequiresPlaying() {
+  func testTheLoadedFlagNeedsTheFirstPlaying() {
     var machine = PlaybackStateMachine()
     _ = machine.load(uri: networkUri, autoPlay: false)
     XCTAssertFalse(machine.hasReachedPlaying)
