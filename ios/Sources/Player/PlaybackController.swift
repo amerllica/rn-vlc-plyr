@@ -391,6 +391,9 @@ final class PlaybackController {
     tracksBeforeReopen = nil
     throttle.reset()
     videoSizeGate.reset()
+    if stallWatchdog.isArmed {
+      scheduleStallCheck()
+    }
     surface.container.isHidden = true
     store.updateMedia { media in
       let status = media.status

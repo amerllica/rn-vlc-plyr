@@ -6,6 +6,9 @@ class StallWatchdog {
   private var armed: Arming? = null
   private var lastGeneration = 0
 
+  val isArmed: Boolean
+    get() = armed != null
+
   fun arm(positionMs: Long): Int {
     lastGeneration += 1
     armed = Arming(lastGeneration, positionMs)

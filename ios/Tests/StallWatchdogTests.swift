@@ -22,6 +22,14 @@ final class StallWatchdogTests: XCTestCase {
     XCTAssertFalse(watchdog.isDue(status: .playing, positionMs: 5250))
   }
 
+  func testArmingAgainAfterASeekMeasuresFromTheSeekTarget() {
+    var watchdog = StallWatchdog()
+    watchdog.arm(positionMs: 60_000)
+    watchdog.arm(positionMs: 10_000)
+    XCTAssertFalse(watchdog.isDue(status: .playing, positionMs: 14_000))
+    XCTAssertTrue(watchdog.isDue(status: .playing, positionMs: 10_000))
+  }
+
   func testNotDueOutsideBufferingAndPlaying() {
     for status in [PlayerStatus.idle, .opening, .paused, .stopped, .ended, .error] {
       var watchdog = StallWatchdog()

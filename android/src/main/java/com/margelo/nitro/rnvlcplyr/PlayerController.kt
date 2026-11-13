@@ -445,10 +445,19 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     when (event.type) {
       MediaPlayer.Event.Opening -> onStatusEvent(EngineEvent.OPENING)
       MediaPlayer.Event.Buffering -> onBuffering(event.buffering)
+    restartStallCheck(target)
       MediaPlayer.Event.Playing -> onPlaying()
       MediaPlayer.Event.Paused -> onStatusEvent(EngineEvent.PAUSED)
       MediaPlayer.Event.Stopped -> onStatusEvent(EngineEvent.STOPPED)
       MediaPlayer.Event.EndReached -> onStatusEvent(EngineEvent.END_REACHED)
+  private fun Outbox.restartStallCheck(positionMs: Long) {
+    if (!watchdog.isArmed) return
+    val delayMs = settings.reloadOnStallAfterMs
+    if (delayMs <= 0L) return watchdog.disarm()
+    val generation = watchdog.arm(positionMs)
+    add { MainThread.postDelayed(delayMs) { onMain { checkStall(generation) } } }
+  }
+
       MediaPlayer.Event.EncounteredError -> onStatusEvent(EngineEvent.ERROR)
       MediaPlayer.Event.TimeChanged -> onTimeChanged(event.timeChanged)
       MediaPlayer.Event.LengthChanged -> onLengthChanged(event.lengthChanged)

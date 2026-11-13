@@ -50,6 +50,17 @@ class StallWatchdogTest {
   }
 
   @Test
+  fun armingAgainAfterASeekMeasuresFromTheSeekTarget() {
+    val beforeSeek = watchdog.arm(POSITION_MS)
+    assertTrue(watchdog.isArmed)
+    val afterSeek = watchdog.arm(SEEK_TARGET_MS)
+
+    assertFalse(watchdog.fire(beforeSeek, VlcStatus.PLAYING, SEEK_TARGET_MS + PROGRESS_MS))
+    assertFalse(watchdog.fire(afterSeek, VlcStatus.PLAYING, SEEK_TARGET_MS + PROGRESS_MS))
+    assertFalse(watchdog.isArmed)
+  }
+
+  @Test
   fun otherStatusesDoNotFire() {
     listOf(VlcStatus.PAUSED, VlcStatus.OPENING, VlcStatus.STOPPED, VlcStatus.ENDED, VlcStatus.ERROR).forEach { status ->
       val generation = watchdog.arm(POSITION_MS)
@@ -59,5 +70,7 @@ class StallWatchdogTest {
 
   private companion object {
     const val POSITION_MS = 42_000L
+    const val SEEK_TARGET_MS = 10_000L
+    const val PROGRESS_MS = 4_000L
   }
 }
