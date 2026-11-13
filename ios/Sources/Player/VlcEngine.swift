@@ -65,15 +65,6 @@ final class VlcEngine: NSObject, VLCMediaPlayerDelegate {
     player.pause()
   }
 
-  func stop() {
-    player.stop()
-  }
-
-  func restartFromBeginning() {
-    player.stop()
-    player.play()
-  }
-
   func seek(toMs milliseconds: Int) {
     player.time = VLCTime(number: NSNumber(value: milliseconds))
   }

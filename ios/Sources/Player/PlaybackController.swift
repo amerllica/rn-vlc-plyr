@@ -72,7 +72,7 @@ final class PlaybackController {
       failInvalidSource()
       return
     }
-    replaceEngine().load(request)
+    loadOnFreshEngine(request, slaves: [])
     let autoPlay = store.settings.autoPlay
     if autoPlay {
       audioSession.activate()
@@ -104,7 +104,7 @@ final class PlaybackController {
     pendingSeekMs = nil
     resumeReconnect.clear()
     cancelStallCheck()
-    engineInstance?.stop()
+    retireEngine()
     store.updateMedia { $0.currentTime = 0 }
     throttle.reset()
     apply(machine.requestStop())
@@ -118,14 +118,13 @@ final class PlaybackController {
     case .none:
       return
     case .seek(let milliseconds):
-      performSeek(milliseconds)
       if isReloadingInPlace || pendingSeekMs != nil {
         pendingSeekMs = milliseconds
       }
+      performSeek(milliseconds)
     case .restartThenSeek(let milliseconds):
       pendingSeekMs = milliseconds
-      engine.stop()
-      startPlayback()
+      restartPlayback()
     }
   }
 
@@ -187,7 +186,7 @@ final class PlaybackController {
     }
     guard Self.mediaActiveStatuses.contains(machine.status) else {
       slave.map(keepAddedSlave)
-      mediaRequest.map { replaceEngine().load($0) }
+      mediaRequest.map { loadOnFreshEngine($0, slaves: []) }
       return
     }
     if !isReloadingInPlace {
@@ -200,13 +199,9 @@ final class PlaybackController {
       if slave.select { trackRestore.forgetAudioSelection() }
     }
     guard let request = mediaRequest else { return }
-    let fresh = replaceEngine()
     bufferingGate.reset()
-    fresh.load(request)
-    reopenSlaves.forEach { _ = fresh.addSlave($0) }
-    audioSession.activate()
-    apply(machine.beginPlayback())
-    engine.play()
+    loadOnFreshEngine(request, slaves: reopenSlaves)
+    startPlayback()
   }
 
   private func captureStateForReopen() {
@@ -293,8 +288,7 @@ final class PlaybackController {
       engine.play()
       scheduleStallCheck()
     case .restart:
-      engine.stop()
-      startPlayback()
+      restartPlayback()
     case .reload:
       reloadAndPlay()
     }
@@ -347,14 +341,31 @@ final class PlaybackController {
       failInvalidSource()
       return
     }
-    replaceEngine().load(request)
+    loadOnFreshEngine(request, slaves: addedSlaves)
     audioSession.activate()
     apply(machine.reloadForRetry())
     engine.play()
   }
 
+  private func restartPlayback() {
+    guard let request = mediaRequest else {
+      failInvalidSource()
+      return
+    }
+    loadOnFreshEngine(request, slaves: addedSlaves)
+    pendingSlaves.removeAll()
+    startPlayback()
+  }
+
+  private func loadOnFreshEngine(_ request: MediaRequest, slaves: [PlaybackSlave]) {
+    let fresh = replaceEngine()
+    fresh.load(request)
+    slaves.forEach { _ = fresh.addSlave($0) }
+  }
+
   private func replaceEngine() -> VlcEngine {
     retireEngine()
+    engineHasPlayed = false
     let fresh = engine
     surface.applyResize(force: true)
     return fresh
@@ -365,7 +376,6 @@ final class PlaybackController {
     engineInstance = nil
     surface.engine = nil
   }
-    engineHasPlayed = false
 
   private func failInvalidSource() {
     store.updateMedia { $0.error = PlayerErrors.invalidSource }
@@ -381,6 +391,9 @@ final class PlaybackController {
   private func performSeek(_ milliseconds: Int) {
     engine.seek(toMs: milliseconds)
     store.updateMedia { $0.currentTime = milliseconds }
+    if stallWatchdog.isArmed {
+      scheduleStallCheck()
+    }
     throttle.markEmitted(atMs: Self.nowMs)
     store.emit(\.timeUpdate, PlayerPayloads.timeUpdate(store.media))
     session.refresh()
@@ -398,9 +411,6 @@ final class PlaybackController {
     tracksBeforeReopen = nil
     throttle.reset()
     videoSizeGate.reset()
-    if stallWatchdog.isArmed {
-      scheduleStallCheck()
-    }
     surface.container.isHidden = true
     store.updateMedia { media in
       let status = media.status
@@ -432,8 +442,8 @@ final class PlaybackController {
       case .error(let failure):
         store.emit(\.error, PlayerPayloads.error(failure))
       case .restartForLoop:
-        DispatchQueue.main.async { [weak self] in
-          self?.restartForLoop()
+        DispatchQueue.main.async { [weak self, weak endedEngine = engineInstance] in
+          self?.restartForLoop(after: endedEngine)
         }
       }
     }
@@ -453,6 +463,7 @@ final class PlaybackController {
   private func didEnterPlaying() {
     guard let engineInstance else { return }
     isReloadingInPlace = false
+    engineHasPlayed = true
     engineInstance.apply(store.settings)
     surface.applyResize(force: true)
     refreshReadout()
@@ -463,7 +474,6 @@ final class PlaybackController {
       pausesOnceStarted = false
       engineInstance.pause()
     }
-    engineHasPlayed = true
   }
 
   private func applyPendingSeekOnceStarted() {
@@ -476,10 +486,12 @@ final class PlaybackController {
     }
   }
 
-  private func restartForLoop() {
-    guard isActive else { return }
-    engineInstance?.restartFromBeginning()
+  private func restartForLoop(after endedEngine: VlcEngine?) {
+    guard isActive, machine.isRestartingForLoop, let endedEngine, endedEngine === engineInstance,
+          let request = mediaRequest else { return }
+    loadOnFreshEngine(request, slaves: addedSlaves)
     store.updateMedia { $0.currentTime = 0 }
+    engine.play()
     session.refresh()
   }
 
@@ -487,6 +499,7 @@ final class PlaybackController {
     guard let engineInstance, Self.mediaActiveStatuses.contains(machine.status), !machine.isRestartingForLoop else { return }
     let readout = engineInstance.readout
     let hasReachedPlaying = machine.hasReachedPlaying
+    let acceptsLengthAndSeekable = hasReachedPlaying && engineHasPlayed && Self.startedStatuses.contains(machine.status)
     store.updateMedia { media in
       media.currentTime = max(readout.timeMs, 0)
       if acceptsLengthAndSeekable {
@@ -499,7 +512,6 @@ final class PlaybackController {
     }
     emitTracksIfChanged(readout.tracks)
     restoreTrackSelection(readout.tracks)
-    let acceptsLengthAndSeekable = hasReachedPlaying && engineHasPlayed && Self.startedStatuses.contains(machine.status)
     revealVideoOnceRendered(readout.videoSize)
     if videoSizeGate.shouldEmit(readout.videoSize) {
       store.emit(\.videoSizeChange, PlayerPayloads.videoSize(readout.videoSize))
@@ -541,7 +553,11 @@ extension PlaybackController: VlcEngineDelegate {
     if session.isVideoDisabled {
       engineInstance?.disableVideoTrack()
     }
+    let wasRestartingForLoop = machine.isRestartingForLoop
     apply(machine.handle(engine: state, engineIsPlaying: isPlaying, loop: store.settings.loop))
+    if wasRestartingForLoop && !machine.isRestartingForLoop && machine.status == .playing {
+      didEnterPlaying()
+    }
     refreshReadout()
   }
 
