@@ -16,6 +16,10 @@ class TrackSelectionRestore private constructor(
     audio = null
   }
 
+  fun forgetSubtitleSelection() {
+    subtitle = null
+  }
+
   fun takeAudioTrack(tracks: Array<VlcTrack>): Int? = take(audio, tracks).also { if (it != null) audio = null }
 
   fun takeSubtitleTrack(tracks: Array<VlcTrack>): Int? = take(subtitle, tracks).also { if (it != null) subtitle = null }

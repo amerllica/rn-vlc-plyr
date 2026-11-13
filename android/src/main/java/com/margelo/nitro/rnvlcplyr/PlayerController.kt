@@ -221,20 +221,30 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     if (!deltaMs.isNaN()) onMain { performSeek(locked { media.currentTimeMs } + deltaMs) }
   }
 
-  fun setAudioTrack(id: Double) = onMain {
-    val trackId = VlcContract.trackId(id) ?: return@onMain
-    if (locked { isSelectable(media.tracks.audioTracks, trackId).also { if (it) tracksBeforeReopen = null } }) {
-      engine.selectAudioTrack(trackId)
-      refreshMediaInfo()
-    }
-  }
+  fun setAudioTrack(id: Double) =
+    selectTrack(id, { audioTracks }, TrackSelectionRestore::forgetAudioSelection, engine::selectAudioTrack)
 
-  fun setSubtitleTrack(id: Double) = onMain {
+  fun setSubtitleTrack(id: Double) =
+    selectTrack(id, { subtitleTracks }, TrackSelectionRestore::forgetSubtitleSelection, engine::selectSubtitleTrack)
+
+  private fun selectTrack(
+    id: Double,
+    tracksOf: VlcTracksInfo.() -> Array<VlcTrack>,
+    forgetPendingRestore: TrackSelectionRestore.() -> Unit,
+    select: (Int) -> Unit
+  ) = onMain {
     val trackId = VlcContract.trackId(id) ?: return@onMain
-    if (locked { isSelectable(media.tracks.subtitleTracks, trackId).also { if (it) tracksBeforeReopen = null } }) {
-      engine.selectSubtitleTrack(trackId)
-      refreshMediaInfo()
+    val selectable = locked {
+      isSelectable(media.tracks.tracksOf(), trackId).also { known ->
+        if (known) {
+          tracksBeforeReopen = null
+          trackRestore.forgetPendingRestore()
+        }
+      }
     }
+    if (!selectable) return@onMain
+    select(trackId)
+    refreshMediaInfo()
   }
 
   fun addAudio(uri: String, select: Boolean) =
@@ -432,6 +442,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     throttle.markEmitted(SystemClock.elapsedRealtime())
     val update = media.timeUpdate
     if (requiresRestart) {
+      if (reloadingInPlace || pendingSeekMs != null) pendingSeekMs = target
       pendingSeekMs = target
       add { engine.restart() }
     } else {

@@ -118,6 +118,9 @@ final class PlaybackController {
       return
     case .seek(let milliseconds):
       performSeek(milliseconds)
+      if isReloadingInPlace || pendingSeekMs != nil {
+        pendingSeekMs = milliseconds
+      }
     case .restartThenSeek(let milliseconds):
       pendingSeekMs = milliseconds
       engine.stop()
@@ -132,6 +135,7 @@ final class PlaybackController {
   func selectAudioTrack(_ id: Int) {
     guard isActive, TrackList.canSelect(id, in: store.media.tracks.audioTracks) else { return }
     tracksBeforeReopen = nil
+    trackRestore.forgetAudioSelection()
     engine.selectAudioTrack(id)
     refreshReadout()
   }
@@ -139,6 +143,7 @@ final class PlaybackController {
   func selectSubtitleTrack(_ id: Int) {
     guard isActive, TrackList.canSelect(id, in: store.media.tracks.subtitleTracks) else { return }
     tracksBeforeReopen = nil
+    trackRestore.forgetSubtitleSelection()
     engine.selectSubtitleTrack(id)
     refreshReadout()
   }
