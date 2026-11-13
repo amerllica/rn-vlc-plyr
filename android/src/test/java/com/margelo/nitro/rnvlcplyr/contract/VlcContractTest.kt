@@ -174,6 +174,17 @@ class VlcContractTest {
   }
 
   @Test
+  fun skipIntervalIsRoundedAndClamped() {
+    assertEquals(10_000, VlcContract.clampSkipInterval(10_000.0))
+    assertEquals(1_501, VlcContract.clampSkipInterval(1_500.5))
+    assertEquals(1_500, VlcContract.clampSkipInterval(1_500.49))
+    assertEquals(1_000, VlcContract.clampSkipInterval(999.0))
+    assertEquals(1_000, VlcContract.clampSkipInterval(-5_000.0))
+    assertEquals(60_000, VlcContract.clampSkipInterval(60_001.0))
+    assertEquals(60_000, VlcContract.clampSkipInterval(Double.POSITIVE_INFINITY))
+  }
+
+  @Test
   fun bufferingPercentIsRoundedAndClamped() {
     assertEquals(43, VlcContract.bufferingPercent(42.5f))
     assertEquals(0, VlcContract.bufferingPercent(-3f))

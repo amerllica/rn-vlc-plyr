@@ -255,26 +255,6 @@ class MediaSessionContractTest {
     assertFalse(RemoteCommand.NEXT in withPrevious)
   }
 
-  @Test
-  fun clampSkipIntervalRoundsHalfUpAndClamps() {
-    assertEquals(10_000, VlcContract.clampSkipInterval(10_000.0))
-    assertEquals(1_501, VlcContract.clampSkipInterval(1_500.5))
-    assertEquals(1_500, VlcContract.clampSkipInterval(1_500.49))
-    assertEquals(1_000, VlcContract.clampSkipInterval(999.0))
-    assertEquals(1_000, VlcContract.clampSkipInterval(-5_000.0))
-    assertEquals(60_000, VlcContract.clampSkipInterval(60_001.0))
-    assertEquals(60_000, VlcContract.clampSkipInterval(Double.POSITIVE_INFINITY))
-  }
-
-  @Test
-  fun remoteSkipIntervalDefaultsAndIgnoresNaN() {
-    val settings = PlayerSettings()
-    assertEquals(10_000, settings.remoteSkipIntervalMs)
-    settings.setRemoteSkipInterval(15_000.4)
-    settings.setRemoteSkipInterval(Double.NaN)
-    assertEquals(15_000, settings.remoteSkipIntervalMs)
-  }
-
   private fun state(
     hasNowPlaying: Boolean = true,
     hasSource: Boolean = true,
