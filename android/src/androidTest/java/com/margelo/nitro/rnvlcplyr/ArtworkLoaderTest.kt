@@ -75,6 +75,16 @@ class ArtworkLoaderTest {
     assertEquals(5, scheduledDelaysMs.size)
   }
 
+  @Test
+  fun artworkOverTheSizeLimitIsRefused() {
+    writeTinyPng()
+    file.appendBytes(ByteArray(BYTES_OVER_THE_LIMIT))
+
+    requestAndAwaitSettled()
+
+    assertNull(loader.cached(uri))
+  }
+
   private fun requestAndAwaitSettled(): Bitmap? {
     val settled = CountDownLatch(1)
     val image = loader.image(TestMedia.targetContext, uri) { settled.countDown() }
@@ -89,5 +99,6 @@ class ArtworkLoaderTest {
 
   private companion object {
     const val SETTLE_TIMEOUT_S = 10L
+    const val BYTES_OVER_THE_LIMIT = 10 * 1024 * 1024 + 1
   }
 }

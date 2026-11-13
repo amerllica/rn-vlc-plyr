@@ -3,6 +3,8 @@ import UIKit
 @testable import RnVlcPlyr
 
 final class ArtworkLoaderTests: XCTestCase {
+  private static let bytesOverTheLimit = 10 * 1024 * 1024 + 1
+  private static let remoteUri = "https://artwork.test/cover.png"
   private var directory: URL!
   private var attempts = 0
   private var scheduledDelays: [Int] = []
@@ -73,6 +75,55 @@ final class ArtworkLoaderTests: XCTestCase {
     XCTAssertEqual(warnings.count, 1)
   }
 
+  func testFileOverTheSizeLimitIsRefused() throws {
+    let url = try writePng(named: "huge.png")
+    let handle = try FileHandle(forWritingTo: url)
+    handle.seekToEndOfFile()
+    handle.write(Data(count: Self.bytesOverTheLimit))
+    try handle.close()
+
+    XCTAssertNil(awaitLoad(url.absoluteString))
+
+    XCTAssertNil(loader.image(for: url.absoluteString))
+    XCTAssertEqual(warnings, ["rn-vlc-plyr: artwork could not be loaded from \(url.absoluteString): too large"])
+  }
+
+  func testHttpArtworkLoads() throws {
+    let png = try Data(contentsOf: writePng(named: "remote.png"))
+
+    let result = try download(replyingWith: 200, body: png)
+
+    XCTAssertNotNil(try? result.get())
+  }
+
+  func testHttpErrorStatusFails() throws {
+    XCTAssertEqual(failure(of: try download(replyingWith: 404, body: Data())), .http(404))
+  }
+
+  func testHttpBodyOverTheSizeLimitFails() throws {
+    XCTAssertEqual(failure(of: try download(replyingWith: 200, body: Data(count: Self.bytesOverTheLimit))), .tooLarge)
+  }
+
+  private func download(replyingWith status: Int, body: Data) throws -> Result<UIImage, ArtworkFailure> {
+    let url = try XCTUnwrap(URL(string: Self.remoteUri))
+    StubArtworkServer.reply = (status, body)
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [StubArtworkServer.self]
+    let finished = expectation(description: "download finished")
+    var result: Result<UIImage, ArtworkFailure> = .failure(.timedOut)
+    ArtworkLoader.download(url, configuration: configuration) { downloaded in
+      result = downloaded
+      finished.fulfill()
+    }
+    wait(for: [finished], timeout: 5)
+    return result
+  }
+
+  private func failure(of result: Result<UIImage, ArtworkFailure>) -> ArtworkFailure? {
+    guard case .failure(let failure) = result else { return nil }
+    return failure
+  }
+
   private func awaitLoad(_ uri: String) -> UIImage? {
     let expectation = expectation(description: "artwork settled")
     loads = expectation
@@ -92,4 +143,26 @@ final class ArtworkLoaderTests: XCTestCase {
     try XCTUnwrap(image.pngData()).write(to: url)
     return url
   }
+}
+
+private final class StubArtworkServer: URLProtocol {
+  static var reply: (status: Int, body: Data) = (200, Data())
+
+  override class func canInit(with request: URLRequest) -> Bool {
+    true
+  }
+
+  override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+    request
+  }
+
+  override func startLoading() {
+    guard let url = request.url,
+          let response = HTTPURLResponse(url: url, statusCode: Self.reply.status, httpVersion: nil, headerFields: nil) else { return }
+    client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+    client?.urlProtocol(self, didLoad: Self.reply.body)
+    client?.urlProtocolDidFinishLoading(self)
+  }
+
+  override func stopLoading() {}
 }

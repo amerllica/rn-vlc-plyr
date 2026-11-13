@@ -11,6 +11,7 @@ import com.margelo.nitro.rnvlcplyr.contract.VlcContract
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileNotFoundException
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL
@@ -98,8 +99,8 @@ class ArtworkLoader(private val schedule: ArtworkScheduler = defaultScheduler())
     val parsed = Uri.parse(uri)
     return when (parsed.scheme?.lowercase()) {
       "http", "https" -> readHttp(uri)
-      "file" -> File(parsed.path ?: throw FileNotFoundException(uri)).readBytes()
-      "content" -> context.contentResolver.openInputStream(parsed)?.use { it.readBytes() } ?: throw FileNotFoundException(uri)
+      "file" -> File(parsed.path ?: throw FileNotFoundException(uri)).inputStream().use(::readWithinLimit)
+      "content" -> context.contentResolver.openInputStream(parsed)?.use(::readWithinLimit) ?: throw FileNotFoundException(uri)
       else -> throw ArtworkFailure("unsupported scheme")
     }
   }
@@ -113,7 +114,7 @@ class ArtworkLoader(private val schedule: ArtworkScheduler = defaultScheduler())
       val status = connection.responseCode
       if (!ArtworkRedirect.isRedirect(status)) {
         if (status !in HTTP_SUCCESS) throw ArtworkFailure("HTTP $status")
-        return connection.inputStream.use { it.readBytes() }
+        return connection.inputStream.use(::readWithinLimit)
       }
       ArtworkRedirect.target(uri, connection.getHeaderField(LOCATION_HEADER)) ?: throw ArtworkFailure("HTTP $status")
     } finally {
@@ -121,6 +122,17 @@ class ArtworkLoader(private val schedule: ArtworkScheduler = defaultScheduler())
     }
     if (hopsLeft == 0) throw ArtworkFailure(TOO_MANY_REDIRECTS)
     return readHttp(redirectTarget, hopsLeft - 1)
+  }
+
+  private fun readWithinLimit(input: InputStream): ByteArray {
+    val body = ByteArrayOutputStream()
+    val chunk = ByteArray(READ_CHUNK_BYTES)
+    while (true) {
+      val read = input.read(chunk)
+      if (read < 0) return body.toByteArray()
+      if (body.size() + read > MAX_BYTES) throw ArtworkFailure(TOO_LARGE)
+      body.write(chunk, 0, read)
+    }
   }
 
   private fun decode(bytes: ByteArray): Bitmap {
@@ -154,6 +166,9 @@ class ArtworkLoader(private val schedule: ArtworkScheduler = defaultScheduler())
     private const val THREAD_NAME = "rn-vlc-plyr-artwork"
     private const val NOT_AN_IMAGE = "not an image"
     private const val TOO_MANY_REDIRECTS = "too many redirects"
+    private const val TOO_LARGE = "too large"
+    private const val MAX_BYTES = 10 * 1024 * 1024
+    private const val READ_CHUNK_BYTES = 64 * 1024
     private const val LOCATION_HEADER = "Location"
     private val HTTP_SUCCESS = 200..299
 
