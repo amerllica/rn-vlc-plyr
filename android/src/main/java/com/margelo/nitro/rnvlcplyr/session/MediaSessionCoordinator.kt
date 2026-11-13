@@ -126,7 +126,7 @@ class MediaSessionCoordinator(context: Context, private val host: SessionHost) {
   }
 
   private fun onFocusChange(change: Int) = onMain {
-    applyInterruption(interruption.focusChanged(change, isPlayerActive()))
+    applyInterruption(focusChangeOf(change)?.let { interruption.focusChanged(it, isPlayerActive()) })
   }
 
   private fun onBecomingNoisy() = onMain { applyInterruption(interruption.becameNoisy(isPlayerActive())) }

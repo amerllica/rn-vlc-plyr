@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioManager
 import androidx.core.content.ContextCompat
+import com.margelo.nitro.rnvlcplyr.contract.FocusChange
 
 class AudioFocusController(
   private val context: Context,
@@ -39,4 +40,11 @@ class AudioFocusController(
     listenForNoisy(false)
     abandon()
   }
+}
+
+fun focusChangeOf(change: Int): FocusChange? = when (change) {
+  AudioManager.AUDIOFOCUS_LOSS -> FocusChange.LOST
+  AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> FocusChange.LOST_BRIEFLY
+  AudioManager.AUDIOFOCUS_GAIN -> FocusChange.GAINED
+  else -> null
 }

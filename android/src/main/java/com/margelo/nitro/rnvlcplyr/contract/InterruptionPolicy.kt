@@ -1,8 +1,8 @@
 package com.margelo.nitro.rnvlcplyr.contract
 
-import android.media.AudioManager
-
 enum class InterruptionEffect { PAUSE, RESUME }
+
+enum class FocusChange { LOST, LOST_BRIEFLY, GAINED }
 
 class InterruptionPolicy {
   var pausedByInterruption: Boolean = false
@@ -20,11 +20,10 @@ class InterruptionPolicy {
     return if (resumes) InterruptionEffect.RESUME else null
   }
 
-  fun focusChanged(change: Int, isActive: Boolean): InterruptionEffect? = when (change) {
-    AudioManager.AUDIOFOCUS_LOSS -> lostPermanently(isActive)
-    AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> began(isActive)
-    AudioManager.AUDIOFOCUS_GAIN -> ended(shouldResume = true)
-    else -> null
+  fun focusChanged(change: FocusChange, isActive: Boolean): InterruptionEffect? = when (change) {
+    FocusChange.LOST -> lostPermanently(isActive)
+    FocusChange.LOST_BRIEFLY -> began(isActive)
+    FocusChange.GAINED -> ended(shouldResume = true)
   }
 
   fun lostPermanently(isActive: Boolean): InterruptionEffect? = pauseAndForget(isActive)
