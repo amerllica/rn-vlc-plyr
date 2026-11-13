@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
+import com.margelo.nitro.rnvlcplyr.contract.ArtworkRedirect
 import com.margelo.nitro.rnvlcplyr.contract.ArtworkRetrySchedule
 import java.io.File
 import java.io.FileNotFoundException
@@ -101,18 +102,23 @@ class ArtworkLoader(private val schedule: ArtworkScheduler = defaultScheduler())
     }
   }
 
-  private fun readHttp(uri: String): ByteArray {
+  private fun readHttp(uri: String, hopsLeft: Int = ArtworkRedirect.MAX_HOPS): ByteArray {
     val connection = URL(uri).openConnection() as HttpURLConnection
     connection.connectTimeout = TIMEOUT_MS
     connection.readTimeout = TIMEOUT_MS
-    connection.instanceFollowRedirects = true
-    return try {
+    connection.instanceFollowRedirects = false
+    val redirectTarget = try {
       val status = connection.responseCode
-      if (status !in HTTP_SUCCESS) throw ArtworkFailure("HTTP $status")
-      connection.inputStream.use { it.readBytes() }
+      if (!ArtworkRedirect.isRedirect(status)) {
+        if (status !in HTTP_SUCCESS) throw ArtworkFailure("HTTP $status")
+        return connection.inputStream.use { it.readBytes() }
+      }
+      ArtworkRedirect.target(uri, connection.getHeaderField(LOCATION_HEADER)) ?: throw ArtworkFailure("HTTP $status")
     } finally {
       connection.disconnect()
     }
+    if (hopsLeft == 0) throw ArtworkFailure(TOO_MANY_REDIRECTS)
+    return readHttp(redirectTarget, hopsLeft - 1)
   }
 
   private fun decode(bytes: ByteArray): Bitmap {
@@ -145,6 +151,8 @@ class ArtworkLoader(private val schedule: ArtworkScheduler = defaultScheduler())
     private const val TIMEOUT_MS = 10_000
     private const val THREAD_NAME = "rn-vlc-plyr-artwork"
     private const val NOT_AN_IMAGE = "not an image"
+    private const val TOO_MANY_REDIRECTS = "too many redirects"
+    private const val LOCATION_HEADER = "Location"
     private val HTTP_SUCCESS = 200..299
 
     val shared by lazy { ArtworkLoader() }
