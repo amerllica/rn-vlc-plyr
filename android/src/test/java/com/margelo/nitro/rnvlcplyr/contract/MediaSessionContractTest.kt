@@ -1,5 +1,6 @@
 package com.margelo.nitro.rnvlcplyr.contract
 
+import android.media.AudioManager
 import com.margelo.nitro.rnvlcplyr.VlcStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -167,6 +168,27 @@ class MediaSessionContractTest {
   fun becomingNoisyWhenInactiveDoesNothing() {
     val policy = InterruptionPolicy()
     assertNull(policy.becameNoisy(isActive = false))
+    assertFalse(policy.pausedByInterruption)
+  }
+
+  @Test
+  fun aBriefFocusLossPausesAndTheGainResumes() {
+    val policy = InterruptionPolicy()
+    assertEquals(InterruptionEffect.PAUSE, policy.focusChanged(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT, isActive = true))
+    assertEquals(InterruptionEffect.RESUME, policy.focusChanged(AudioManager.AUDIOFOCUS_GAIN, isActive = false))
+  }
+
+  @Test
+  fun aPermanentFocusLossPausesAndTheGainDoesNotResume() {
+    val policy = InterruptionPolicy()
+    assertEquals(InterruptionEffect.PAUSE, policy.focusChanged(AudioManager.AUDIOFOCUS_LOSS, isActive = true))
+    assertNull(policy.focusChanged(AudioManager.AUDIOFOCUS_GAIN, isActive = false))
+  }
+
+  @Test
+  fun duckingAndOtherFocusChangesDoNothing() {
+    val policy = InterruptionPolicy()
+    assertNull(policy.focusChanged(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK, isActive = true))
     assertFalse(policy.pausedByInterruption)
   }
 

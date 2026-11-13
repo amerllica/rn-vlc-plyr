@@ -2,7 +2,6 @@ package com.margelo.nitro.rnvlcplyr.session
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.media.AudioManager
 import com.margelo.nitro.rnvlcplyr.VlcNowPlaying
 import com.margelo.nitro.rnvlcplyr.VlcStatus
 import com.margelo.nitro.rnvlcplyr.contract.BackgroundEffect
@@ -127,13 +126,7 @@ class MediaSessionCoordinator(context: Context, private val host: SessionHost) {
   }
 
   private fun onFocusChange(change: Int) = onMain {
-    val effect = when (change) {
-      AudioManager.AUDIOFOCUS_LOSS -> interruption.lostPermanently(isPlayerActive())
-      AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> interruption.began(isPlayerActive())
-      AudioManager.AUDIOFOCUS_GAIN -> interruption.ended(shouldResume = true)
-      else -> null
-    }
-    applyInterruption(effect)
+    applyInterruption(interruption.focusChanged(change, isPlayerActive()))
   }
 
   private fun onBecomingNoisy() = onMain { applyInterruption(interruption.becameNoisy(isPlayerActive())) }
