@@ -13,9 +13,9 @@ Results of the cross-platform checklist against [the player contract](player-con
 
 | Suite | iOS | Android |
 |---|---|---|
-| Pure contract rules | XCTest, pass | JUnit on the JVM, 162 pass |
+| Pure contract rules | XCTest, pass | JUnit on the JVM, 172 pass |
 | Real playback | XCTest with bundled MP4 and M4A files, pass | Instrumented tests on the emulator with bundled MP4, M4A, MKV and SRT files, 62 pass |
-| Total | 214 pass | 224 pass |
+| Total | 236 pass | 234 pass |
 
 Counts from 2026-11-13 for 1.5, on the iPhone 18 Pro simulator (iOS 27) and the Api35_GoogleApis
 emulator (API 35). The background and media session contract rules share 33 test names on both
