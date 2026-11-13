@@ -72,6 +72,33 @@ final class ListenerRegistryTests: XCTestCase {
     XCTAssertEqual(received, ["a10", "b10", "b20"])
   }
 
+  func testPresenceIsReportedOnTheFirstAddAndTheLastRemove() {
+    let registry = ListenerRegistry<Int>()
+    var presence: [Bool] = []
+    registry.observePresence { presence.append($0) }
+
+    let first = registry.add { _ in }
+    let second = registry.add { _ in }
+    first.remove()
+    first.remove()
+    second.remove()
+
+    XCTAssertEqual(presence, [true, false])
+    XCTAssertEqual(registry.count, 0)
+  }
+
+  func testRemoveAllReportsTheLostPresenceOnce() {
+    let registry = ListenerRegistry<Int>()
+    var presence: [Bool] = []
+    _ = registry.add { _ in }
+    registry.observePresence { presence.append($0) }
+
+    registry.removeAll()
+    registry.removeAll()
+
+    XCTAssertEqual(presence, [false])
+  }
+
   func testListenerMayRemoveItselfWhileEmitting() throws {
     let player = HybridVlcPlayer()
     defer { try? player.release() }
