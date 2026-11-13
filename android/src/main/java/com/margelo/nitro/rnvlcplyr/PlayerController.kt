@@ -264,10 +264,10 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     get() = addedSlaves.any { it.kind == PlaybackSlave.Kind.AUDIO }
 
   private fun reloadAdding(slave: PlaybackSlave) = mutate {
-    when {
-      !machine.hasSource || machine.status == VlcStatus.ERROR -> addedSlaves.add(slave)
-      machine.isPlaybackActive() -> reopenWithCurrentState(adding = slave)
-      else -> reloadWithoutPlaying(slave)
+    when (machine.reloadMode()) {
+      ReloadMode.NONE -> addedSlaves.add(slave)
+      ReloadMode.IN_PLACE -> reopenWithCurrentState(adding = slave)
+      ReloadMode.WITHOUT_PLAYING -> reloadWithoutPlaying(slave)
     }
   }
 
@@ -386,10 +386,10 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     privateLibVLC = next
     engine.useLibVLC(next ?: VlcEngine.libVLC(context))
     mutate {
-      when {
-        !machine.hasSource || machine.status == VlcStatus.ERROR -> Unit
-        machine.isPlaybackActive() -> reopenWithCurrentState()
-        else -> add { engine.stop() }
+      when (machine.reloadMode()) {
+        ReloadMode.NONE -> Unit
+        ReloadMode.IN_PLACE -> reopenWithCurrentState()
+        ReloadMode.WITHOUT_PLAYING -> add { engine.stop() }
       }
     }
     previous?.release()

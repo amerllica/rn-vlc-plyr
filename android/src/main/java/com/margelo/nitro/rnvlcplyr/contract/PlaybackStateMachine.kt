@@ -7,6 +7,8 @@ enum class EngineEvent { OPENING, BUFFERING, PLAYING, PAUSED, STOPPED, END_REACH
 
 enum class PlayAction { NONE, RESUME, RESTART, RELOAD }
 
+enum class ReloadMode { NONE, IN_PLACE, WITHOUT_PLAYING }
+
 sealed interface PlaybackEffect {
   data class StatusChanged(val status: VlcStatus) : PlaybackEffect
   data object Loaded : PlaybackEffect
@@ -58,6 +60,12 @@ class PlaybackStateMachine(private val isLooping: () -> Boolean) {
     status == VlcStatus.ENDED || status == VlcStatus.STOPPED -> PlayAction.RESTART
     status == VlcStatus.ERROR -> PlayAction.RELOAD
     else -> PlayAction.RESUME
+  }
+
+  fun reloadMode(): ReloadMode = when {
+    !hasSource || status == VlcStatus.ERROR -> ReloadMode.NONE
+    isPlaybackActive() -> ReloadMode.IN_PLACE
+    else -> ReloadMode.WITHOUT_PLAYING
   }
 
   fun canPause(): Boolean = status == VlcStatus.PLAYING || status == VlcStatus.BUFFERING

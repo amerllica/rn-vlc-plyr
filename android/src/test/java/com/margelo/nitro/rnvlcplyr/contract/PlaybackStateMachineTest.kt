@@ -199,6 +199,21 @@ class PlaybackStateMachineTest {
   }
 
   @Test
+  fun reloadModeFollowsTheSubtitleStyleReloadRules() {
+    assertEquals(ReloadMode.NONE, machine.reloadMode())
+    machine.begin(URI, autoPlay = false)
+    assertEquals(ReloadMode.WITHOUT_PLAYING, machine.reloadMode())
+    playThrough()
+    assertEquals(ReloadMode.IN_PLACE, machine.reloadMode())
+    machine.onEngineEvent(EngineEvent.PAUSED, false)
+    assertEquals(ReloadMode.IN_PLACE, machine.reloadMode())
+    machine.stop()
+    assertEquals(ReloadMode.WITHOUT_PLAYING, machine.reloadMode())
+    machine.onEngineEvent(EngineEvent.ERROR, false)
+    assertEquals(ReloadMode.NONE, machine.reloadMode())
+  }
+
+  @Test
   fun clearReturnsToIdleAndIgnoresLateEngineEvents() {
     playThrough()
     assertEquals(listOf(status(VlcStatus.IDLE)), machine.clear())
