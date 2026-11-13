@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
 import { act, renderHook } from '@testing-library/react-native';
 import { useVlcPlayerEvent, useVlcPlayerStatus } from '../useVlcPlayerEvent';
 import { addVlcPlayerListener } from '../events';
@@ -84,5 +84,15 @@ describe('useVlcPlayerStatus', () => {
     expect(result.current).toBe('idle');
     await act(() => player.setStatus('buffering'));
     expect(result.current).toBe('buffering');
+  });
+
+  it('keeps one native listener across rerenders', async () => {
+    const player = new FakePlayer();
+    const subscribe = jest.spyOn(player, 'addOnStatusChangeListener');
+    const { rerender } = await renderHook(() => useVlcPlayerStatus(player));
+
+    await rerender({});
+
+    expect(subscribe).toHaveBeenCalledTimes(1);
   });
 });
