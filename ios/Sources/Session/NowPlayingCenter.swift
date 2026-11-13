@@ -1,7 +1,6 @@
 import MediaPlayer
 
 struct NowPlayingCenter {
-  private static let millisecondsPerSecond = 1000.0
 
   private var center: MPNowPlayingInfoCenter { .default() }
 
@@ -34,6 +33,6 @@ struct NowPlayingCenter {
   }
 
   private static func seconds(_ milliseconds: Int) -> Double {
-    Double(milliseconds) / millisecondsPerSecond
+    Double(milliseconds) / VlcContract.millisecondsPerSecond
   }
 }

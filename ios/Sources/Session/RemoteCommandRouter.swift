@@ -12,8 +12,6 @@ enum RemoteRequest: Equatable {
 }
 
 final class RemoteCommandRouter {
-  private static let millisecondsPerSecond = 1000.0
-
   private let route: (RemoteRequest) -> Bool
   private var registrations: [(command: MPRemoteCommand, target: Any)] = []
 
@@ -42,7 +40,7 @@ final class RemoteCommandRouter {
     register(center.pauseCommand) { _ in .pause }
     register(center.togglePlayPauseCommand) { _ in .togglePlayPause }
     register(center.changePlaybackPositionCommand) { event in
-      (event as? MPChangePlaybackPositionCommandEvent).map { .seek(toMs: $0.positionTime * Self.millisecondsPerSecond) }
+      (event as? MPChangePlaybackPositionCommandEvent).map { .seek(toMs: $0.positionTime * VlcContract.millisecondsPerSecond) }
     }
     register(center.skipForwardCommand) { _ in .skipForward }
     register(center.skipBackwardCommand) { _ in .skipBackward }
@@ -60,7 +58,7 @@ final class RemoteCommandRouter {
     bindings.forEach { command, remote in
       remote.isEnabled = commands.contains(command)
     }
-    let interval = [NSNumber(value: Double(skipIntervalMs) / Self.millisecondsPerSecond)]
+    let interval = [NSNumber(value: Double(skipIntervalMs) / VlcContract.millisecondsPerSecond)]
     center.skipForwardCommand.preferredIntervals = interval
     center.skipBackwardCommand.preferredIntervals = interval
   }

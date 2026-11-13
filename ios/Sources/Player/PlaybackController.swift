@@ -4,7 +4,6 @@ import UIKit
 final class PlaybackController {
   private static let snapshotQueue = DispatchQueue(label: "rn-vlc-plyr.snapshot")
   private static let startedStatuses: Set<PlayerStatus> = [.buffering, .playing, .paused]
-  private static let mediaActiveStatuses: Set<PlayerStatus> = [.opening, .buffering, .playing, .paused]
 
   private let store: PlayerStore
   private var machine = PlaybackStateMachine()
@@ -158,11 +157,7 @@ final class PlaybackController {
     reload(adding: slave)
   }
 
-  func subtitleStyleDidChange() {
-    reload(adding: nil)
-  }
-
-  func libvlcOptionsDidChange() {
+  func instanceOptionsDidChange() {
     reload(adding: nil)
   }
 
@@ -184,7 +179,7 @@ final class PlaybackController {
       slave.map(keepAddedSlave)
       return
     }
-    guard Self.mediaActiveStatuses.contains(machine.status) else {
+    guard machine.isMediaActive else {
       slave.map(keepAddedSlave)
       mediaRequest.map { loadOnFreshEngine($0, slaves: []) }
       return
@@ -217,7 +212,7 @@ final class PlaybackController {
   }
 
   private func attachSlave(_ slave: PlaybackSlave) {
-    let isMediaOpen = Self.mediaActiveStatuses.contains(machine.status)
+    let isMediaOpen = machine.isMediaActive
     if isMediaOpen && engine.addSlave(slave) {
       return
     }
@@ -242,7 +237,7 @@ final class PlaybackController {
 
   func applySettings() {
     guard isActive else { return }
-    if Self.mediaActiveStatuses.contains(machine.status) {
+    if machine.isMediaActive {
       engineInstance?.apply(store.settings)
     }
     session.settingsDidChange()
@@ -470,20 +465,20 @@ final class PlaybackController {
     let slaves = pendingSlaves
     pendingSlaves.removeAll()
     slaves.forEach(attachSlave)
-    if pausesOnceStarted && pendingSeekMs == nil {
-      pausesOnceStarted = false
-      engineInstance.pause()
-    }
+    pauseIfRequestedWhileStarting()
   }
 
   private func applyPendingSeekOnceStarted() {
     guard let pendingSeekMs, machine.status == .playing, store.media.isSeekable else { return }
     self.pendingSeekMs = nil
     performSeek(pendingSeekMs)
-    if pausesOnceStarted {
-      pausesOnceStarted = false
-      engineInstance?.pause()
-    }
+    pauseIfRequestedWhileStarting()
+  }
+
+  private func pauseIfRequestedWhileStarting() {
+    guard pausesOnceStarted, pendingSeekMs == nil else { return }
+    pausesOnceStarted = false
+    engineInstance?.pause()
   }
 
   private func restartForLoop(after endedEngine: VlcEngine?) {
@@ -496,7 +491,7 @@ final class PlaybackController {
   }
 
   private func refreshReadout() {
-    guard let engineInstance, Self.mediaActiveStatuses.contains(machine.status), !machine.isRestartingForLoop else { return }
+    guard let engineInstance, machine.isMediaActive, !machine.isRestartingForLoop else { return }
     let readout = engineInstance.readout
     let hasReachedPlaying = machine.hasReachedPlaying
     let acceptsLengthAndSeekable = hasReachedPlaying && engineHasPlayed && Self.startedStatuses.contains(machine.status)
@@ -575,7 +570,7 @@ extension PlaybackController: VlcEngineDelegate {
   }
 
   func engineDidReportBuffering(percent: Float) {
-    guard isActive, Self.mediaActiveStatuses.contains(machine.status),
+    guard isActive, machine.isMediaActive,
           let rounded = VlcContract.bufferingPercent(fromEngineCache: percent),
           bufferingGate.shouldEmit(rounded) else { return }
     store.emit(\.buffering, PlayerPayloads.buffering(rounded))

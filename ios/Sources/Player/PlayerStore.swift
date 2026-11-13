@@ -21,18 +21,12 @@ final class PlayerEvents {
   let remoteNext = ListenerRegistry<Void>()
   let remotePrevious = ListenerRegistry<Void>()
 
+  var registries: [AnyListenerRegistry] {
+    Mirror(reflecting: self).children.compactMap { $0.value as? AnyListenerRegistry }
+  }
+
   func removeAll() {
-    statusChange.removeAll()
-    timeUpdate.removeAll()
-    loaded.removeAll()
-    ended.removeAll()
-    error.removeAll()
-    volumeChange.removeAll()
-    tracksChange.removeAll()
-    videoSizeChange.removeAll()
-    buffering.removeAll()
-    remoteNext.removeAll()
-    remotePrevious.removeAll()
+    registries.forEach { $0.removeAll() }
   }
 }
 

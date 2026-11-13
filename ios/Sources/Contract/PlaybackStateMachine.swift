@@ -97,6 +97,10 @@ struct PlaybackStateMachine {
     }
   }
 
+  var isMediaActive: Bool {
+    status == .opening || status == .buffering || status == .playing || status == .paused
+  }
+
   var canPause: Bool {
     status == .playing || status == .buffering
   }
