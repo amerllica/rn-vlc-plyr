@@ -139,12 +139,17 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     val action = locked { machine.resolvePlay() }
     if (action == PlayAction.NONE) return@onMain
     session.onUserCommand()
-    session.requestFocus()
     locked { pendingSessionPause = false }
     when (action) {
       PlayAction.NONE -> Unit
-      PlayAction.RESUME -> resume()
-      PlayAction.RESTART -> restartFromBeginning()
+      PlayAction.RESUME -> {
+        session.requestFocus()
+        resume()
+      }
+      PlayAction.RESTART -> {
+        session.requestFocus()
+        restartFromBeginning()
+      }
       PlayAction.RELOAD -> loadSource(locked { source }, forcePlay = true)
     }
   }

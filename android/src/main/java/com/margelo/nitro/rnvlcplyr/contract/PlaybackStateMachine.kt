@@ -54,6 +54,7 @@ class PlaybackStateMachine(private val isLooping: () -> Boolean) {
 
   fun resolvePlay(): PlayAction = when {
     !hasSource -> PlayAction.NONE
+    sourceUri == null -> PlayAction.RELOAD
     status == VlcStatus.ENDED || status == VlcStatus.STOPPED -> PlayAction.RESTART
     status == VlcStatus.ERROR -> PlayAction.RELOAD
     else -> PlayAction.RESUME

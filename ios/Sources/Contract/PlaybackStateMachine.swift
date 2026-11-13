@@ -59,6 +59,7 @@ struct PlaybackStateMachine {
   mutating func failInvalidSource() -> [PlaybackEffect] {
     resetMediaFlags()
     hasSource = true
+    sourceUri = ""
     guard status != .error else { return [] }
     return fail(with: PlayerErrors.invalidSource)
   }
@@ -86,6 +87,7 @@ struct PlaybackStateMachine {
 
   func playAction() -> PlayAction {
     guard hasSource else { return .none }
+    guard !sourceUri.isEmpty else { return .reload }
     switch status {
     case .idle: return .start
     case .paused: return .resume

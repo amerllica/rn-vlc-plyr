@@ -136,6 +136,15 @@ class PlaybackStateMachineTest {
   }
 
   @Test
+  fun playAfterStoppingAnInvalidSourceReloadsIt() {
+    playThrough()
+    machine.rejectInvalidSource()
+    machine.stop()
+    assertEquals(VlcStatus.STOPPED, machine.status)
+    assertEquals(PlayAction.RELOAD, machine.resolvePlay())
+  }
+
+  @Test
   fun clearReturnsToIdleAndIgnoresLateEngineEvents() {
     playThrough()
     assertEquals(listOf(status(VlcStatus.IDLE)), machine.clear())

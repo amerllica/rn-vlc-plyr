@@ -133,6 +133,14 @@ final class PlaybackStateMachineTests: XCTestCase {
     XCTAssertEqual(machine.playAction(), .reload)
   }
 
+  func testPlayAfterStoppingAnInvalidSourceReloadsIt() {
+    var machine = playingMachine()
+    _ = machine.failInvalidSource()
+    _ = machine.requestStop()
+    XCTAssertEqual(machine.status, .stopped)
+    XCTAssertEqual(machine.playAction(), .reload)
+  }
+
   func testReloadAfterErrorFiresLoadedAgain() {
     var machine = PlaybackStateMachine()
     _ = machine.load(uri: networkUri, autoPlay: false)
