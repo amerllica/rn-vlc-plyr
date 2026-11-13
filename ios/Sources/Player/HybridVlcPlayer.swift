@@ -146,11 +146,13 @@ final class HybridVlcPlayer: HybridVlcPlayerSpec {
   }
 
   func setAudioTrack(id: Double) throws {
-    onMain { $0.selectAudioTrack(Int(id)) }
+    guard let trackId = VlcContract.trackId(id) else { return }
+    onMain { $0.selectAudioTrack(trackId) }
   }
 
   func setSubtitleTrack(id: Double) throws {
-    onMain { $0.selectSubtitleTrack(Int(id)) }
+    guard let trackId = VlcContract.trackId(id) else { return }
+    onMain { $0.selectSubtitleTrack(trackId) }
   }
 
   func addAudio(uri: String, select: Bool) throws {

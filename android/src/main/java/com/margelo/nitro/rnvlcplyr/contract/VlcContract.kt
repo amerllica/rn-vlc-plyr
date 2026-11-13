@@ -70,6 +70,8 @@ object VlcContract {
 
   fun delayToMicros(delayMs: Int): Long = delayMs * MICROS_PER_MILLI
 
+  fun trackId(value: Double): Int? = value.takeIf { it.isFinite() }?.toInt()
+
   fun clampSeek(targetMs: Double, durationMs: Long): Long {
     val lowerBounded = roundHalfUp(targetMs).coerceAtLeast(0L)
     return if (durationMs > 0) lowerBounded.coerceAtMost(durationMs) else lowerBounded

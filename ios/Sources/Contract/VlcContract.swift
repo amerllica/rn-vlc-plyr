@@ -59,6 +59,10 @@ enum VlcContract {
     return Int(min(max(jsRound(value), 0), upperBound))
   }
 
+  static func trackId(_ value: Double) -> Int? {
+    Int(exactly: value.rounded(.towardZero))
+  }
+
   static func duration(fromEngineLength length: Int) -> Int {
     max(length, 0)
   }

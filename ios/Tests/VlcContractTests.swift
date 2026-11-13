@@ -44,6 +44,16 @@ final class VlcContractTests: XCTestCase {
     XCTAssertNil(VlcContract.clampSeekTarget(.nan, duration: 0))
   }
 
+  func testTrackIdTruncatesAndRejectsValuesOutsideTheIntegerRange() {
+    XCTAssertEqual(VlcContract.trackId(2), 2)
+    XCTAssertEqual(VlcContract.trackId(-1), -1)
+    XCTAssertEqual(VlcContract.trackId(2.9), 2)
+    XCTAssertNil(VlcContract.trackId(.nan))
+    XCTAssertNil(VlcContract.trackId(.infinity))
+    XCTAssertNil(VlcContract.trackId(-.infinity))
+    XCTAssertNil(VlcContract.trackId(1e300))
+  }
+
   func testDurationFromEngineLength() {
     XCTAssertEqual(VlcContract.duration(fromEngineLength: -1), 0)
     XCTAssertEqual(VlcContract.duration(fromEngineLength: 0), 0)

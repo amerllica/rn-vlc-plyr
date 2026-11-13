@@ -57,6 +57,16 @@ class VlcContractTest {
   }
 
   @Test
+  fun trackIdTruncatesAndRejectsNonFiniteValues() {
+    assertEquals(2, VlcContract.trackId(2.0))
+    assertEquals(-1, VlcContract.trackId(-1.0))
+    assertEquals(2, VlcContract.trackId(2.9))
+    assertNull(VlcContract.trackId(Double.NaN))
+    assertNull(VlcContract.trackId(Double.POSITIVE_INFINITY))
+    assertNull(VlcContract.trackId(Double.NEGATIVE_INFINITY))
+  }
+
+  @Test
   fun durationIsZeroWhenEngineReportsNonPositiveLength() {
     assertEquals(0L, VlcContract.durationFromEngine(-1))
     assertEquals(0L, VlcContract.durationFromEngine(0))

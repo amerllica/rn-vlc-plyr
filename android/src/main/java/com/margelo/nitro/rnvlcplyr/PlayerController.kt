@@ -217,7 +217,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   }
 
   fun setAudioTrack(id: Double) = onMain {
-    val trackId = id.toInt()
+    val trackId = VlcContract.trackId(id) ?: return@onMain
     if (locked { isSelectable(media.tracks.audioTracks, trackId).also { if (it) tracksBeforeReopen = null } }) {
       engine.selectAudioTrack(trackId)
       refreshMediaInfo()
@@ -225,7 +225,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   }
 
   fun setSubtitleTrack(id: Double) = onMain {
-    val trackId = id.toInt()
+    val trackId = VlcContract.trackId(id) ?: return@onMain
     if (locked { isSelectable(media.tracks.subtitleTracks, trackId).also { if (it) tracksBeforeReopen = null } }) {
       engine.selectSubtitleTrack(trackId)
       refreshMediaInfo()
