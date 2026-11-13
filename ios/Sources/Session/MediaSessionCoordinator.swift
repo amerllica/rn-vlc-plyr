@@ -78,9 +78,14 @@ final class MediaSessionCoordinator {
     refresh()
   }
 
-  func refresh(reachedPlaying: Bool = false) {
+  func didReachPlaying() {
+    guard !isShutDown, snapshot.state.isActive else { return }
+    MediaSessionOwner.shared.claim(self)
+  }
+
+  func refresh() {
     guard !isShutDown else { return }
-    MediaSessionOwner.shared.update(self, reachedPlaying: reachedPlaying)
+    MediaSessionOwner.shared.update(self)
   }
 
   func shutdown() {

@@ -48,6 +48,7 @@ final class VlcEngine: NSObject, VLCMediaPlayerDelegate {
   private static let noTrack: Int32 = -1
 
   weak var delegate: VlcEngineDelegate?
+  private(set) var hasPlayed = false
   private let player: VLCMediaPlayer
   private var disabledVideoTrack: Int32?
   private var bufferingObserver: VlcBufferingObserver?
@@ -165,6 +166,7 @@ final class VlcEngine: NSObject, VLCMediaPlayerDelegate {
   }
 
   func mediaPlayerStateChanged(_ aNotification: Notification) {
+    hasPlayed = hasPlayed || player.state == .playing
     delegate?.engineDidChangeState(Self.engineState(player.state), isPlaying: player.isPlaying)
   }
 

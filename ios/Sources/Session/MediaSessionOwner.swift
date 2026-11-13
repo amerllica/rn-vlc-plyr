@@ -20,14 +20,18 @@ final class MediaSessionOwner {
     self?.refreshOwner()
   }
 
-  func update(_ candidate: MediaSessionCoordinator, reachedPlaying: Bool = false) {
+  func claim(_ candidate: MediaSessionCoordinator) {
+    owner = candidate
+  }
+
+  func update(_ candidate: MediaSessionCoordinator) {
     let snapshot = candidate.snapshot
     guard snapshot.state.isActive else {
       resign(candidate)
       return
     }
-    if snapshot.state.playback == .playing && (reachedPlaying || owner == nil) {
-      owner = candidate
+    if snapshot.state.playback == .playing && owner == nil {
+      claim(candidate)
     }
     guard owner === candidate else { return }
     publish(snapshot)

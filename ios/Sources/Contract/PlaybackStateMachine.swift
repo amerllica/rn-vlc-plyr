@@ -12,6 +12,7 @@ enum EngineState: Equatable {
 }
 
 enum PlaybackEffect: Equatable {
+  case startedPlaying
   case status(PlayerStatus)
   case loaded
   case ended
@@ -27,6 +28,18 @@ enum PlayAction: Equatable {
   case reload
 }
 
+enum ReloadMode: Equatable {
+  case none
+  case inPlace
+  case withoutPlaying
+}
+
+enum SourceState: Equatable {
+  case none
+  case invalid
+  case valid(uri: String)
+}
+
 enum SeekAction: Equatable {
   case none
   case seek(Int)
@@ -36,32 +49,37 @@ enum SeekAction: Equatable {
 struct PlaybackStateMachine {
   private(set) var status: PlayerStatus = .idle
   private(set) var hasReachedPlaying = false
-  private(set) var hasSource = false
-  private var sourceUri = ""
+  private var source = SourceState.none
   private var loadedEmitted = false
   private var expectingPlayback = false
   private var restartingForLoop = false
 
   mutating func load(uri: String, autoPlay: Bool) -> [PlaybackEffect] {
     resetMediaFlags()
-    hasSource = true
-    sourceUri = uri
+    source = .valid(uri: uri)
     return autoPlay ? beginPlayback() : transition(to: .idle)
   }
 
   mutating func clear() -> [PlaybackEffect] {
     resetMediaFlags()
-    hasSource = false
-    sourceUri = ""
+    source = .none
     return transition(to: .idle)
   }
 
   mutating func failInvalidSource() -> [PlaybackEffect] {
     resetMediaFlags()
-    hasSource = true
-    sourceUri = ""
+    source = .invalid
     guard status != .error else { return [] }
     return fail(with: PlayerErrors.invalidSource)
+  }
+
+  var hasSource: Bool {
+    source != .none
+  }
+
+  var reloadMode: ReloadMode {
+    if !hasSource || status == .error { return .none }
+    return isMediaActive ? .inPlace : .withoutPlaying
   }
 
   var isRestartingForLoop: Bool {
@@ -86,14 +104,14 @@ struct PlaybackStateMachine {
   }
 
   func playAction() -> PlayAction {
-    guard hasSource else { return .none }
-    guard !sourceUri.isEmpty else { return .reload }
-    switch status {
-    case .idle: return .start
-    case .paused: return .resume
-    case .ended, .stopped: return .restart
-    case .error: return .reload
-    case .opening, .buffering, .playing: return .none
+    switch (source, status) {
+    case (.none, _): return .none
+    case (.invalid, _): return .reload
+    case (.valid, .idle): return .start
+    case (.valid, .paused): return .resume
+    case (.valid, .ended), (.valid, .stopped): return .restart
+    case (.valid, .error): return .reload
+    case (.valid, .opening), (.valid, .buffering), (.valid, .playing): return .none
     }
   }
 
@@ -134,10 +152,15 @@ struct PlaybackStateMachine {
     case .ended:
       return restartingForLoop ? [] : reachEnd(loop: loop)
     case .error:
-      return fail(with: PlayerErrors.engineFailure(uri: sourceUri, hasReachedPlaying: hasReachedPlaying))
+      return fail(with: PlayerErrors.engineFailure(uri: validUri, hasReachedPlaying: hasReachedPlaying))
     case .esAdded:
       return []
     }
+  }
+
+  private var validUri: String {
+    guard case .valid(let uri) = source else { return "" }
+    return uri
   }
 
   private func ignoresBuffering(engineIsPlaying: Bool) -> Bool {
@@ -145,9 +168,12 @@ struct PlaybackStateMachine {
   }
 
   private mutating func enterPlaying() -> [PlaybackEffect] {
+    let endsLoopRestart = restartingForLoop
     restartingForLoop = false
     hasReachedPlaying = true
-    var effects = transition(to: .playing)
+    let statusChange = transition(to: .playing)
+    guard endsLoopRestart || !statusChange.isEmpty else { return [] }
+    var effects = [PlaybackEffect.startedPlaying] + statusChange
     if !loadedEmitted {
       loadedEmitted = true
       effects.append(.loaded)

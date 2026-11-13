@@ -2,64 +2,59 @@ import XCTest
 @testable import RnVlcPlyr
 
 final class StallWatchdogTests: XCTestCase {
-  func testDueWhileStillBuffering() {
-    var watchdog = StallWatchdog()
-    watchdog.arm(positionMs: 5000)
-    XCTAssertTrue(watchdog.isDue(status: .buffering, positionMs: 5000))
-    XCTAssertTrue(watchdog.isDue(status: .buffering, positionMs: 5400))
+  private static let positionMs = 42_000
+  private static let seekTargetMs = 10_000
+  private static let progressMs = 4000
+
+  private var watchdog = StallWatchdog()
+
+  func testFiresWhileStillBuffering() {
+    let generation = watchdog.arm(positionMs: Self.positionMs)
+    XCTAssertTrue(watchdog.fire(generation: generation, status: .buffering, positionMs: Self.positionMs + Self.progressMs))
   }
 
-  func testDueWhilePlayingWithoutProgress() {
-    var watchdog = StallWatchdog()
-    watchdog.arm(positionMs: 5000)
-    XCTAssertTrue(watchdog.isDue(status: .playing, positionMs: 5000))
-    XCTAssertTrue(watchdog.isDue(status: .playing, positionMs: 4800))
+  func testFiresWhenPlayingWithoutProgress() {
+    let generation = watchdog.arm(positionMs: Self.positionMs)
+    XCTAssertTrue(watchdog.fire(generation: generation, status: .playing, positionMs: Self.positionMs))
   }
 
-  func testNotDueOncePlaybackMoved() {
-    var watchdog = StallWatchdog()
-    watchdog.arm(positionMs: 5000)
-    XCTAssertFalse(watchdog.isDue(status: .playing, positionMs: 5250))
+  func testStaysQuietOncePlaybackMoves() {
+    let generation = watchdog.arm(positionMs: Self.positionMs)
+    XCTAssertFalse(watchdog.fire(generation: generation, status: .playing, positionMs: Self.positionMs + 1))
+  }
+
+  func testFiresOncePerResume() {
+    let generation = watchdog.arm(positionMs: Self.positionMs)
+    XCTAssertTrue(watchdog.fire(generation: generation, status: .buffering, positionMs: Self.positionMs))
+    XCTAssertFalse(watchdog.isArmed)
+    XCTAssertFalse(watchdog.fire(generation: generation, status: .buffering, positionMs: Self.positionMs))
+  }
+
+  func testDisarmedOrOutdatedChecksDoNothing() {
+    let first = watchdog.arm(positionMs: Self.positionMs)
+    let second = watchdog.arm(positionMs: Self.positionMs)
+
+    XCTAssertFalse(watchdog.fire(generation: first, status: .buffering, positionMs: Self.positionMs))
+
+    watchdog.disarm()
+
+    XCTAssertFalse(watchdog.fire(generation: second, status: .buffering, positionMs: Self.positionMs))
   }
 
   func testArmingAgainAfterASeekMeasuresFromTheSeekTarget() {
-    var watchdog = StallWatchdog()
-    watchdog.arm(positionMs: 60_000)
-    watchdog.arm(positionMs: 10_000)
-    XCTAssertFalse(watchdog.isDue(status: .playing, positionMs: 14_000))
-    XCTAssertTrue(watchdog.isDue(status: .playing, positionMs: 10_000))
-  }
+    let beforeSeek = watchdog.arm(positionMs: Self.positionMs)
+    XCTAssertTrue(watchdog.isArmed)
+    let afterSeek = watchdog.arm(positionMs: Self.seekTargetMs)
 
-  func testNotDueOutsideBufferingAndPlaying() {
-    for status in [PlayerStatus.idle, .opening, .paused, .stopped, .ended, .error] {
-      var watchdog = StallWatchdog()
-      watchdog.arm(positionMs: 0)
-      XCTAssertFalse(watchdog.isDue(status: status, positionMs: 0), "\(status)")
-      XCTAssertTrue(StallWatchdog.ends(at: status), "\(status)")
-    }
-  }
-
-  func testPlayingAndBufferingKeepItArmed() {
-    XCTAssertFalse(StallWatchdog.ends(at: .buffering))
-    XCTAssertFalse(StallWatchdog.ends(at: .playing))
-  }
-
-  func testFiresOncePerArm() {
-    var watchdog = StallWatchdog()
-    watchdog.arm(positionMs: 0)
-    XCTAssertTrue(watchdog.isDue(status: .buffering, positionMs: 0))
-    watchdog.markFired()
+    XCTAssertFalse(watchdog.fire(generation: beforeSeek, status: .playing, positionMs: Self.seekTargetMs + Self.progressMs))
+    XCTAssertFalse(watchdog.fire(generation: afterSeek, status: .playing, positionMs: Self.seekTargetMs + Self.progressMs))
     XCTAssertFalse(watchdog.isArmed)
-    XCTAssertFalse(watchdog.isDue(status: .buffering, positionMs: 0))
-    watchdog.arm(positionMs: 0)
-    XCTAssertTrue(watchdog.isDue(status: .buffering, positionMs: 0))
   }
 
-  func testNotDueWithoutArmOrAfterDisarm() {
-    var watchdog = StallWatchdog()
-    XCTAssertFalse(watchdog.isDue(status: .buffering, positionMs: 0))
-    watchdog.arm(positionMs: 0)
-    watchdog.disarm()
-    XCTAssertFalse(watchdog.isDue(status: .buffering, positionMs: 0))
+  func testOtherStatusesDoNotFire() {
+    for status in [PlayerStatus.paused, .opening, .stopped, .ended, .error] {
+      let generation = watchdog.arm(positionMs: Self.positionMs)
+      XCTAssertFalse(watchdog.fire(generation: generation, status: status, positionMs: Self.positionMs), "\(status)")
+    }
   }
 }
