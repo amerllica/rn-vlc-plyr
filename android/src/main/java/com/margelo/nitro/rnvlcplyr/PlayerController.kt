@@ -12,12 +12,12 @@ import com.margelo.nitro.rnvlcplyr.contract.PlaybackSlave
 import com.margelo.nitro.rnvlcplyr.contract.PlaybackStateMachine
 import com.margelo.nitro.rnvlcplyr.contract.PlayerSettings
 import com.margelo.nitro.rnvlcplyr.contract.ReloadMode
+import com.margelo.nitro.rnvlcplyr.contract.ReopenState
 import com.margelo.nitro.rnvlcplyr.contract.ResumeGuard
 import com.margelo.nitro.rnvlcplyr.contract.ResumeTarget
 import com.margelo.nitro.rnvlcplyr.contract.StallCheck
 import com.margelo.nitro.rnvlcplyr.contract.TimeUpdateThrottle
 import com.margelo.nitro.rnvlcplyr.contract.TrackList
-import com.margelo.nitro.rnvlcplyr.contract.TrackSelectionRestore
 import com.margelo.nitro.rnvlcplyr.contract.VlcContract
 import com.margelo.nitro.rnvlcplyr.engine.EngineMediaInfo
 import com.margelo.nitro.rnvlcplyr.engine.EngineSettings
@@ -49,15 +49,9 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   private val session = MediaSessionCoordinator(context, this)
   private var media = MediaState()
   private var source: VlcSource? = null
-  private var pendingSeekMs: Long? = null
-  private var pendingSessionPause = false
   private val addedSlaves = mutableListOf<PlaybackSlave>()
-  private var reopenSlaves: List<PlaybackSlave> = emptyList()
-  private var reopenSlavesAtMs: Long? = null
-  private var trackRestore = TrackSelectionRestore.none()
+  private var reopen = ReopenState()
   private var privateLibVLC: LibVLC? = null
-  private var reloadingInPlace = false
-  private var tracksBeforeReopen: VlcTracksInfo? = null
   private var released = false
 
   val isReleased: Boolean
@@ -67,7 +61,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
 
   fun setSource(value: VlcSource?) {
     if (!locked { if (released) false else { source = value; addedSlaves.clear(); true } }) return
-    onMain { loadSource(value, forcePlay = false) }
+    onMain { loadSource(value) }
   }
 
   fun setVolume(value: Double) = mutate {
@@ -137,25 +131,19 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     read { SessionSnapshot.of(this, events.remoteNext.count > 0, events.remotePrevious.count > 0) }
 
   override fun play() = onMain {
-    val action = locked { machine.resolvePlay() }
-    if (action == PlayAction.NONE) return@onMain
-    session.onUserCommand()
-    locked { pendingSessionPause = false }
-    when (action) {
-      PlayAction.NONE -> Unit
-      PlayAction.RESUME -> {
-        session.requestFocus()
-        resume()
-      }
-      PlayAction.RESTART -> {
-        session.requestFocus()
-        restartFromBeginning()
-      }
-      PlayAction.RELOAD -> loadSource(locked { source }, forcePlay = true)
+    val start: () -> Unit = when (locked { machine.resolvePlay() }) {
+      PlayAction.NONE -> return@onMain
+      PlayAction.RESUME -> ::resume
+      PlayAction.RESTART -> ::restartFromBeginning
+      PlayAction.RELOAD -> ::retrySource
     }
+    session.onUserCommand()
+    locked { reopen.pausesOnceStarted = false }
+    start()
   }
 
   private fun resume() {
+    session.requestFocus()
     val plan = locked {
       resumeGuard.resume(
         nowMs = SystemClock.elapsedRealtime(),
@@ -185,7 +173,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
 
   override fun pauseForSession() = onMain {
     val pausable = locked {
-      pendingSessionPause = machine.status == VlcStatus.OPENING
+      reopen.pausesOnceStarted = machine.status == VlcStatus.OPENING
       machine.canPause()
     }
     if (pausable) engine.pause()
@@ -197,9 +185,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     session.onStopped()
     mutate {
       val effects = machine.stop() ?: return@mutate
-      pendingSeekMs = null
-      pendingSessionPause = false
-      reloadingInPlace = false
+      reopen.cancelPendingStart()
       resumeGuard.reset()
       media = media.copy(currentTimeMs = 0L)
       val update = media.timeUpdate
@@ -224,7 +210,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   private fun selectTrack(kind: PlaybackSlave.Kind, id: Double) = onMain {
     val trackId = VlcContract.trackId(id) ?: return@onMain
     val selectable = locked {
-      TrackList.canSelect(media.tracks.of(kind), trackId).also { known -> if (known) forgetPendingSelection(kind) }
+      TrackList.canSelect(media.tracks.of(kind), trackId).also { known -> if (known) reopen.forgetSelection(kind) }
     }
     if (!selectable) return@onMain
     when (kind) {
@@ -237,15 +223,6 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   private fun VlcTracksInfo.of(kind: PlaybackSlave.Kind): Array<VlcTrack> = when (kind) {
     PlaybackSlave.Kind.AUDIO -> audioTracks
     PlaybackSlave.Kind.SUBTITLE -> subtitleTracks
-  }
-
-  private fun forgetPendingSelection(kind: PlaybackSlave.Kind) {
-    tracksBeforeReopen = null
-    when (kind) {
-      PlaybackSlave.Kind.AUDIO -> trackRestore.forgetAudioSelection()
-      PlaybackSlave.Kind.SUBTITLE -> trackRestore.forgetSubtitleSelection()
-    }
-    reopenSlaves = reopenSlaves.map { slave -> if (slave.kind == kind) slave.copy(select = false) else slave }
   }
 
   fun addAudio(uri: String, select: Boolean) =
@@ -281,7 +258,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     val uri = VlcContract.resolveMediaUri(current.uri) ?: return
     val attached = addedSlaves.toList()
     addedSlaves.add(slave)
-    reopenSlaves = reopenSlaves + slave
+    reopen.add(slave)
     val options = VlcContract.mediaOptions(current, hasAddedAudio)
     add {
       engine.load(uri, options)
@@ -307,7 +284,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
       machine.clear()
       media = MediaState()
       source = null
-      pendingSeekMs = null
+      reopen = ReopenState()
       resumeGuard.reset()
       previous
     }
@@ -339,22 +316,22 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     engine.applyScale(output)
   }
 
-  private fun loadSource(value: VlcSource?, forcePlay: Boolean) {
+  private fun loadSource(value: VlcSource?) =
+    open(value, playNow = locked { settings.autoPlay }, slavesToAddAgain = emptyList())
+
+  private fun retrySource() =
+    open(locked { source }, playNow = true, slavesToAddAgain = locked { addedSlaves.toList() })
+
+  private fun open(value: VlcSource?, playNow: Boolean, slavesToAddAgain: List<PlaybackSlave>) {
     val resolvedUri = value?.let { VlcContract.resolveMediaUri(it.uri) }
-    val wantsPlay = resolvedUri != null && (forcePlay || locked { settings.autoPlay })
+    val wantsPlay = resolvedUri != null && playNow
     if (wantsPlay) session.requestFocus()
-    mutate { applySource(value, resolvedUri, wantsPlay, addsTracksAgain = forcePlay) }
+    mutate { applySource(value, resolvedUri, wantsPlay, slavesToAddAgain) }
   }
 
-  private fun Outbox.applySource(value: VlcSource?, resolvedUri: String?, playNow: Boolean, addsTracksAgain: Boolean) {
+  private fun Outbox.applySource(value: VlcSource?, resolvedUri: String?, playNow: Boolean, slavesToAddAgain: List<PlaybackSlave>) {
     media = MediaState()
-    pendingSeekMs = null
-    pendingSessionPause = false
-    reopenSlaves = if (addsTracksAgain) addedSlaves.toList() else emptyList()
-    reopenSlavesAtMs = null
-    trackRestore = TrackSelectionRestore.none()
-    reloadingInPlace = false
-    tracksBeforeReopen = null
+    reopen = ReopenState(slavesToAddAgain)
     throttle.reset()
     videoSizeFilter.reset()
     bufferingFilter.reset()
@@ -380,9 +357,12 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     add { session.onSourceChanged(cleared = value == null) }
   }
 
-  private fun restartFromBeginning() = mutate {
-    media = media.copy(currentTimeMs = 0L)
-    add { engine.restart() }
+  private fun restartFromBeginning() {
+    session.requestFocus()
+    mutate {
+      media = media.copy(currentTimeMs = 0L)
+      add { engine.restart() }
+    }
   }
 
   private fun applyInstanceOptions(options: List<String>) {
@@ -403,31 +383,16 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   private fun Outbox.reopenWithCurrentState(adding: PlaybackSlave? = null) {
     val current = source ?: return
     val uri = VlcContract.resolveMediaUri(current.uri) ?: return
-    if (!reloadingInPlace) {
-      captureStateForReopen()
-      reloadingInPlace = true
-    }
+    reopen.beginReload(media, isPaused = machine.status == VlcStatus.PAUSED, addedSlaves = addedSlaves)
     if (adding != null) {
       addedSlaves.add(adding)
-      reopenSlaves = reopenSlaves + adding
-      if (adding.select) trackRestore.forgetAudioSelection()
+      reopen.add(adding)
     }
     bufferingFilter.reset()
     val options = VlcContract.mediaOptions(current, hasAddedAudio)
     add { engine.load(uri, options) }
     applyEffects(machine.reopen())
     add { engine.play() }
-  }
-
-  private fun captureStateForReopen() {
-    if (pendingSeekMs == null && media.hasReachedPlaying && media.isSeekable && media.currentTimeMs > 0L) {
-      pendingSeekMs = media.currentTimeMs
-    }
-    pendingSessionPause = pendingSessionPause || machine.status == VlcStatus.PAUSED
-    val tracks = tracksBeforeReopen?.takeIf { TrackList.isStillLoading(media.tracks, it) } ?: media.tracks
-    tracksBeforeReopen = tracks
-    trackRestore = TrackSelectionRestore.capture(tracks, addedSlaves)
-    reopenSlaves = trackRestore.reopenSlaves
   }
 
   private fun performSeek(targetMs: Double) = mutate {
@@ -438,10 +403,10 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     throttle.markEmitted(SystemClock.elapsedRealtime())
     val update = media.timeUpdate
     if (requiresRestart) {
-      pendingSeekMs = target
+      reopen.pendingSeekMs = target
       add { engine.restart() }
     } else {
-      if (reloadingInPlace || pendingSeekMs != null) pendingSeekMs = target
+      reopen.keepSeek(target)
       add { engine.setTime(target) }
     }
     resumeGuard.seek(target, settings.reloadOnStallAfterMs)?.let { check -> add { scheduleStallCheck(check) } }
@@ -497,8 +462,8 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
       applyEffects(effects)
       val engineSettings = currentEngineSettings()
       add { engine.apply(engineSettings) }
-      reloadingInPlace = false
-      if (pendingSeekMs == null) queuePendingSessionPause()
+      reopen.playbackStarted()
+      if (reopen.pendingSeekMs == null) queuePendingSessionPause()
     }
   }
 
@@ -506,7 +471,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     val seekable = engine.isSeekable
     mutate {
       if (machine.status !in TIME_TRACKING_STATUSES) return@mutate
-      val target = pendingSeekMs
+      val target = reopen.pendingSeekMs
       if (target != null && machine.status == VlcStatus.PLAYING && seekable) {
         applyPendingSeek(target)
         return@mutate
@@ -517,26 +482,20 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   }
 
   private fun Outbox.applyPendingSeek(target: Long) {
-    pendingSeekMs = null
+    reopen.pendingSeekMs = null
     media = media.copy(currentTimeMs = target)
     add { engine.setTime(target) }
     queuePendingSessionPause()
   }
 
   private fun Outbox.reattachSlavesOnceSettled() {
-    if (reopenSlaves.isEmpty() || pendingSeekMs != null || machine.status != VlcStatus.PLAYING) return
-    val now = SystemClock.elapsedRealtime()
-    val dueAt = reopenSlavesAtMs ?: (now + VlcContract.SLAVE_REATTACH_DELAY_MS).also { reopenSlavesAtMs = it }
-    if (now < dueAt) return
-    val slaves = reopenSlaves
-    reopenSlaves = emptyList()
-    reopenSlavesAtMs = null
-    slaves.forEach { slave -> add { onMain { engine.addSlave(slave) } } }
+    reopen.takeSlavesDue(SystemClock.elapsedRealtime(), isPlaying = machine.status == VlcStatus.PLAYING)
+      .forEach { slave -> add { onMain { engine.addSlave(slave) } } }
   }
 
   private fun Outbox.queuePendingSessionPause() {
-    if (pendingSessionPause) add { engine.pause() }
-    pendingSessionPause = false
+    if (reopen.pausesOnceStarted) add { engine.pause() }
+    reopen.pausesOnceStarted = false
   }
 
   private fun Outbox.trackTime(timeMs: Long) {
@@ -579,13 +538,9 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   }
 
   private fun Outbox.queueTrackRestore(tracks: VlcTracksInfo) {
-    if (tracksBeforeReopen?.let { TrackList.isStillLoading(tracks, it) } == false) tracksBeforeReopen = null
-    trackRestore.takeAudioTrack(tracks.audioTracks)
-      ?.takeIf { it != tracks.selectedAudioTrack.toInt() }
-      ?.let { id -> add { onMain { engine.selectAudioTrack(id) } } }
-    trackRestore.takeSubtitleTrack(tracks.subtitleTracks)
-      ?.takeIf { it != tracks.selectedSubtitleTrack.toInt() }
-      ?.let { id -> add { onMain { engine.selectSubtitleTrack(id) } } }
+    val restored = reopen.tracksArrived(tracks)
+    restored.audio?.let { id -> add { onMain { engine.selectAudioTrack(id) } } }
+    restored.subtitle?.let { id -> add { onMain { engine.selectSubtitleTrack(id) } } }
   }
 
   private fun Outbox.queueVideoSize(width: Int, height: Int) {
