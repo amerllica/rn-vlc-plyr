@@ -44,7 +44,7 @@ Native clamps every input. The getter returns the clamped value immediately afte
 | `timeUpdateInterval` | round, clamp 50–5000 ms |
 | `subtitleDelay`, `audioDelay` | round, clamp −60000–60000 ms. Engine takes microseconds: multiply by 1000 |
 | `remoteSkipInterval` | round, clamp 1000–60000 ms |
-| `reconnectOnResumeAfterMs`, `reloadOnStallAfterMs` | round; `NaN` and negative become 0. `0` turns the feature off |
+| `reconnectOnResumeAfterMs`, `reloadOnStallAfterMs` | round; `NaN`, infinite and negative values become 0. Capped at 2147483647. `0` turns the feature off |
 | `libvlcOptions` | each entry trimmed, empty entries dropped, order kept |
 | `subtitleStyle.fontScale` | round, clamp 25–400 %. Engine size: `--freetype-rel-fontsize=round(1600 / fontScale)` |
 | `subtitleStyle.shadowDistance` | clamp 0–1 |
@@ -70,7 +70,7 @@ re-applied to the engine each time a new media reaches `playing`.
   selections to defaults, and emits `statusChange('opening')` when playback starts.
 - `uri` that is empty or has no scheme and is not an absolute path → `status 'error'`,
   `error { code: 'invalidSource', message: 'Invalid source uri' }`. An absolute path is treated as
-  `file://`.
+  `file://` and percent-encoded, so a path may hold spaces, `#` and `%`.
 - `userAgent` → `:http-user-agent=…`, `referrer` → `:http-referrer=…`, `vlcOptions` are passed as
   media options verbatim, in that order.
 - `autoPlay true` → playback starts at once. `autoPlay false` → media is prepared, status stays
@@ -99,14 +99,14 @@ Status values: `idle`, `opening`, `buffering`, `playing`, `paused`, `stopped`, `
 
 | Command | Rule |
 |---|---|
-| `play()` | no source → no-op. `ended` or `stopped` → restart from 0. `error` → reload the source and play. Otherwise resume |
+| `play()` | no source → no-op. An invalid source → `error` with `invalidSource` again, from every status. `ended` or `stopped` → restart from 0. `error` → reload the source and play; audio and subtitles added with `addAudio` and `addSubtitle` are added again. Otherwise resume |
 | `pause()` | only when `playing` or `buffering`; otherwise no-op |
 | `stop()` | engine stop, `currentTime` 0, status `stopped`. Works from every status except `idle`, including `ended` and `error` |
 | `seek(ms)` | no-op unless `isSeekable`. In `ended` or `stopped`: restart playback, then seek. Emits one `timeUpdate` right after the seek with the target time |
 | `setAudioTrack(id)` / `setSubtitleTrack(id)` | `-1` disables. Unknown id → no-op. `NaN` or an infinite id → no-op. A fraction is cut off. A real change emits `tracksChange` |
 | `addAudio(uri, select)` | no source → throws `Error('addAudio requires a source')` (Nitro prefixes synchronous errors with `VlcPlayer.addAudio(...): `). Otherwise adds an audio slave; the new track arrives through `tracksChange` after the embedded audio tracks. `select` true selects it once it appears. The file should hold one audio track and be as long as the media. The first added audio file reloads the media in place, as a subtitle style change does: status goes through `opening`, `loaded` is not emitted again, and the position, pause state and track choices are kept. From then on the media opens with `:demux=avformat`, so it keeps playing while an added track is selected and the video track is off (background audio, `:no-video`, an audio-only source, an Android video layout change). On Android, a fresh player (`loop`, `play()` after `stop()` or the end) keeps the track in the list but VLC selects the first audio track again |
 | `addSubtitle(uri, select)` | no source → throws `Error('addSubtitle requires a source')` (Nitro prefixes synchronous errors with `VlcPlayer.addSubtitle(...): `). Otherwise adds a subtitle slave; the new track arrives through `tracksChange`. `select` true selects it once it appears. On Android, a fresh player (`loop`, `play()` after `stop()` or the end) adds the file again and selects it, also when the app chose another subtitle track or added it with `select` false |
-| `snapshot()` | resolves with a `file://` URI of a PNG of the current frame at video resolution. Rejects with `Error('No video frame available')` when no view is attached or nothing has rendered |
+| `snapshot()` | resolves with a `file://` URI of a PNG of the current frame at video resolution. Rejects with `Error('No video frame available')` when no view is attached, nothing has rendered or the player is released |
 | `release()` | idempotent. Stops, detaches all views, frees the engine. Afterwards every command is a no-op, getters return defaults, no event fires. `dispose()` calls `release()` |
 
 ## Events
@@ -193,7 +193,8 @@ Messages are fixed strings so they match across OSes: `Invalid source uri`,
   has not moved past the position at the resume. VLC can report `playing` while it still waits on
   the network. A stall reloads the media in place once, with the subtitle style reload rules below.
   `idle`, `opening`, `paused`, `stopped`, `ended`, `error`, a new source, `stop()` and `release()`
-  cancel the check.
+  cancel the check. A seek while the check waits starts the wait again from the seek target, so a
+  seek backwards is not taken for a stall.
 
 ## Subtitle style
 
@@ -223,6 +224,8 @@ The style becomes libVLC instance options. Order and format are identical on bot
     restored by position in the track list. Added tracks are taken to be the last ones in their
     list, so a selected embedded track is restored once the embedded tracks are back, and a
     selected added track once the added tracks are back too. `loaded` is not emitted again.
+    A `seek`, `setAudioTrack` or `setSubtitleTrack` made during the reload wins over the restored
+    position or track.
   - `idle`, `stopped` or `ended`: the engine is rebuilt without playing, so the next `play()` uses
     the style.
   - `error` or no source: nothing happens until the next load.
@@ -237,6 +240,10 @@ The style becomes libVLC instance options. Order and format are identical on bot
   `stretch` fills and distorts, `original` shows native pixels centred without scaling.
 - `surfaceType` (Android only, default `texture`): `texture` composes like a normal view (clipping,
   rounded corners, transforms); `surface` uses a SurfaceView. iOS ignores it.
+- `keepScreenOn` (default `true`): the view keeps the screen on while its player is `opening`,
+  `buffering` or `playing`. `false` lets the screen sleep.
+- `release()` on the player detaches every attached view, so no view keeps the screen on for a
+  released player.
 - Background is black.
 
 ## Audio session (iOS)

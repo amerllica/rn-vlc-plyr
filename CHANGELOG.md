@@ -14,6 +14,23 @@ All notable changes to rn-vlc-plyr. The format follows
   and uses the shared libVLC instance.
 - `useVlcPlayer` no longer loads the media twice when the source object lists its keys in another
   order than `uri`, `userAgent`, `referrer`, `vlcOptions`, `title`.
+- `play()` on a source with an invalid uri fails again with `invalidSource` from every status. On
+  iOS it no longer hangs in `opening` after `stop()`; on Android it no longer takes audio focus.
+- A `seek`, `setAudioTrack` or `setSubtitleTrack` made while the media reloads in place (subtitle
+  style, `libvlcOptions`, first `addAudio`, stall reload) is kept. The reload no longer puts the old
+  position or track back.
+- `reloadOnStallAfterMs`: a seek backwards after a resume is no longer taken for a stall.
+- `reconnectOnResumeAfterMs` and `reloadOnStallAfterMs` turn off for an infinite value and are
+  capped, the same on both platforms. Android reloaded at once on a huge value.
+- The screen can sleep again after `player.release()` when the view stays mounted.
+- iOS: `duration`, `isSeekable` and `isLive` keep their values while the media reloads in place.
+  They dropped to 0, `false` and `true` for a moment.
+- iOS: `stop()`, `play()` after the end, a seek after the end and a loop no longer stop the VLC
+  player on the main thread. A stalled network stream could freeze the app there.
+- Android: a file path with `#` or `%` plays. An absolute path is now percent-encoded.
+- Android: `snapshot()` rejects when `release()` runs first. The promise never settled.
+- Android: `play()` after an error keeps the audio and subtitles added with `addAudio` and
+  `addSubtitle`.
 - `useVlcPlayerStatus` keeps one native listener. It no longer adds and removes one on every render.
 
 ## [1.4.0] - 2026-11-09
