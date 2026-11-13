@@ -55,6 +55,7 @@ outside. The fixes come with tests, and both platforms follow the player contrac
 - The artwork warning in the device log no longer shows the user name, password, query or fragment
   of the artwork uri.
 - `userAgent` and `referrer` lose their line breaks, so a value cannot add an HTTP header.
+- Artwork: a redirect from `https` to `http` fails, and iOS also stops after five redirects.
 - iOS: artwork replies are no longer kept in the shared URL cache on disk.
 - iOS: the file of a rejected `snapshot()` is deleted.
 
