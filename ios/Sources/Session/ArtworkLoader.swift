@@ -38,7 +38,6 @@ final class ArtworkLoader {
   static let maxPixelSize = 512
   static let timeoutSeconds: TimeInterval = 10
   static let maxBytes = 10 * 1024 * 1024
-  static let maxRedirects = 5
   static let successStatuses = 200..<300
   private static let remoteSchemes: Set<String> = ["http", "https"]
   private static let decodeQueue = DispatchQueue(label: "rn-vlc-plyr.artwork", qos: .utility)
@@ -170,12 +169,6 @@ final class ArtworkLoader {
     return decode(data)
   }
 
-  static func allowsRedirect(from: URL?, to: URL?, hop: Int) -> Bool {
-    let target = to?.scheme?.lowercased()
-    let isDowngrade = from?.scheme?.lowercased() == "https" && target != "https"
-    return hop <= maxRedirects && !isDowngrade && target.map(remoteSchemes.contains) == true
-  }
-
   static func download(
     _ url: URL,
     configuration: URLSessionConfiguration,
@@ -239,7 +232,7 @@ private final class CappedDownload: NSObject, URLSessionDataDelegate {
     completionHandler: @escaping (URLRequest?) -> Void
   ) {
     redirects += 1
-    let isAllowed = ArtworkLoader.allowsRedirect(from: response.url, to: request.url, hop: redirects)
+    let isAllowed = redirects <= ArtworkRedirect.maxHops && ArtworkRedirect.allows(from: response.url, to: request.url)
     completionHandler(isAllowed ? request : nil)
   }
 
