@@ -96,6 +96,16 @@ final class ArtworkLoaderTests: XCTestCase {
     XCTAssertNotNil(try? result.get())
   }
 
+  func testRedirectsStayOnHttpAndStopAfterFiveHops() {
+    let http = URL(string: "http://host/a.png")
+    let https = URL(string: "https://host/a.png")
+    XCTAssertTrue(ArtworkLoader.allowsRedirect(from: http, to: https, hop: 1))
+    XCTAssertTrue(ArtworkLoader.allowsRedirect(from: http, to: http, hop: 5))
+    XCTAssertFalse(ArtworkLoader.allowsRedirect(from: https, to: http, hop: 1))
+    XCTAssertFalse(ArtworkLoader.allowsRedirect(from: https, to: URL(string: "file:///a.png"), hop: 1))
+    XCTAssertFalse(ArtworkLoader.allowsRedirect(from: https, to: https, hop: 6))
+  }
+
   func testHttpErrorStatusFails() throws {
     XCTAssertEqual(failure(of: try download(replyingWith: 404, body: Data())), .http(404))
   }

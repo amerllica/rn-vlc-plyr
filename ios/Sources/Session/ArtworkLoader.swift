@@ -38,6 +38,7 @@ final class ArtworkLoader {
   static let maxPixelSize = 512
   static let timeoutSeconds: TimeInterval = 10
   static let maxBytes = 10 * 1024 * 1024
+  static let maxRedirects = 5
   static let successStatuses = 200..<300
   private static let remoteSchemes: Set<String> = ["http", "https"]
   private static let decodeQueue = DispatchQueue(label: "rn-vlc-plyr.artwork", qos: .utility)
@@ -169,6 +170,12 @@ final class ArtworkLoader {
     return decode(data)
   }
 
+  static func allowsRedirect(from: URL?, to: URL?, hop: Int) -> Bool {
+    let target = to?.scheme?.lowercased()
+    let isDowngrade = from?.scheme?.lowercased() == "https" && target != "https"
+    return hop <= maxRedirects && !isDowngrade && target.map(remoteSchemes.contains) == true
+  }
+
   static func download(
     _ url: URL,
     configuration: URLSessionConfiguration,
@@ -206,6 +213,7 @@ private final class CappedDownload: NSObject, URLSessionDataDelegate {
   private var body = Data()
   private var status: Int?
   private var isTooLarge = false
+  private var redirects = 0
 
   init(maxBytes: Int, completion: @escaping (Result<Data, ArtworkFailure>) -> Void) {
     self.maxBytes = maxBytes
@@ -221,6 +229,18 @@ private final class CappedDownload: NSObject, URLSessionDataDelegate {
     status = (response as? HTTPURLResponse)?.statusCode
     isTooLarge = response.expectedContentLength > Int64(maxBytes)
     completionHandler(isTooLarge ? .cancel : .allow)
+  }
+
+  func urlSession(
+    _ session: URLSession,
+    task: URLSessionTask,
+    willPerformHTTPRedirection response: HTTPURLResponse,
+    newRequest request: URLRequest,
+    completionHandler: @escaping (URLRequest?) -> Void
+  ) {
+    redirects += 1
+    let isAllowed = ArtworkLoader.allowsRedirect(from: response.url, to: request.url, hop: redirects)
+    completionHandler(isAllowed ? request : nil)
   }
 
   func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {

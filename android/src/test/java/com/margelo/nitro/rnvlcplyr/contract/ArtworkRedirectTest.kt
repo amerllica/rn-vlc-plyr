@@ -31,8 +31,19 @@ class ArtworkRedirectTest {
   }
 
   @Test
+  fun aRedirectFromHttpsBackToHttpIsRefused() {
+    assertNull(ArtworkRedirect.target("https://host/cover.png", "http://host/cover.png"))
+    assertEquals("http://other/cover.png", ArtworkRedirect.target("http://host/cover.png", "http://other/cover.png"))
+  }
+
+  @Test
+  fun aLocationWithASpaceIsFollowed() {
+    assertEquals("https://host/my cover.png", ArtworkRedirect.target("https://host/a.png", "/my cover.png"))
+  }
+
+  @Test
   fun aMissingOrBrokenLocationIsRefused() {
     assertNull(ArtworkRedirect.target("https://host/cover.png", null))
-    assertNull(ArtworkRedirect.target("https://host/cover.png", "ht tp://bad host"))
+    assertNull(ArtworkRedirect.target("not a url", "/cover.png"))
   }
 }
