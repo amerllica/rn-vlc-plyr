@@ -9,6 +9,12 @@ enum class PlayAction { NONE, RESUME, RESTART, RELOAD }
 
 enum class ReloadMode { NONE, IN_PLACE, WITHOUT_PLAYING }
 
+sealed interface SourceState {
+  data object None : SourceState
+  data object Invalid : SourceState
+  data class Valid(val uri: String) : SourceState
+}
+
 sealed interface PlaybackEffect {
   data class StatusChanged(val status: VlcStatus) : PlaybackEffect
   data object Loaded : PlaybackEffect
@@ -22,22 +28,20 @@ class PlaybackStateMachine(private val isLooping: () -> Boolean) {
     private set
   var hasReachedPlaying: Boolean = false
     private set
-  var hasSource: Boolean = false
-    private set
+  val hasSource: Boolean
+    get() = source != SourceState.None
 
-  private var sourceUri: String? = null
+  private var source: SourceState = SourceState.None
   private var restartingForLoop = false
 
   fun clear(): List<PlaybackEffect> {
-    hasSource = false
-    sourceUri = null
+    source = SourceState.None
     resetPerSourceFlags()
     return transition(VlcStatus.IDLE)
   }
 
   fun begin(uri: String, autoPlay: Boolean): List<PlaybackEffect> {
-    hasSource = true
-    sourceUri = uri
+    source = SourceState.Valid(uri)
     resetPerSourceFlags()
     return transition(if (autoPlay) VlcStatus.OPENING else VlcStatus.IDLE)
   }
@@ -48,18 +52,19 @@ class PlaybackStateMachine(private val isLooping: () -> Boolean) {
   }
 
   fun rejectInvalidSource(): List<PlaybackEffect> {
-    hasSource = true
-    sourceUri = null
+    source = SourceState.Invalid
     resetPerSourceFlags()
     return fail(VlcContract.INVALID_SOURCE_ERROR)
   }
 
-  fun resolvePlay(): PlayAction = when {
-    !hasSource -> PlayAction.NONE
-    sourceUri == null -> PlayAction.RELOAD
-    status == VlcStatus.ENDED || status == VlcStatus.STOPPED -> PlayAction.RESTART
-    status == VlcStatus.ERROR -> PlayAction.RELOAD
-    else -> PlayAction.RESUME
+  fun resolvePlay(): PlayAction = when (source) {
+    SourceState.None -> PlayAction.NONE
+    SourceState.Invalid -> PlayAction.RELOAD
+    is SourceState.Valid -> when (status) {
+      VlcStatus.ENDED, VlcStatus.STOPPED -> PlayAction.RESTART
+      VlcStatus.ERROR -> PlayAction.RELOAD
+      else -> PlayAction.RESUME
+    }
   }
 
   fun reloadMode(): ReloadMode = when {
@@ -83,7 +88,7 @@ class PlaybackStateMachine(private val isLooping: () -> Boolean) {
   }
 
   fun onEngineEvent(event: EngineEvent, engineIsPlaying: Boolean): List<PlaybackEffect> {
-    if (sourceUri == null) return emptyList()
+    val uri = (source as? SourceState.Valid)?.uri ?: return emptyList()
     return when (event) {
       EngineEvent.OPENING -> if (restartingForLoop) emptyList() else transition(VlcStatus.OPENING)
       EngineEvent.BUFFERING -> onBuffering(engineIsPlaying)
@@ -93,7 +98,7 @@ class PlaybackStateMachine(private val isLooping: () -> Boolean) {
       EngineEvent.END_REACHED -> onEndReached()
       EngineEvent.ERROR -> {
         restartingForLoop = false
-        fail(VlcContract.classifyEngineError(sourceUri, hasReachedPlaying))
+        fail(VlcContract.classifyEngineError(uri, hasReachedPlaying))
       }
     }
   }
