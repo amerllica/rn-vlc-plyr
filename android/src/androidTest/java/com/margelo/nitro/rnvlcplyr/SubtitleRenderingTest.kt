@@ -10,7 +10,6 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -106,8 +105,11 @@ class SubtitleRenderingTest {
     awaitCondition("external audio selected") {
       tracks.any { it.audioTracks.size == 2 && it.selectedAudioTrack == it.audioTracks.last().id }
     }
+    val start = controller.read { media.currentTimeMs }
     scenario.onActivity { controller.renewOutput(output ?: return@onActivity) }
-    Thread.sleep(LAYOUT_SETTLE_MS)
+    awaitCondition("playback past the new layout or the end") {
+      VlcStatus.ENDED in statuses || controller.read { media.currentTimeMs } >= start + LAYOUT_SETTLE_MS
+    }
     assertTrue("statuses=$statuses", VlcStatus.ENDED !in statuses && statuses.last() == VlcStatus.PLAYING)
   }
 
@@ -136,7 +138,7 @@ class SubtitleRenderingTest {
     scenario.onActivity { activity ->
       output = activity.createOutput(usesTextureView).also(controller::attachOutput)
     }
-    controller.setSource(VlcSource(TestMedia.copyToCache(asset).absolutePath, null, null, null, null))
+    controller.setSource(TestMedia.source(TestMedia.copyToCache(asset).absolutePath))
     controller.play()
     awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
   }
@@ -166,7 +168,7 @@ class SubtitleRenderingTest {
     try {
       warmScenario.onActivity { activity -> warmController.attachOutput(activity.createOutput(usesTextureView = true)) }
       warmController.setLoop(true)
-      warmController.setSource(VlcSource(TestMedia.copyToCache(TestMedia.PLAIN_VIDEO_ASSET).absolutePath, null, null, null, null))
+      warmController.setSource(TestMedia.source(TestMedia.copyToCache(TestMedia.PLAIN_VIDEO_ASSET).absolutePath))
       warmController.play()
       warmController.addSubtitle(TestMedia.copyToCache(TestMedia.LONG_CUE_SUBTITLE_ASSET, SUBTITLE_FOLDER).absolutePath, true)
       waitForSubtitlePixels(WARM_UP_SECONDS)
@@ -191,20 +193,12 @@ class SubtitleRenderingTest {
     File(directory, "subtitle-$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
   }
 
-  private fun awaitCondition(label: String, condition: () -> Boolean) {
-    val deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(TIMEOUT_SECONDS)
-    while (System.currentTimeMillis() < deadline) {
-      if (condition()) return
-      Thread.sleep(POLL_MS)
-    }
-    fail("timed out waiting for $label; statuses=$statuses")
-  }
+  private fun awaitCondition(label: String, condition: () -> Boolean) =
+    awaitCondition(label, context = { "statuses=$statuses" }, condition = condition)
 
   private companion object {
-    const val TIMEOUT_SECONDS = 15L
     const val SUBTITLE_TIMEOUT_SECONDS = 6L
     const val WARM_UP_SECONDS = 30L
-    const val POLL_MS = 50L
     const val SCREENSHOT_INTERVAL_MS = 250L
     const val VIDEO_OFF_MS = 1000L
     const val LAYOUT_SETTLE_MS = 2500L

@@ -33,6 +33,10 @@ object TestMedia {
     return libVLC
   }
 
+  fun source(uri: String) = VlcSource(uri, null, null, null, null)
+
+  fun assetSource(asset: String) = source(copyToCache(asset).absolutePath)
+
   fun copyToCache(asset: String, folder: String? = null): File {
     val directory = folder?.let { File(targetContext.cacheDir, it).apply { mkdirs() } } ?: targetContext.cacheDir
     val file = File(directory, asset)

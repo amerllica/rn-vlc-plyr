@@ -3,6 +3,7 @@ package com.margelo.nitro.rnvlcplyr
 import android.os.Handler
 import android.os.Looper
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
@@ -48,16 +49,17 @@ class PlayerControllerTest {
     controller.release()
   }
 
-  private fun localSource() = VlcSource(TestMedia.copyToCache(TestMedia.VIDEO_ASSET).absolutePath, null, null, null, null)
+  private fun localSource() = TestMedia.assetSource(TestMedia.VIDEO_ASSET)
 
-  private fun tenSecondSource() = VlcSource(TestMedia.copyToCache(TestMedia.PLAIN_VIDEO_ASSET).absolutePath, null, null, null, null)
+  private fun tenSecondSource() = TestMedia.assetSource(TestMedia.PLAIN_VIDEO_ASSET)
 
   private fun assertKeepsPlaying() {
     val start = controller.read { media.currentTimeMs }
-    Thread.sleep(BACKGROUND_PLAY_MS)
+    awaitCondition("three more seconds of playback or the end") {
+      statuses.contains(VlcStatus.ENDED) || controller.read { media.currentTimeMs } >= start + BACKGROUND_PLAY_MS
+    }
     assertFalse("ended with the video off; statuses=$statuses", statuses.contains(VlcStatus.ENDED))
     assertEquals(VlcStatus.PLAYING, controller.read { status })
-    assertTrue(controller.read { media.currentTimeMs } > start)
   }
 
   @Test
@@ -67,7 +69,7 @@ class PlayerControllerTest {
     awaitCondition("loaded") { loaded.isNotEmpty() }
 
     assertEquals(VlcStatus.OPENING, statuses.first())
-    assertEquals(statuses.indexOf(VlcStatus.PLAYING) >= 0, true)
+    assertTrue(statuses.indexOf(VlcStatus.OPENING) < statuses.indexOf(VlcStatus.PLAYING))
     val info = loaded.single()
     assertTrue(info.duration > 0)
     assertTrue(info.isSeekable)
@@ -116,7 +118,7 @@ class PlayerControllerTest {
   }
 
   @Test
-  fun seekEmitsTargetTimeImmediately() {
+  fun seekEmitsATimeUpdateWithTheTargetTime() {
     controller.setLoop(true)
     controller.setSource(localSource())
     awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
@@ -126,7 +128,7 @@ class PlayerControllerTest {
 
   @Test
   fun invalidUriFailsWithInvalidSource() {
-    controller.setSource(VlcSource("relative/path.mp4", null, null, null, null))
+    controller.setSource(TestMedia.source("relative/path.mp4"))
     awaitCondition("error") { errors.isNotEmpty() }
     assertEquals(VlcErrorCode.INVALIDSOURCE, errors.single().code)
     assertEquals(listOf(VlcStatus.ERROR), statuses.toList())
@@ -241,7 +243,7 @@ class PlayerControllerTest {
     controller.play()
     controller.setVolume(50.0)
     controller.setSource(localSource())
-    Thread.sleep(RELEASE_OBSERVATION_MS)
+    InstrumentationRegistry.getInstrumentation().waitForIdleSync()
     assertEquals(countAfterRelease, statuses.size)
     assertEquals(VlcStatus.IDLE, controller.read { status })
     assertEquals(100, controller.read { settings.volumeControl.volume })
@@ -265,6 +267,7 @@ class PlayerControllerTest {
     controller.setSource(localSource())
     awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
     assertEquals(1, loaded.size)
+    assertEquals(YELLOW_SUBTITLES.fontScale, controller.read { settings.subtitleStyle }?.fontScale)
   }
 
   @Test
@@ -368,7 +371,7 @@ class PlayerControllerTest {
 
   @Test
   fun playAfterStoppingAnInvalidSourceFailsAgain() {
-    controller.setSource(VlcSource(INVALID_URI, null, null, null, null))
+    controller.setSource(TestMedia.source(INVALID_URI))
     awaitCondition("error") { statuses.contains(VlcStatus.ERROR) }
     controller.stop()
     awaitCondition("stopped") { statuses.contains(VlcStatus.STOPPED) }
@@ -429,7 +432,9 @@ class PlayerControllerTest {
     statuses.clear()
 
     controller.seek(EARLY_SEEK_MS.toDouble())
-    Thread.sleep(STALL_OBSERVATION_MS)
+    awaitCondition("a reload or playback past the stall check") {
+      statuses.contains(VlcStatus.OPENING) || controller.read { media.currentTimeMs } in PAST_THE_STALL_CHECK_MS until LATE_SEEK_MS
+    }
 
     assertFalse("reloaded as a stall; statuses=$statuses", statuses.contains(VlcStatus.OPENING))
   }
@@ -452,7 +457,7 @@ class PlayerControllerTest {
     val original = TestMedia.copyToCache(TestMedia.VIDEO_ASSET)
     val renamed = original.copyTo(File(original.parentFile, FILE_NAME_WITH_URI_CHARACTERS), overwrite = true)
 
-    controller.setSource(VlcSource(renamed.absolutePath, null, null, null, null))
+    controller.setSource(TestMedia.source(renamed.absolutePath))
 
     awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
   }
@@ -461,7 +466,7 @@ class PlayerControllerTest {
   fun playAfterAnErrorKeepsAnAddedSubtitle() {
     val missing = TestMedia.copyToCache(TestMedia.VIDEO_ASSET, RETRY_FOLDER)
     missing.delete()
-    controller.setSource(VlcSource(missing.absolutePath, null, null, null, null))
+    controller.setSource(TestMedia.source(missing.absolutePath))
     awaitCondition("error") { statuses.contains(VlcStatus.ERROR) }
     controller.addSubtitle(TestMedia.copyToCache(TestMedia.SUBTITLE_ASSET).absolutePath, true)
     TestMedia.copyToCache(TestMedia.VIDEO_ASSET, RETRY_FOLDER)
@@ -498,21 +503,13 @@ class PlayerControllerTest {
   private fun selectsExternalAudio(info: VlcTracksInfo): Boolean =
     info.audioTracks.size == 2 && info.selectedAudioTrack == info.audioTracks.last().id
 
-  private fun awaitCondition(label: String, condition: () -> Boolean) {
-    val deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(TIMEOUT_SECONDS)
-    while (System.currentTimeMillis() < deadline) {
-      if (condition()) return
-      Thread.sleep(POLL_MS)
-    }
-    fail("timed out waiting for $label; statuses=$statuses")
-  }
+  private fun awaitCondition(label: String, condition: () -> Boolean) =
+    awaitCondition(label, context = { "statuses=$statuses" }, condition = condition)
 
   private companion object {
-    const val TIMEOUT_SECONDS = 15L
+    const val TIMEOUT_SECONDS = AWAIT_TIMEOUT_SECONDS
     const val BACKGROUND_PLAY_MS = 3_000L
-    const val POLL_MS = 50L
     const val FAST_TIME_UPDATE_MS = 50.0
-    const val RELEASE_OBSERVATION_MS = 1000L
     const val SEEK_TARGET_MS = 1000L
     const val POSITION_TOLERANCE_MS = 300L
     const val REJECTED_INSTANCE_OPTION = "--no-such-libvlc-option"
@@ -522,7 +519,7 @@ class PlayerControllerTest {
     const val SEEK_MIDPOINT_MS = 3500L
     const val SETTLED_TIME_UPDATES = 3
     const val STALL_CHECK_MS = 1000L
-    const val STALL_OBSERVATION_MS = 2000L
+    const val PAST_THE_STALL_CHECK_MS = EARLY_SEEK_MS + 2 * STALL_CHECK_MS
     const val FILE_NAME_WITH_URI_CHARACTERS = "episode #1 100%.mp4"
     const val RETRY_FOLDER = "retry"
     val YELLOW_SUBTITLES = VlcSubtitleStyle(
