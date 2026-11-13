@@ -31,6 +31,11 @@ class ArtworkLoader(private val schedule: ArtworkScheduler = defaultScheduler())
 
   private class ArtworkFailure(val reason: String) : Exception(reason)
 
+  private sealed interface HttpReply {
+    class Body(val bytes: ByteArray) : HttpReply
+    class Redirect(val target: String) : HttpReply
+  }
+
   private val lock = Any()
   private var cache: Pair<String, Bitmap>? = null
   private val failed = mutableSetOf<String>()
@@ -106,23 +111,33 @@ class ArtworkLoader(private val schedule: ArtworkScheduler = defaultScheduler())
     }
   }
 
-  private fun readHttp(uri: String, hopsLeft: Int = ArtworkRedirect.MAX_HOPS): ByteArray {
+  private fun readHttp(uri: String): ByteArray {
+    var current = uri
+    repeat(ArtworkRedirect.MAX_HOPS + 1) {
+      when (val reply = fetch(current)) {
+        is HttpReply.Body -> return reply.bytes
+        is HttpReply.Redirect -> current = reply.target
+      }
+    }
+    throw ArtworkFailure(TOO_MANY_REDIRECTS)
+  }
+
+  private fun fetch(uri: String): HttpReply {
     val connection = URL(uri).openConnection() as HttpURLConnection
     connection.connectTimeout = TIMEOUT_MS
     connection.readTimeout = TIMEOUT_MS
     connection.instanceFollowRedirects = false
-    val redirectTarget = try {
+    try {
       val status = connection.responseCode
-      if (!ArtworkRedirect.isRedirect(status)) {
-        if (status !in HTTP_SUCCESS) throw ArtworkFailure("HTTP $status")
-        return connection.inputStream.use(::readWithinLimit)
+      if (ArtworkRedirect.isRedirect(status)) {
+        val target = ArtworkRedirect.target(uri, connection.getHeaderField(LOCATION_HEADER)) ?: throw ArtworkFailure("HTTP $status")
+        return HttpReply.Redirect(target)
       }
-      ArtworkRedirect.target(uri, connection.getHeaderField(LOCATION_HEADER)) ?: throw ArtworkFailure("HTTP $status")
+      if (status !in HTTP_SUCCESS) throw ArtworkFailure("HTTP $status")
+      return HttpReply.Body(connection.inputStream.use(::readWithinLimit))
     } finally {
       connection.disconnect()
     }
-    if (hopsLeft == 0) throw ArtworkFailure(TOO_MANY_REDIRECTS)
-    return readHttp(redirectTarget, hopsLeft - 1)
   }
 
   private fun readWithinLimit(input: InputStream): ByteArray {
