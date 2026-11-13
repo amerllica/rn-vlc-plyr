@@ -288,7 +288,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     val output = outputs.top
     val size = locked { media.videoSize }
     if (isReleased || output == null || !MediaState.isRenderableSize(size.width.toInt(), size.height.toInt())) {
-      onResult(Result.failure(VlcPlayerError(NO_FRAME_MESSAGE)))
+      onResult(Result.failure(VlcPlayerError(SnapshotCapture.NO_FRAME_MESSAGE)))
     } else {
       SnapshotCapture.capture(context, output, size, onResult)
     }
@@ -487,8 +487,9 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     mutate {
       if (!machine.hasSource) return@mutate
       if (info != null) applyMediaInfo(info)
-      media = media.copy(hasReachedPlaying = true)
-      applyEffects(machine.onEngineEvent(EngineEvent.PLAYING, true))
+      val effects = machine.onEngineEvent(EngineEvent.PLAYING, true)
+      media = media.copy(hasReachedPlaying = machine.hasReachedPlaying)
+      applyEffects(effects)
       val engineSettings = currentEngineSettings()
       add { engine.apply(engineSettings) }
       reloadingInPlace = false
@@ -647,7 +648,6 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   }
 
   private companion object {
-    const val NO_FRAME_MESSAGE = SnapshotCapture.NO_FRAME_MESSAGE
     const val NO_BUFFERING_PERCENT = -1
     val TIME_TRACKING_STATUSES = setOf(VlcStatus.BUFFERING, VlcStatus.PLAYING, VlcStatus.PAUSED)
   }

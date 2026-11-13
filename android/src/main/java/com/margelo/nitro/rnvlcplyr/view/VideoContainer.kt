@@ -15,6 +15,7 @@ class VideoContainer(context: Context) : FrameLayout(context) {
 
   override fun requestLayout() {
     super.requestLayout()
+    removeCallbacks(relayout)
     post(relayout)
   }
 
