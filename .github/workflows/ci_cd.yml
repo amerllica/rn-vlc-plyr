@@ -75,7 +75,12 @@ jobs:
         run: yarn prepare
 
       - name: Check package contents
-        run: npm pack --dry-run
+        run: |
+          npm pack --dry-run 2>&1 | tee "$RUNNER_TEMP/package-contents.txt"
+          if grep -E 'example|__tests__|__fixtures__|__mocks__' "$RUNNER_TEMP/package-contents.txt"; then
+            echo "::error::The package holds example or test files"
+            exit 1
+          fi
 
   test-native-android:
     runs-on: ubuntu-latest

@@ -1,4 +1,12 @@
 {
   "extends": "./tsconfig",
-  "exclude": ["example", "lib"]
+  "exclude": [
+    "example",
+    "example-expo",
+    "example-shared",
+    "lib",
+    "**/__tests__",
+    "**/__fixtures__",
+    "**/__mocks__"
+  ]
 }
