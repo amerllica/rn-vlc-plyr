@@ -402,7 +402,7 @@ jobs:
         run: yarn release-notes > "$RUNNER_TEMP/release-notes.md"
 
       - name: Update npm for trusted publishing
-        run: npm install --global npm@^11.5.1
+        run: npm install --global npm@11.5.1
 
       - name: Publish to npm
         run: |
