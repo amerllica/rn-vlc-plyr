@@ -108,6 +108,23 @@ class VlcContractTest {
   }
 
   @Test
+  fun lineBreaksAreRemovedFromUserAgentAndReferrer() {
+    val source = VlcSource("https://host/video.mp4", "Agent\r\nX-Injected: 1", "https://ref\nX-Other: 2", null, null)
+    assertEquals(
+      listOf(":http-user-agent=AgentX-Injected: 1", ":http-referrer=https://refX-Other: 2"),
+      VlcContract.mediaOptions(source, hasAddedAudio = false)
+    )
+  }
+
+  @Test
+  fun redactedUriDropsUserInfoQueryAndFragment() {
+    assertEquals("https://host:8080/art/cover.png", VlcContract.redactUri("https://user:secret@host:8080/art/cover.png?token=abc#top"))
+    assertEquals("file:///covers/a.png", VlcContract.redactUri("file:///covers/a.png"))
+    assertEquals("content://media/external/images/1", VlcContract.redactUri("content://media/external/images/1"))
+    assertEquals("not a uri", VlcContract.redactUri("not a uri?x=1"))
+  }
+
+  @Test
   fun addedAudioAppendsTheReaderOptionOnce() {
     val source = VlcSource("https://x", null, null, arrayOf(":network-caching=300"), null)
     assertEquals(listOf(":network-caching=300", ":demux=avformat"), VlcContract.mediaOptions(source, hasAddedAudio = true))

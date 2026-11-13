@@ -31,6 +31,19 @@ final class MediaRequestTests: XCTestCase {
     XCTAssertEqual(request?.options, [":http-user-agent=UA/1", ":http-referrer=http://ref", ":network-caching=300", "--no-audio"])
   }
 
+  func testLineBreaksAreRemovedFromUserAgentAndReferrer() {
+    XCTAssertEqual(
+      MediaRequest.buildOptions(userAgent: "Agent\r\nX-Injected: 1", referrer: "https://ref\nX-Other: 2", vlcOptions: nil),
+      [":http-user-agent=AgentX-Injected: 1", ":http-referrer=https://refX-Other: 2"]
+    )
+  }
+
+  func testRedactedUriDropsUserInfoQueryAndFragment() {
+    XCTAssertEqual(MediaUri.redacted("https://user:secret@host:8080/art/cover.png?token=abc#top"), "https://host:8080/art/cover.png")
+    XCTAssertEqual(MediaUri.redacted("file:///covers/a.png"), "file:///covers/a.png")
+    XCTAssertEqual(MediaUri.redacted("not a uri?x=1"), "not a uri")
+  }
+
   func testAddedAudioAppendsTheReaderOptionOnce() {
     let request = MediaRequest.make(uri: "http://host/a", vlcOptions: [":network-caching=300"])
     XCTAssertEqual(request?.readingAddedAudio(false).options, [":network-caching=300"])

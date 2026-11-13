@@ -32,6 +32,8 @@ object VlcContract {
   private const val MAX_RECOVERY_DELAY_MS = Int.MAX_VALUE.toLong()
   private const val FILE_SCHEME = "file"
   private const val NO_AUTHORITY = ""
+  private const val KEEP_SCHEME = "$1"
+  private val USER_INFO = Regex("^([A-Za-z][A-Za-z0-9+.-]*://)[^/@]*@")
   private const val USER_AGENT_OPTION = ":http-user-agent="
   private const val REFERRER_OPTION = ":http-referrer="
 
@@ -91,11 +93,16 @@ object VlcContract {
 
   fun mediaOptions(source: VlcSource, hasAddedAudio: Boolean): List<String> {
     val options = listOfNotNull(
-      source.userAgent?.let { USER_AGENT_OPTION + it },
-      source.referrer?.let { REFERRER_OPTION + it }
+      source.userAgent?.let { USER_AGENT_OPTION + withoutLineBreaks(it) },
+      source.referrer?.let { REFERRER_OPTION + withoutLineBreaks(it) }
     ) + source.vlcOptions.orEmpty()
     return if (hasAddedAudio && ADDED_AUDIO_READER_OPTION !in options) options + ADDED_AUDIO_READER_OPTION else options
   }
+
+  fun redactUri(uri: String): String =
+    uri.substringBefore('?').substringBefore('#').replace(USER_INFO, KEEP_SCHEME)
+
+  private fun withoutLineBreaks(value: String): String = value.filterNot { it == '\r' || it == '\n' }
 
   fun isNetworkSource(uri: String?): Boolean = uri?.let(::schemeOf)?.lowercase()?.let { it in NETWORK_SCHEMES } == true
 

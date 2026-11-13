@@ -18,10 +18,14 @@ struct MediaRequest: Equatable {
 
   static func buildOptions(userAgent: String?, referrer: String?, vlcOptions: [String]?) -> [String] {
     var options: [String] = []
-    if let userAgent { options.append(":http-user-agent=\(userAgent)") }
-    if let referrer { options.append(":http-referrer=\(referrer)") }
+    if let userAgent { options.append(":http-user-agent=\(withoutLineBreaks(userAgent))") }
+    if let referrer { options.append(":http-referrer=\(withoutLineBreaks(referrer))") }
     options.append(contentsOf: vlcOptions ?? [])
     return options
+  }
+
+  private static func withoutLineBreaks(_ value: String) -> String {
+    String(value.unicodeScalars.filter { $0 != "\r" && $0 != "\n" })
   }
 }
 
@@ -29,6 +33,7 @@ enum MediaUri {
   static let networkSchemes: Set<String> = ["http", "https", "rtsp", "rtmp", "rtp", "udp", "mms", "ftp", "smb"]
 
   private static let uriCharacters = CharacterSet.urlQueryAllowed.union(CharacterSet(charactersIn: "#%[]"))
+  private static let userInfoPattern = "^([A-Za-z][A-Za-z0-9+.-]*://)[^/@]*@"
   private static let schemePattern = try? NSRegularExpression(pattern: "^[A-Za-z][A-Za-z0-9+.-]*:")
 
   static func resolve(_ uri: String) -> URL? {
@@ -37,6 +42,11 @@ enum MediaUri {
     }
     guard scheme(of: uri) != nil else { return nil }
     return URL(string: uri) ?? uri.addingPercentEncoding(withAllowedCharacters: uriCharacters).flatMap(URL.init(string:))
+  }
+
+  static func redacted(_ uri: String) -> String {
+    String(uri.prefix { $0 != "?" && $0 != "#" })
+      .replacingOccurrences(of: userInfoPattern, with: "$1", options: .regularExpression)
   }
 
   static func scheme(of uri: String) -> String? {
