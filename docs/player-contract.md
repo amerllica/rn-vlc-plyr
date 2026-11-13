@@ -198,7 +198,8 @@ Messages are fixed strings so they match across OSes: `Invalid source uri`,
   the network. A stall reloads the media in place once, with the subtitle style reload rules below.
   `idle`, `opening`, `paused`, `stopped`, `ended`, `error`, a new source, `stop()` and `release()`
   cancel the check. A seek while the check waits starts the wait again from the seek target, so a
-  seek backwards is not taken for a stall.
+  seek backwards is not taken for a stall. VLC can need more than one second to continue after a
+  seek, so a value below about 3000 ms can reload a healthy stream after a seek.
 
 ## Subtitle style
 
