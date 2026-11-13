@@ -57,6 +57,16 @@ class VlcContractTest {
   }
 
   @Test
+  fun trackIdTruncatesAndRejectsNonFiniteValues() {
+    assertEquals(2, VlcContract.trackId(2.0))
+    assertEquals(-1, VlcContract.trackId(-1.0))
+    assertEquals(2, VlcContract.trackId(2.9))
+    assertNull(VlcContract.trackId(Double.NaN))
+    assertNull(VlcContract.trackId(Double.POSITIVE_INFINITY))
+    assertNull(VlcContract.trackId(Double.NEGATIVE_INFINITY))
+  }
+
+  @Test
   fun durationIsZeroWhenEngineReportsNonPositiveLength() {
     assertEquals(0L, VlcContract.durationFromEngine(-1))
     assertEquals(0L, VlcContract.durationFromEngine(0))
@@ -69,6 +79,19 @@ class VlcContractTest {
     assertEquals("rtsp://cam/stream", VlcContract.resolveMediaUri("rtsp://cam/stream"))
     assertEquals("file:///sdcard/a.mp4", VlcContract.resolveMediaUri("/sdcard/a.mp4"))
     assertEquals("content://media/1", VlcContract.resolveMediaUri("content://media/1"))
+  }
+
+  @Test
+  fun absolutePathIsPercentEncoded() {
+    assertEquals(
+      "file:///sdcard/episode%20%231%20100%25.mp4",
+      VlcContract.resolveMediaUri("/sdcard/episode #1 100%.mp4")
+    )
+  }
+
+  @Test
+  fun absolutePathKeepsNonAsciiCharactersAsTheyAre() {
+    assertEquals("file:///sdcard/cafe\u0301 \uD55C.mp4".replace(" ", "%20"), VlcContract.resolveMediaUri("/sdcard/cafe\u0301 \uD55C.mp4"))
   }
 
   @Test
@@ -87,6 +110,25 @@ class VlcContractTest {
       VlcContract.mediaOptions(source, hasAddedAudio = false)
     )
     assertEquals(emptyList<String>(), VlcContract.mediaOptions(VlcSource("https://x", null, null, null, null), hasAddedAudio = false))
+  }
+
+  @Test
+  fun lineBreaksAreRemovedFromUserAgentAndReferrer() {
+    val source = VlcSource("https://host/video.mp4", "Agent\r\nX-Injected: 1", "https://ref\nX-Other: 2", null, null)
+    assertEquals(
+      listOf(":http-user-agent=AgentX-Injected: 1", ":http-referrer=https://refX-Other: 2"),
+      VlcContract.mediaOptions(source, hasAddedAudio = false)
+    )
+  }
+
+  @Test
+  fun redactedUriDropsUserInfoQueryAndFragment() {
+    assertEquals("https://host:8080/art/cover.png", VlcContract.redactUri("https://user:secret@host:8080/art/cover.png?token=abc#top"))
+    assertEquals("file:///covers/a.png", VlcContract.redactUri("file:///covers/a.png"))
+    assertEquals("content://media/external/images/1", VlcContract.redactUri("content://media/external/images/1"))
+    assertEquals("not a uri", VlcContract.redactUri("not a uri?x=1"))
+    assertEquals("https://host/a.jpg", VlcContract.redactUri("https://user:p@ss@host/a.jpg"))
+    assertEquals("https://host/a.jpg", VlcContract.redactUri("https://user:p?s#s@host/a.jpg?token=1"))
   }
 
   @Test
@@ -134,6 +176,19 @@ class VlcContractTest {
     assertEquals(1500L, VlcContract.clampDelayMs(1499.6))
     assertEquals(0L, VlcContract.clampDelayMs(-20.0))
     assertEquals(0L, VlcContract.clampDelayMs(Double.NaN))
+    assertEquals(0L, VlcContract.clampDelayMs(Double.POSITIVE_INFINITY))
+    assertEquals(Int.MAX_VALUE.toLong(), VlcContract.clampDelayMs(1e300))
+  }
+
+  @Test
+  fun skipIntervalIsRoundedAndClamped() {
+    assertEquals(10_000, VlcContract.clampSkipInterval(10_000.0))
+    assertEquals(1_501, VlcContract.clampSkipInterval(1_500.5))
+    assertEquals(1_500, VlcContract.clampSkipInterval(1_500.49))
+    assertEquals(1_000, VlcContract.clampSkipInterval(999.0))
+    assertEquals(1_000, VlcContract.clampSkipInterval(-5_000.0))
+    assertEquals(60_000, VlcContract.clampSkipInterval(60_001.0))
+    assertEquals(60_000, VlcContract.clampSkipInterval(Double.POSITIVE_INFINITY))
   }
 
   @Test

@@ -171,6 +171,20 @@ class MediaSessionContractTest {
   }
 
   @Test
+  fun aBriefFocusLossPausesAndTheGainResumes() {
+    val policy = InterruptionPolicy()
+    assertEquals(InterruptionEffect.PAUSE, policy.focusChanged(FocusChange.LOST_BRIEFLY, isActive = true))
+    assertEquals(InterruptionEffect.RESUME, policy.focusChanged(FocusChange.GAINED, isActive = false))
+  }
+
+  @Test
+  fun aPermanentFocusLossPausesAndTheGainDoesNotResume() {
+    val policy = InterruptionPolicy()
+    assertEquals(InterruptionEffect.PAUSE, policy.focusChanged(FocusChange.LOST, isActive = true))
+    assertNull(policy.focusChanged(FocusChange.GAINED, isActive = false))
+  }
+
+  @Test
   fun resetClearsPausedByInterruption() {
     val policy = InterruptionPolicy()
     policy.began(isActive = true)
@@ -253,26 +267,6 @@ class MediaSessionContractTest {
     val withPrevious = state(hasPreviousListener = true).commands
     assertTrue(RemoteCommand.PREVIOUS in withPrevious)
     assertFalse(RemoteCommand.NEXT in withPrevious)
-  }
-
-  @Test
-  fun clampSkipIntervalRoundsHalfUpAndClamps() {
-    assertEquals(10_000, VlcContract.clampSkipInterval(10_000.0))
-    assertEquals(1_501, VlcContract.clampSkipInterval(1_500.5))
-    assertEquals(1_500, VlcContract.clampSkipInterval(1_500.49))
-    assertEquals(1_000, VlcContract.clampSkipInterval(999.0))
-    assertEquals(1_000, VlcContract.clampSkipInterval(-5_000.0))
-    assertEquals(60_000, VlcContract.clampSkipInterval(60_001.0))
-    assertEquals(60_000, VlcContract.clampSkipInterval(Double.POSITIVE_INFINITY))
-  }
-
-  @Test
-  fun remoteSkipIntervalDefaultsAndIgnoresNaN() {
-    val settings = PlayerSettings()
-    assertEquals(10_000, settings.remoteSkipIntervalMs)
-    settings.setRemoteSkipInterval(15_000.4)
-    settings.setRemoteSkipInterval(Double.NaN)
-    assertEquals(15_000, settings.remoteSkipIntervalMs)
   }
 
   private fun state(

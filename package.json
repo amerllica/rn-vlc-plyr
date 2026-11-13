@@ -1,6 +1,6 @@
 {
   "name": "rn-vlc-plyr",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "React Native VLC Player (Video/Audio) based on VLC, powered by Nitro Modules",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
@@ -18,11 +18,9 @@
     "lib",
     "android",
     "ios",
-    "cpp",
     "nitrogen",
     "nitro.json",
     "*.podspec",
-    "react-native.config.js",
     "app.plugin.js",
     "plugin",
     "!ios/build",
@@ -109,7 +107,7 @@
   },
   "peerDependencies": {
     "react": "*",
-    "react-native": "*",
+    "react-native": ">=0.79",
     "react-native-nitro-modules": ">=0.37.0"
   },
   "workspaces": [
@@ -152,6 +150,7 @@
   },
   "jest": {
     "preset": "@react-native/jest-preset",
+    "testTimeout": 15000,
     "testEnvironmentOptions": {
       "customExportConditions": [
         "require",

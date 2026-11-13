@@ -13,10 +13,6 @@ object MainThread {
     if (isCurrent) block() else handler.post(block)
   }
 
-  fun post(block: () -> Unit) {
-    handler.post(block)
-  }
-
   fun postDelayed(delayMs: Long, block: () -> Unit) {
     handler.postDelayed(block, delayMs)
   }

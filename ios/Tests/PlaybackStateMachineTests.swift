@@ -23,9 +23,9 @@ final class PlaybackStateMachineTests: XCTestCase {
     XCTAssertEqual(machine.load(uri: networkUri, autoPlay: true), [.status(.opening)])
     XCTAssertEqual(machine.handle(engine: .opening, engineIsPlaying: false, loop: false), [])
     XCTAssertEqual(machine.handle(engine: .buffering, engineIsPlaying: false, loop: false), [.status(.buffering)])
-    XCTAssertEqual(machine.handle(engine: .playing, engineIsPlaying: true, loop: false), [.status(.playing), .loaded])
+    XCTAssertEqual(machine.handle(engine: .playing, engineIsPlaying: true, loop: false), [.startedPlaying, .status(.playing), .loaded])
     XCTAssertEqual(machine.handle(engine: .paused, engineIsPlaying: false, loop: false), [.status(.paused)])
-    XCTAssertEqual(machine.handle(engine: .playing, engineIsPlaying: true, loop: false), [.status(.playing)])
+    XCTAssertEqual(machine.handle(engine: .playing, engineIsPlaying: true, loop: false), [.startedPlaying, .status(.playing)])
   }
 
   func testAutoPlayOffStaysIdleUntilPlay() {
@@ -92,7 +92,7 @@ final class PlaybackStateMachineTests: XCTestCase {
     XCTAssertEqual(machine.handle(engine: .stopped, engineIsPlaying: false, loop: true), [])
     XCTAssertEqual(machine.handle(engine: .opening, engineIsPlaying: false, loop: true), [])
     XCTAssertEqual(machine.handle(engine: .buffering, engineIsPlaying: false, loop: true), [])
-    XCTAssertEqual(machine.handle(engine: .playing, engineIsPlaying: true, loop: true), [])
+    XCTAssertEqual(machine.handle(engine: .playing, engineIsPlaying: true, loop: true), [.startedPlaying])
     XCTAssertEqual(machine.status, .playing)
     XCTAssertEqual(machine.handle(engine: .ended, engineIsPlaying: false, loop: true), [.restartForLoop])
   }
@@ -133,22 +133,51 @@ final class PlaybackStateMachineTests: XCTestCase {
     XCTAssertEqual(machine.playAction(), .reload)
   }
 
+  func testPlayAfterStoppingAnInvalidSourceReloadsIt() {
+    var machine = playingMachine()
+    _ = machine.failInvalidSource()
+    _ = machine.requestStop()
+    XCTAssertEqual(machine.status, .stopped)
+    XCTAssertEqual(machine.playAction(), .reload)
+  }
+
+  func testReloadModeFollowsTheSubtitleStyleReloadRules() {
+    var machine = PlaybackStateMachine()
+    XCTAssertEqual(machine.reloadMode, .none)
+    _ = machine.load(uri: networkUri, autoPlay: false)
+    XCTAssertEqual(machine.reloadMode, .withoutPlaying)
+    _ = machine.beginPlayback()
+    _ = machine.handle(engine: .playing, engineIsPlaying: true, loop: false)
+    XCTAssertEqual(machine.reloadMode, .inPlace)
+    _ = machine.handle(engine: .paused, engineIsPlaying: false, loop: false)
+    XCTAssertEqual(machine.reloadMode, .inPlace)
+    _ = machine.requestStop()
+    XCTAssertEqual(machine.reloadMode, .withoutPlaying)
+    _ = machine.failInvalidSource()
+    XCTAssertEqual(machine.reloadMode, .none)
+  }
+
+  func testARepeatedPlayingSignalStartsNothing() {
+    var machine = playingMachine()
+    XCTAssertEqual(machine.handle(engine: .playing, engineIsPlaying: true, loop: false), [])
+  }
+
   func testReloadAfterErrorFiresLoadedAgain() {
     var machine = PlaybackStateMachine()
     _ = machine.load(uri: networkUri, autoPlay: false)
     _ = machine.beginPlayback()
     _ = machine.handle(engine: .error, engineIsPlaying: false, loop: false)
     XCTAssertEqual(machine.reloadForRetry(), [.status(.opening)])
-    XCTAssertEqual(machine.handle(engine: .playing, engineIsPlaying: true, loop: false), [.status(.playing), .loaded])
+    XCTAssertEqual(machine.handle(engine: .playing, engineIsPlaying: true, loop: false), [.startedPlaying, .status(.playing), .loaded])
   }
 
   func testLoadedOncePerSource() {
     var machine = playingMachine()
     _ = machine.requestStop()
     _ = machine.beginPlayback()
-    XCTAssertEqual(machine.handle(engine: .playing, engineIsPlaying: true, loop: false), [.status(.playing)])
+    XCTAssertEqual(machine.handle(engine: .playing, engineIsPlaying: true, loop: false), [.startedPlaying, .status(.playing)])
     XCTAssertEqual(machine.load(uri: networkUri, autoPlay: true), [.status(.opening)])
-    XCTAssertEqual(machine.handle(engine: .playing, engineIsPlaying: true, loop: false), [.status(.playing), .loaded])
+    XCTAssertEqual(machine.handle(engine: .playing, engineIsPlaying: true, loop: false), [.startedPlaying, .status(.playing), .loaded])
   }
 
   func testLoadWithoutAutoPlayFromPlayingGoesIdle() {
@@ -202,7 +231,7 @@ final class PlaybackStateMachineTests: XCTestCase {
     XCTAssertEqual(machine.seekAction(targetMs: 5000, duration: 10_000, isSeekable: true), .restartThenSeek(5000))
   }
 
-  func testIsLiveRequiresPlaying() {
+  func testTheLoadedFlagNeedsTheFirstPlaying() {
     var machine = PlaybackStateMachine()
     _ = machine.load(uri: networkUri, autoPlay: false)
     XCTAssertFalse(machine.hasReachedPlaying)

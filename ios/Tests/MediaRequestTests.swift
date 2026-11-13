@@ -21,9 +21,29 @@ final class MediaRequestTests: XCTestCase {
     XCTAssertEqual(MediaRequest.make(uri: "file:///tmp/a.mp4")?.url.absoluteString, "file:///tmp/a.mp4")
   }
 
+  func testUriWithSpacesResolvesToAnEncodedUrl() {
+    XCTAssertEqual(MediaUri.resolve("https://host/my clip.mp4?a=1#t=2")?.absoluteString, "https://host/my%20clip.mp4?a=1#t=2")
+    XCTAssertEqual(MediaUri.resolve("https://host/my%20clip.mp4")?.absoluteString, "https://host/my%20clip.mp4")
+  }
+
   func testOptionsAreUserAgentThenReferrerThenVerbatim() {
     let request = MediaRequest.make(uri: "http://host/a", userAgent: "UA/1", referrer: "http://ref", vlcOptions: [":network-caching=300", "--no-audio"])
     XCTAssertEqual(request?.options, [":http-user-agent=UA/1", ":http-referrer=http://ref", ":network-caching=300", "--no-audio"])
+  }
+
+  func testLineBreaksAreRemovedFromUserAgentAndReferrer() {
+    XCTAssertEqual(
+      MediaRequest.buildOptions(userAgent: "Agent\r\nX-Injected: 1", referrer: "https://ref\nX-Other: 2", vlcOptions: nil),
+      [":http-user-agent=AgentX-Injected: 1", ":http-referrer=https://refX-Other: 2"]
+    )
+  }
+
+  func testRedactedUriDropsUserInfoQueryAndFragment() {
+    XCTAssertEqual(MediaUri.redacted("https://user:secret@host:8080/art/cover.png?token=abc#top"), "https://host:8080/art/cover.png")
+    XCTAssertEqual(MediaUri.redacted("file:///covers/a.png"), "file:///covers/a.png")
+    XCTAssertEqual(MediaUri.redacted("not a uri?x=1"), "not a uri")
+    XCTAssertEqual(MediaUri.redacted("https://user:p@ss@host/a.jpg"), "https://host/a.jpg")
+    XCTAssertEqual(MediaUri.redacted("https://user:p?s#s@host/a.jpg?token=1"), "https://host/a.jpg")
   }
 
   func testAddedAudioAppendsTheReaderOptionOnce() {

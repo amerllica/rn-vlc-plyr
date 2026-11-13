@@ -49,6 +49,13 @@ final class HybridVlcPlayerView: HybridVlcPlayerViewSpec, VideoHost {
     attach(to: nil)
   }
 
+  func playerDidRelease() {
+    statusSubscription?.remove()
+    statusSubscription = nil
+    attachedPlayer = nil
+    keepAwake(while: nil)
+  }
+
   private func attach(to next: HybridVlcPlayer?) {
     guard next !== attachedPlayer else { return }
     statusSubscription?.remove()

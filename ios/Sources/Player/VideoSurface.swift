@@ -3,6 +3,8 @@ import UIKit
 protocol VideoHost: AnyObject {
   var hostView: UIView { get }
   var hostResizeMode: ResizeMode { get }
+
+  func playerDidRelease()
 }
 
 final class VideoSurface {
@@ -34,8 +36,10 @@ final class VideoSurface {
   }
 
   func removeAll() {
+    let released = hosts.elements
     hosts.removeAll()
     container.removeFromSuperview()
+    released.forEach { ($0 as? VideoHost)?.playerDidRelease() }
   }
 
   func mount() {

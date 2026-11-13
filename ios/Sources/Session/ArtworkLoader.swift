@@ -6,6 +6,7 @@ enum ArtworkFailure: Error, Equatable {
   case fileNotFound
   case notAnImage
   case timedOut
+  case tooLarge
   case http(Int)
   case transport(String)
 
@@ -23,6 +24,7 @@ enum ArtworkFailure: Error, Equatable {
     case .fileNotFound: return "file not found"
     case .notAnImage: return "not an image"
     case .timedOut: return "timed out"
+    case .tooLarge: return "too large"
     case .http(let status): return "HTTP \(status)"
     case .transport(let description): return description
     }
@@ -35,8 +37,9 @@ final class ArtworkLoader {
 
   static let maxPixelSize = 512
   static let timeoutSeconds: TimeInterval = 10
+  static let maxBytes = 10 * 1024 * 1024
+  static let successStatuses = 200..<300
   private static let remoteSchemes: Set<String> = ["http", "https"]
-  private static let successStatuses = 200..<300
   private static let decodeQueue = DispatchQueue(label: "rn-vlc-plyr.artwork", qos: .utility)
 
   static let mainQueueScheduler: Scheduler = { delayMs, work in
@@ -141,7 +144,7 @@ final class ArtworkLoader {
   private func giveUp(_ load: Load, _ failure: ArtworkFailure) {
     current = nil
     failed.insert(load.uri)
-    log("rn-vlc-plyr: artwork could not be loaded from \(load.uri): \(failure.reason)")
+    log("rn-vlc-plyr: artwork could not be loaded from \(MediaUri.redacted(load.uri)): \(failure.reason)")
     onLoad()
   }
 
@@ -153,34 +156,30 @@ final class ArtworkLoader {
     if url.isFileURL {
       decodeQueue.async { completion(readFile(url)) }
     } else if remoteSchemes.contains(scheme) {
-      download(url, completion: completion)
+      download(url, configuration: .ephemeral, completion: completion)
     } else {
       completion(.failure(.unsupportedScheme))
     }
   }
 
   private static func readFile(_ url: URL) -> Result<UIImage, ArtworkFailure> {
+    guard let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize else { return .failure(.fileNotFound) }
+    guard size <= maxBytes else { return .failure(.tooLarge) }
     guard let data = try? Data(contentsOf: url) else { return .failure(.fileNotFound) }
     return decode(data)
   }
 
-  private static func download(_ url: URL, completion: @escaping (Result<UIImage, ArtworkFailure>) -> Void) {
+  static func download(
+    _ url: URL,
+    configuration: URLSessionConfiguration,
+    completion: @escaping (Result<UIImage, ArtworkFailure>) -> Void
+  ) {
     var request = URLRequest(url: url)
     request.timeoutInterval = timeoutSeconds
-    URLSession.shared.dataTask(with: request) { data, response, error in
-      completion(downloadResult(data, response, error))
-    }.resume()
-  }
-
-  private static func downloadResult(_ data: Data?, _ response: URLResponse?, _ error: Error?) -> Result<UIImage, ArtworkFailure> {
-    if let error {
-      return .failure(ArtworkFailure(error))
-    }
-    if let status = (response as? HTTPURLResponse)?.statusCode, !successStatuses.contains(status) {
-      return .failure(.http(status))
-    }
-    guard let data else { return .failure(.notAnImage) }
-    return decode(data)
+    let body = CappedDownload(maxBytes: maxBytes) { completion($0.flatMap(decode)) }
+    let session = URLSession(configuration: configuration, delegate: body, delegateQueue: nil)
+    session.dataTask(with: request).resume()
+    session.finishTasksAndInvalidate()
   }
 
   private static func decode(_ data: Data) -> Result<UIImage, ArtworkFailure> {
@@ -198,5 +197,60 @@ final class ArtworkLoader {
     ]
     guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
     return UIImage(cgImage: thumbnail)
+  }
+}
+
+private final class CappedDownload: NSObject, URLSessionDataDelegate {
+  private let maxBytes: Int
+  private let completion: (Result<Data, ArtworkFailure>) -> Void
+  private var body = Data()
+  private var status: Int?
+  private var isTooLarge = false
+  private var redirects = 0
+
+  init(maxBytes: Int, completion: @escaping (Result<Data, ArtworkFailure>) -> Void) {
+    self.maxBytes = maxBytes
+    self.completion = completion
+  }
+
+  func urlSession(
+    _ session: URLSession,
+    dataTask: URLSessionDataTask,
+    didReceive response: URLResponse,
+    completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
+  ) {
+    status = (response as? HTTPURLResponse)?.statusCode
+    isTooLarge = response.expectedContentLength > Int64(maxBytes)
+    completionHandler(isTooLarge ? .cancel : .allow)
+  }
+
+  func urlSession(
+    _ session: URLSession,
+    task: URLSessionTask,
+    willPerformHTTPRedirection response: HTTPURLResponse,
+    newRequest request: URLRequest,
+    completionHandler: @escaping (URLRequest?) -> Void
+  ) {
+    redirects += 1
+    let isAllowed = redirects <= ArtworkRedirect.maxHops && ArtworkRedirect.allows(from: response.url, to: request.url)
+    completionHandler(isAllowed ? request : nil)
+  }
+
+  func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+    body.append(data)
+    guard body.count > maxBytes else { return }
+    isTooLarge = true
+    dataTask.cancel()
+  }
+
+  func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    completion(result(error))
+  }
+
+  private func result(_ error: Error?) -> Result<Data, ArtworkFailure> {
+    if isTooLarge { return .failure(.tooLarge) }
+    if let error { return .failure(ArtworkFailure(error)) }
+    if let status, !ArtworkLoader.successStatuses.contains(status) { return .failure(.http(status)) }
+    return .success(body)
   }
 }

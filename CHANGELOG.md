@@ -6,6 +6,78 @@ All notable changes to rn-vlc-plyr. The format follows
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-13
+
+### Highlights
+
+A bug-fix and hardening release. A review of the whole library found two crashes, a set of playback
+bugs around reloads, seeks and two players, and a few gaps in how the library treats values from
+outside. The fixes come with tests, and both platforms follow the player contract more closely.
+
+### Fixed
+
+- iOS: `setAudioTrack` and `setSubtitleTrack` no longer crash the app on `NaN` or an infinite id.
+  Both platforms ignore such an id.
+- A `libvlcOptions` entry that libVLC rejects no longer crashes the app. The player logs a warning
+  and uses the shared libVLC instance.
+- `useVlcPlayer` no longer loads the media twice when the source object lists its keys in another
+  order than `uri`, `userAgent`, `referrer`, `vlcOptions`, `title`.
+- `play()` on a source with an invalid uri fails again with `invalidSource` from every status. On
+  iOS it no longer hangs in `opening` after `stop()`; on Android it no longer takes audio focus.
+- A `seek`, `setAudioTrack` or `setSubtitleTrack` made while the media reloads in place (subtitle
+  style, `libvlcOptions`, first `addAudio`, stall reload) is kept. The reload no longer puts the old
+  position or track back.
+- `reloadOnStallAfterMs`: a seek backwards after a resume is no longer taken for a stall.
+- `reconnectOnResumeAfterMs` and `reloadOnStallAfterMs` turn off for an infinite value and are
+  capped, the same on both platforms. Android reloaded at once on a huge value.
+- The screen can sleep again after `player.release()` when the view stays mounted.
+- iOS: `duration`, `isSeekable` and `isLive` keep their values while the media reloads in place.
+  They dropped to 0, `false` and `true` for a moment.
+- iOS: `stop()`, `play()` after the end, a seek after the end and a loop no longer stop the VLC
+  player on the main thread. A stalled network stream could freeze the app there.
+- Android: a file path with `#` or `%` plays. An absolute path is now percent-encoded.
+- Android: `snapshot()` rejects when `release()` runs first. The promise never settled.
+- Android: `play()` after an error keeps the audio and subtitles added with `addAudio` and
+  `addSubtitle`.
+- With two players that both play, a seek, a loop or a rate change of the first no longer takes the
+  lock screen and the remote commands back from the second.
+- Android: artwork loads through a redirect from `http` to `https`.
+- Android: a player whose shutdown hangs on a bad network no longer blocks the shutdown of later
+  players, so an old stream cannot keep playing under a new one.
+- iOS 16: a `uri` with a space, for example `https://host/my clip.mp4`, plays. It failed with
+  `invalidSource`.
+- iOS: `loaded` now comes right after the first `statusChange('playing')`. `tracksChange` and
+  `videoSizeChange` fired between the two.
+- `useVlcPlayerStatus` keeps one native listener. It no longer adds and removes one on every render.
+
+### Changed
+
+- Artwork is limited to 10 MB. A larger file or reply fails as `too large` and no longer fills the
+  memory of the app.
+- The artwork warning in the device log no longer shows the user name, password, query or fragment
+  of the artwork uri.
+- `userAgent` and `referrer` lose their line breaks, so a value cannot add an HTTP header.
+- Artwork: a redirect from `https` to `http` fails, and iOS also stops after five redirects.
+- iOS: artwork replies are no longer kept in the shared URL cache on disk.
+- iOS: the file of a rejected `snapshot()` is deleted.
+
+- The `react-native` peer range is `>=0.79`. It was `*`, but older versions never built.
+
+### Docs
+
+- README has a new [Security](README.md#security) section.
+- The [player contract](docs/player-contract.md) now covers `keepScreenOn`, an invalid source on
+  `play()`, a seek during a reload, the session owner rule, artwork redirects and limits, rejected
+  `libvlcOptions` and the iOS buffering rule.
+
+### Internal
+
+- About 100 new native tests and 8 new Jest tests. The mixed test files are split by subject.
+- CI fails when the npm package holds example or test files. The package had about 150 example type
+  files; they are gone.
+- The turbo cache for the example builds now sees changes in the library sources.
+- The podspec tag matches the `v` release tags.
+
 ## [1.4.0] - 2026-11-09
 
 ### Added
@@ -231,7 +303,8 @@ same on iOS and Android.
 - Releases are published only by GitHub Actions on a version tag, with npm trusted publishing and
   provenance. See [ADR 0012](docs/adr/0012-release-pipeline.md).
 
-[Unreleased]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.1.0...v1.2.0

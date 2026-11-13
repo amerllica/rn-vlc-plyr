@@ -13,8 +13,8 @@ struct ChangeGate<Value: Equatable> {
     return true
   }
 
-  mutating func reset(to value: Value? = nil) {
-    lastEmitted = value
+  mutating func reset() {
+    lastEmitted = nil
   }
 }
 

@@ -5,9 +5,14 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
+import com.margelo.nitro.rnvlcplyr.LOG_TAG
+import com.margelo.nitro.rnvlcplyr.contract.ArtworkRedirect
 import com.margelo.nitro.rnvlcplyr.contract.ArtworkRetrySchedule
+import com.margelo.nitro.rnvlcplyr.contract.VlcContract
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileNotFoundException
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL
@@ -25,6 +30,11 @@ class ArtworkLoader(private val schedule: ArtworkScheduler = defaultScheduler())
   }
 
   private class ArtworkFailure(val reason: String) : Exception(reason)
+
+  private sealed interface HttpReply {
+    class Body(val bytes: ByteArray) : HttpReply
+    class Redirect(val target: String) : HttpReply
+  }
 
   private val lock = Any()
   private var cache: Pair<String, Bitmap>? = null
@@ -80,7 +90,7 @@ class ArtworkLoader(private val schedule: ArtworkScheduler = defaultScheduler())
       failed += uri
       cycles.remove(uri)?.waiters.orEmpty()
     }
-    Log.w(TAG, "$TAG: artwork could not be loaded from $uri: $reason")
+    Log.w(LOG_TAG, "rn-vlc-plyr: artwork could not be loaded from ${VlcContract.redactUri(uri)}: $reason")
     waiters.forEach { it() }
   }
 
@@ -95,23 +105,49 @@ class ArtworkLoader(private val schedule: ArtworkScheduler = defaultScheduler())
     val parsed = Uri.parse(uri)
     return when (parsed.scheme?.lowercase()) {
       "http", "https" -> readHttp(uri)
-      "file" -> File(parsed.path ?: throw FileNotFoundException(uri)).readBytes()
-      "content" -> context.contentResolver.openInputStream(parsed)?.use { it.readBytes() } ?: throw FileNotFoundException(uri)
+      "file" -> File(parsed.path ?: throw FileNotFoundException(uri)).inputStream().use(::readWithinLimit)
+      "content" -> context.contentResolver.openInputStream(parsed)?.use(::readWithinLimit) ?: throw FileNotFoundException(uri)
       else -> throw ArtworkFailure("unsupported scheme")
     }
   }
 
   private fun readHttp(uri: String): ByteArray {
+    var current = uri
+    repeat(ArtworkRedirect.MAX_HOPS + 1) {
+      when (val reply = fetch(current)) {
+        is HttpReply.Body -> return reply.bytes
+        is HttpReply.Redirect -> current = reply.target
+      }
+    }
+    throw ArtworkFailure(TOO_MANY_REDIRECTS)
+  }
+
+  private fun fetch(uri: String): HttpReply {
     val connection = URL(uri).openConnection() as HttpURLConnection
     connection.connectTimeout = TIMEOUT_MS
     connection.readTimeout = TIMEOUT_MS
-    connection.instanceFollowRedirects = true
-    return try {
+    connection.instanceFollowRedirects = false
+    try {
       val status = connection.responseCode
+      if (ArtworkRedirect.isRedirect(status)) {
+        val target = ArtworkRedirect.target(uri, connection.getHeaderField(LOCATION_HEADER)) ?: throw ArtworkFailure("HTTP $status")
+        return HttpReply.Redirect(target)
+      }
       if (status !in HTTP_SUCCESS) throw ArtworkFailure("HTTP $status")
-      connection.inputStream.use { it.readBytes() }
+      return HttpReply.Body(connection.inputStream.use(::readWithinLimit))
     } finally {
       connection.disconnect()
+    }
+  }
+
+  private fun readWithinLimit(input: InputStream): ByteArray {
+    val body = ByteArrayOutputStream()
+    val chunk = ByteArray(READ_CHUNK_BYTES)
+    while (true) {
+      val read = input.read(chunk)
+      if (read < 0) return body.toByteArray()
+      if (body.size() + read > MAX_BYTES) throw ArtworkFailure(TOO_LARGE)
+      body.write(chunk, 0, read)
     }
   }
 
@@ -140,11 +176,15 @@ class ArtworkLoader(private val schedule: ArtworkScheduler = defaultScheduler())
   }
 
   companion object {
-    private const val TAG = "rn-vlc-plyr"
     private const val MAX_SIDE_PX = 512
     private const val TIMEOUT_MS = 10_000
     private const val THREAD_NAME = "rn-vlc-plyr-artwork"
     private const val NOT_AN_IMAGE = "not an image"
+    private const val TOO_MANY_REDIRECTS = "too many redirects"
+    private const val TOO_LARGE = "too large"
+    private const val MAX_BYTES = 10 * 1024 * 1024
+    private const val READ_CHUNK_BYTES = 64 * 1024
+    private const val LOCATION_HEADER = "Location"
     private val HTTP_SUCCESS = 200..299
 
     val shared by lazy { ArtworkLoader() }

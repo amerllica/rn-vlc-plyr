@@ -4,6 +4,7 @@ import com.margelo.nitro.rnvlcplyr.VlcError
 import com.margelo.nitro.rnvlcplyr.VlcErrorCode
 import com.margelo.nitro.rnvlcplyr.VlcSource
 import com.margelo.nitro.rnvlcplyr.VlcSubtitleStyle
+import java.net.URI
 import kotlin.math.floor
 
 object VlcContract {
@@ -28,7 +29,11 @@ object VlcContract {
   private const val MIN_BUFFERING_PERCENT = 0L
   private const val MAX_BUFFERING_PERCENT = 100L
   private const val MICROS_PER_MILLI = 1000L
-  private const val FILE_SCHEME_PREFIX = "file://"
+  private const val MAX_RECOVERY_DELAY_MS = Int.MAX_VALUE.toLong()
+  private const val FILE_SCHEME = "file"
+  private const val NO_AUTHORITY = ""
+  private const val KEEP_SCHEME = "$1"
+  private val USER_INFO = Regex("^([A-Za-z][A-Za-z0-9+.-]*://)[^/]*@")
   private const val USER_AGENT_OPTION = ":http-user-agent="
   private const val REFERRER_OPTION = ":http-referrer="
 
@@ -57,7 +62,8 @@ object VlcContract {
       .coerceIn(MIN_REMOTE_SKIP_INTERVAL_MS.toLong(), MAX_REMOTE_SKIP_INTERVAL_MS.toLong())
       .toInt()
 
-  fun clampDelayMs(value: Double): Long = roundHalfUp(value).coerceAtLeast(0L)
+  fun clampDelayMs(value: Double): Long =
+    if (value.isFinite()) roundHalfUp(value).coerceIn(0L, MAX_RECOVERY_DELAY_MS) else 0L
 
   fun bufferingPercent(value: Float): Int =
     roundHalfUp(value.toDouble()).coerceIn(MIN_BUFFERING_PERCENT, MAX_BUFFERING_PERCENT).toInt()
@@ -70,6 +76,8 @@ object VlcContract {
 
   fun delayToMicros(delayMs: Int): Long = delayMs * MICROS_PER_MILLI
 
+  fun trackId(value: Double): Int? = value.takeIf { it.isFinite() }?.toInt()
+
   fun clampSeek(targetMs: Double, durationMs: Long): Long {
     val lowerBounded = roundHalfUp(targetMs).coerceAtLeast(0L)
     return if (durationMs > 0) lowerBounded.coerceAtMost(durationMs) else lowerBounded
@@ -78,18 +86,23 @@ object VlcContract {
   fun durationFromEngine(lengthMs: Long): Long = if (lengthMs <= 0) 0L else lengthMs
 
   fun resolveMediaUri(uri: String): String? = when {
-    uri.startsWith("/") -> FILE_SCHEME_PREFIX + uri
+    uri.startsWith("/") -> URI(FILE_SCHEME, NO_AUTHORITY, uri, null).toString()
     schemeOf(uri) != null -> uri
     else -> null
   }
 
   fun mediaOptions(source: VlcSource, hasAddedAudio: Boolean): List<String> {
     val options = listOfNotNull(
-      source.userAgent?.let { USER_AGENT_OPTION + it },
-      source.referrer?.let { REFERRER_OPTION + it }
+      source.userAgent?.let { USER_AGENT_OPTION + withoutLineBreaks(it) },
+      source.referrer?.let { REFERRER_OPTION + withoutLineBreaks(it) }
     ) + source.vlcOptions.orEmpty()
     return if (hasAddedAudio && ADDED_AUDIO_READER_OPTION !in options) options + ADDED_AUDIO_READER_OPTION else options
   }
+
+  fun redactUri(uri: String): String =
+    uri.replace(USER_INFO, KEEP_SCHEME).substringBefore('?').substringBefore('#')
+
+  private fun withoutLineBreaks(value: String): String = value.filterNot { it == '\r' || it == '\n' }
 
   fun isNetworkSource(uri: String?): Boolean = uri?.let(::schemeOf)?.lowercase()?.let { it in NETWORK_SCHEMES } == true
 

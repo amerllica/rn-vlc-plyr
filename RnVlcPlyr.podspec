@@ -11,12 +11,11 @@ Pod::Spec.new do |s|
   s.authors      = package["author"]
 
   s.platforms    = { :ios => "16.0" }
-  s.source       = { :git => "https://github.com/amerllica/rn-vlc-plyr.git", :tag => "#{s.version}" }
+  s.source       = { :git => "https://github.com/amerllica/rn-vlc-plyr.git", :tag => "v#{s.version}" }
 
   s.source_files = [
     "ios/Sources/**/*.{swift}",
     "ios/Sources/**/*.{m,mm}",
-    "cpp/**/*.{hpp,cpp}",
     "ios/Sources/**/*.h",
   ]
   s.public_header_files = ["ios/Sources/ObjC/*.h"]

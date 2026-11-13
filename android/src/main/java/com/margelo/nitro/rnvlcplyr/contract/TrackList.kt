@@ -26,7 +26,8 @@ object TrackList {
     selectedSubtitle: Int
   ): VlcTracksInfo = VlcTracksInfo(build(audio), build(subtitles), selectedAudio.toDouble(), selectedSubtitle.toDouble())
 
-  fun contains(tracks: Array<VlcTrack>, id: Int): Boolean = tracks.any { it.id == id.toDouble() }
+  fun canSelect(tracks: Array<VlcTrack>, id: Int): Boolean =
+    id == VlcContract.NO_TRACK_ID || tracks.any { it.id == id.toDouble() }
 
   fun isStillLoading(tracks: VlcTracksInfo, before: VlcTracksInfo): Boolean =
     tracks.audioTracks.size < before.audioTracks.size || tracks.subtitleTracks.size < before.subtitleTracks.size

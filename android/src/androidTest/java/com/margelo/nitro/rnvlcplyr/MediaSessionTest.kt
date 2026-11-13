@@ -9,14 +9,12 @@ import com.margelo.nitro.rnvlcplyr.session.MediaSessionOwner
 import com.margelo.nitro.rnvlcplyr.session.PlaybackServiceSetup
 import com.margelo.nitro.rnvlcplyr.session.SystemMediaSession
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -122,8 +120,26 @@ class MediaSessionTest {
     assertEquals(VlcStatus.PLAYING, controller.read { status })
   }
 
-  private fun fixtureSource() =
-    VlcSource(TestMedia.copyToCache(TestMedia.VIDEO_ASSET).absolutePath, null, null, null, null)
+  @Test
+  fun aSeekOnTheFirstPlayerDoesNotTakeTheSessionBackFromTheSecond() {
+    val session = startPlaying()
+    val second = PlayerController(TestMedia.targetContext)
+    try {
+      second.setLoop(true)
+      second.updateSessionSettings { nowPlaying = SECOND_NOW_PLAYING }
+      second.setSource(fixtureSource())
+      awaitCondition("second owns the session") { session.publishedTitle() == SECOND_NOW_PLAYING.title }
+
+      controller.seek(0.0)
+      onMainSync { }
+
+      assertEquals(SECOND_NOW_PLAYING.title, session.publishedTitle())
+    } finally {
+      second.release()
+    }
+  }
+
+  private fun fixtureSource() = TestMedia.assetSource(TestMedia.VIDEO_ASSET)
 
   private fun startPlaying(): MediaControllerCompat {
     controller.setSource(fixtureSource())
@@ -135,6 +151,8 @@ class MediaSessionTest {
 
   private fun MediaControllerCompat.publishedPosition(): Long = playbackState?.position ?: -1L
 
+  private fun MediaControllerCompat.publishedTitle(): String? = metadata?.getString(MediaMetadataCompat.METADATA_KEY_TITLE)
+
   private fun MediaControllerCompat.hasAction(action: Long): Boolean =
     (playbackState?.actions ?: 0L) and action != 0L
 
@@ -144,20 +162,13 @@ class MediaSessionTest {
     return result.get()
   }
 
-  private fun awaitCondition(label: String, condition: () -> Boolean) {
-    val deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(TIMEOUT_SECONDS)
-    while (System.currentTimeMillis() < deadline) {
-      if (condition()) return
-      Thread.sleep(POLL_MS)
-    }
-    fail("timed out waiting for $label; statuses=$statuses")
-  }
+  private fun awaitCondition(label: String, condition: () -> Boolean) =
+    awaitCondition(label, context = { "statuses=$statuses" }, condition = condition)
 
   private companion object {
-    const val TIMEOUT_SECONDS = 15L
-    const val POLL_MS = 50L
     const val FOCUS_SETTLE_MS = 500L
     const val LATE_SEEK_MS = 1500.0
     val NOW_PLAYING = VlcNowPlaying("Two seconds", "rn-vlc-plyr", "Fixtures", null)
+    val SECOND_NOW_PLAYING = VlcNowPlaying("Second player", "rn-vlc-plyr", "Fixtures", null)
   }
 }

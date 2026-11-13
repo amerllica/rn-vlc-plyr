@@ -26,25 +26,13 @@ class LibVlcPlaybackTest {
     media.release()
     player.play()
 
-    assertTrue("player never reached Playing", playing.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
-    assertTrue("length was ${player.length}", waitFor { player.length > 0 })
-
-    player.stop()
-    player.setEventListener(null)
-    player.release()
-  }
-
-  private fun waitFor(condition: () -> Boolean): Boolean {
-    val deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(TIMEOUT_SECONDS)
-    while (System.currentTimeMillis() < deadline) {
-      if (condition()) return true
-      Thread.sleep(POLL_MS)
+    try {
+      assertTrue("player never reached Playing", playing.await(AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+      awaitCondition("a length above zero", context = { "length=${player.length}" }) { player.length > 0 }
+    } finally {
+      player.stop()
+      player.setEventListener(null)
+      player.release()
     }
-    return false
-  }
-
-  private companion object {
-    const val TIMEOUT_SECONDS = 15L
-    const val POLL_MS = 50L
   }
 }

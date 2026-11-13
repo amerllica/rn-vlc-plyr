@@ -15,6 +15,10 @@ struct SurfaceStack<Element: AnyObject> {
     top == nil
   }
 
+  var elements: [Element] {
+    entries.compactMap(\.element)
+  }
+
   mutating func attach(_ element: Element) {
     detach(element)
     entries.append(WeakEntry(element: element))

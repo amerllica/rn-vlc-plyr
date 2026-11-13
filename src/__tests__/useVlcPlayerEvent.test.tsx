@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
 import { act, renderHook } from '@testing-library/react-native';
 import { useVlcPlayerEvent, useVlcPlayerStatus } from '../useVlcPlayerEvent';
 import { addVlcPlayerListener } from '../events';
@@ -21,6 +21,27 @@ describe('useVlcPlayerEvent', () => {
 
     expect(received).toEqual(['second:playing']);
     expect(player.channels.statusChange.listeners.size).toBe(1);
+  });
+
+  it('moves the native listener when the player changes', async () => {
+    const first = new FakePlayer();
+    const second = new FakePlayer();
+    const received: string[] = [];
+    const { rerender } = await renderHook(
+      ({ player }: { player: FakePlayer }) =>
+        useVlcPlayerEvent(player, 'statusChange', (status) =>
+          received.push(status)
+        ),
+      { initialProps: { player: first } }
+    );
+
+    await rerender({ player: second });
+    await act(() => first.setStatus('paused'));
+    await act(() => second.setStatus('playing'));
+
+    expect(received).toEqual(['playing']);
+    expect(first.channels.statusChange.listeners.size).toBe(0);
+    expect(second.channels.statusChange.listeners.size).toBe(1);
   });
 
   it('removes the native listener on unmount', async () => {
@@ -84,5 +105,15 @@ describe('useVlcPlayerStatus', () => {
     expect(result.current).toBe('idle');
     await act(() => player.setStatus('buffering'));
     expect(result.current).toBe('buffering');
+  });
+
+  it('keeps one native listener across rerenders', async () => {
+    const player = new FakePlayer();
+    const subscribe = jest.spyOn(player, 'addOnStatusChangeListener');
+    const { rerender } = await renderHook(() => useVlcPlayerStatus(player));
+
+    await rerender({});
+
+    expect(subscribe).toHaveBeenCalledTimes(1);
   });
 });

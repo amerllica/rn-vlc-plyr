@@ -1,4 +1,4 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import type { VlcPlayer, VlcStatus } from './specs/VlcPlayer.nitro';
 import {
   addVlcPlayerListener,
@@ -29,11 +29,12 @@ export function useVlcPlayerEvent<E extends VlcPlayerEvent>(
 }
 
 export function useVlcPlayerStatus(player: VlcPlayer): VlcStatus {
-  return useSyncExternalStore(
-    (onChange) => {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
       const subscription = player.addOnStatusChangeListener(onChange);
       return () => subscription.remove();
     },
-    () => player.status
+    [player]
   );
+  return useSyncExternalStore(subscribe, () => player.status);
 }

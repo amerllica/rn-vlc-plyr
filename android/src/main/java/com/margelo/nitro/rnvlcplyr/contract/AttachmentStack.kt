@@ -6,9 +6,6 @@ class AttachmentStack<T : Any> {
   val top: T?
     get() = items.lastOrNull()
 
-  val size: Int
-    get() = items.size
-
   fun attach(item: T): Boolean {
     val previousTop = top
     items.remove(item)
@@ -22,7 +19,5 @@ class AttachmentStack<T : Any> {
     return previousTop !== top
   }
 
-  fun clear() {
-    items.clear()
-  }
+  fun clear(): List<T> = items.toList().also { items.clear() }
 }

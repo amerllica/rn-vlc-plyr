@@ -16,18 +16,45 @@ struct EngineReadout {
   let tracks: TracksSnapshot
 }
 
+final class VlcInstance {
+  private static let rejectedOptionsWarning = "rn-vlc-plyr: libVLC rejected the instance options, so the player uses the shared instance"
+
+  let options: [String]
+  private let library: VLCLibrary?
+
+  init(options: [String]) {
+    self.options = options
+    library = Self.makeLibrary(options: options)
+  }
+
+  func makePlayer() -> VLCMediaPlayer {
+    library.map(VLCMediaPlayer.init(library:)) ?? VLCMediaPlayer()
+  }
+
+  private static func makeLibrary(options: [String]) -> VLCLibrary? {
+    guard !options.isEmpty else { return nil }
+    let library = VLCLibrary(options: options)
+    guard library.instance != nil else {
+      NSLog("%@", rejectedOptionsWarning)
+      return nil
+    }
+    return library
+  }
+}
+
 final class VlcEngine: NSObject, VLCMediaPlayerDelegate {
-  private static let retirementQueue = DispatchQueue(label: "rn-vlc-plyr.engine-retirement")
+  private static let retirementQueue = DispatchQueue(label: "rn-vlc-plyr.engine-retirement", attributes: .concurrent)
   private static let retirementGracePeriod: TimeInterval = 1
   private static let noTrack: Int32 = -1
 
   weak var delegate: VlcEngineDelegate?
+  private(set) var hasPlayed = false
   private let player: VLCMediaPlayer
   private var disabledVideoTrack: Int32?
   private var bufferingObserver: VlcBufferingObserver?
 
-  init(drawable: UIView, libraryOptions: [String]) {
-    player = libraryOptions.isEmpty ? VLCMediaPlayer() : VLCMediaPlayer(options: libraryOptions)
+  init(drawable: UIView, instance: VlcInstance) {
+    player = instance.makePlayer()
     super.init()
     player.delegate = self
     player.drawable = drawable
@@ -52,15 +79,6 @@ final class VlcEngine: NSObject, VLCMediaPlayerDelegate {
 
   func pause() {
     player.pause()
-  }
-
-  func stop() {
-    player.stop()
-  }
-
-  func restartFromBeginning() {
-    player.stop()
-    player.play()
   }
 
   func seek(toMs milliseconds: Int) {
@@ -148,6 +166,7 @@ final class VlcEngine: NSObject, VLCMediaPlayerDelegate {
   }
 
   func mediaPlayerStateChanged(_ aNotification: Notification) {
+    hasPlayed = hasPlayed || player.state == .playing
     delegate?.engineDidChangeState(Self.engineState(player.state), isPlaying: player.isPlaying)
   }
 

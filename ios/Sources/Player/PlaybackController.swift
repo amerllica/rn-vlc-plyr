@@ -3,8 +3,7 @@ import UIKit
 
 final class PlaybackController {
   private static let snapshotQueue = DispatchQueue(label: "rn-vlc-plyr.snapshot")
-  private static let snapshotStatuses: Set<PlayerStatus> = [.buffering, .playing, .paused]
-  private static let mediaActiveStatuses: Set<PlayerStatus> = [.opening, .buffering, .playing, .paused]
+  private static let startedStatuses: Set<PlayerStatus> = [.buffering, .playing, .paused]
 
   private let store: PlayerStore
   private var machine = PlaybackStateMachine()
@@ -14,18 +13,11 @@ final class PlaybackController {
   private var audioSession = PlaybackAudioSession()
   private let snapshots = SnapshotRequests()
   private var engineInstance: VlcEngine?
+  private var vlcInstance: VlcInstance?
   private var currentRequest: MediaRequest?
-  private var pendingSeekMs: Int?
-  private var pendingSlaves: [PlaybackSlave] = []
   private var addedSlaves: [PlaybackSlave] = []
-  private var reopenSlaves: [PlaybackSlave] = []
-  private var trackRestore = TrackSelectionRestore()
-  private var isReloadingInPlace = false
-  private var tracksBeforeReopen: TracksSnapshot?
-  private var pausesOnceStarted = false
-  private var resumeReconnect = ResumeReconnect()
-  private var stallWatchdog = StallWatchdog()
-  private var stallCheck: DispatchWorkItem?
+  private var reopen = ReopenState()
+  private var resumeGuard = ResumeGuard()
   private var bufferingGate = ChangeGate<Int>()
   private var isShutDown = false
   private lazy var surface = VideoSurface()
@@ -41,14 +33,19 @@ final class PlaybackController {
 
   private var engine: VlcEngine {
     if let engineInstance { return engineInstance }
-    let settings = store.settings
-    let created = VlcEngine(
-      drawable: surface.container,
-      libraryOptions: VlcContract.instanceOptions(libvlcOptions: settings.libvlcOptions, subtitleStyle: settings.subtitleStyle)
-    )
+    let created = VlcEngine(drawable: surface.container, instance: currentVlcInstance())
     created.delegate = self
     engineInstance = created
     surface.engine = created
+    return created
+  }
+
+  private func currentVlcInstance() -> VlcInstance {
+    let settings = store.settings
+    let options = VlcContract.instanceOptions(libvlcOptions: settings.libvlcOptions, subtitleStyle: settings.subtitleStyle)
+    if let vlcInstance, vlcInstance.options == options { return vlcInstance }
+    let created = VlcInstance(options: options)
+    vlcInstance = created
     return created
   }
 
@@ -56,7 +53,6 @@ final class PlaybackController {
     guard isActive else { return }
     defer { session.sourceDidChange() }
     resetMediaState()
-    resumeReconnect.clear()
     addedSlaves.removeAll()
     guard let source else {
       currentRequest = nil
@@ -71,14 +67,13 @@ final class PlaybackController {
       failInvalidSource()
       return
     }
-    replaceEngine().load(request)
+    loadOnFreshEngine(request, slaves: [])
     let autoPlay = store.settings.autoPlay
+    let effects = machine.load(uri: source.uri, autoPlay: autoPlay)
     if autoPlay {
-      audioSession.activate()
-    }
-    apply(machine.load(uri: source.uri, autoPlay: autoPlay))
-    if autoPlay {
-      engine.play()
+      play(entering: effects)
+    } else {
+      apply(effects)
     }
   }
 
@@ -91,19 +86,16 @@ final class PlaybackController {
   func pause() {
     guard isActive else { return }
     session.userDidCommand()
-    pausesOnceStarted = false
+    reopen.pausesOnceStarted = false
     pauseEngine()
   }
 
   func stop() {
     guard isActive, machine.canStop else { return }
     session.userDidCommand()
-    pausesOnceStarted = false
-    isReloadingInPlace = false
-    pendingSeekMs = nil
-    resumeReconnect.clear()
-    cancelStallCheck()
-    engineInstance?.stop()
+    reopen.cancelPendingStart()
+    resumeGuard.reset()
+    retireEngine()
     store.updateMedia { $0.currentTime = 0 }
     throttle.reset()
     apply(machine.requestStop())
@@ -117,11 +109,11 @@ final class PlaybackController {
     case .none:
       return
     case .seek(let milliseconds):
+      reopen.keepSeek(milliseconds)
       performSeek(milliseconds)
     case .restartThenSeek(let milliseconds):
-      pendingSeekMs = milliseconds
-      engine.stop()
-      startPlayback()
+      reopen.pendingSeekMs = milliseconds
+      restartPlayback()
     }
   }
 
@@ -131,14 +123,14 @@ final class PlaybackController {
 
   func selectAudioTrack(_ id: Int) {
     guard isActive, TrackList.canSelect(id, in: store.media.tracks.audioTracks) else { return }
-    tracksBeforeReopen = nil
+    reopen.forgetSelection(.audio)
     engine.selectAudioTrack(id)
     refreshReadout()
   }
 
   func selectSubtitleTrack(_ id: Int) {
     guard isActive, TrackList.canSelect(id, in: store.media.tracks.subtitleTracks) else { return }
-    tracksBeforeReopen = nil
+    reopen.forgetSelection(.subtitle)
     engine.selectSubtitleTrack(id)
     refreshReadout()
   }
@@ -153,11 +145,7 @@ final class PlaybackController {
     reload(adding: slave)
   }
 
-  func subtitleStyleDidChange() {
-    reload(adding: nil)
-  }
-
-  func libvlcOptionsDidChange() {
+  func instanceOptionsDidChange() {
     reload(adding: nil)
   }
 
@@ -175,56 +163,46 @@ final class PlaybackController {
   }
 
   private func reload(adding slave: PlaybackSlave?) {
-    guard isActive, engineInstance != nil, currentRequest != nil, machine.status != .error else {
+    guard isActive else { return }
+    switch machine.reloadMode {
+    case .none:
       slave.map(keepAddedSlave)
-      return
-    }
-    guard Self.mediaActiveStatuses.contains(machine.status) else {
+    case .withoutPlaying:
       slave.map(keepAddedSlave)
-      mediaRequest.map { replaceEngine().load($0) }
-      return
+      if engineInstance != nil, let request = mediaRequest {
+        loadOnFreshEngine(request, slaves: [])
+      }
+    case .inPlace:
+      reloadInPlace(adding: slave)
     }
-    if !isReloadingInPlace {
-      captureStateForReopen()
-      isReloadingInPlace = true
-    }
-    if let slave {
-      addedSlaves.append(slave)
-      pendingSlaves.append(slave)
-      if slave.select { trackRestore.forgetAudioSelection() }
-    }
-    guard let request = mediaRequest else { return }
-    let fresh = replaceEngine()
-    bufferingGate.reset()
-    fresh.load(request)
-    reopenSlaves.forEach { _ = fresh.addSlave($0) }
-    audioSession.activate()
-    apply(machine.beginPlayback())
-    engine.play()
   }
 
-  private func captureStateForReopen() {
-    let media = store.media
-    if pendingSeekMs == nil && machine.hasReachedPlaying && media.isSeekable && media.currentTime > 0 {
-      pendingSeekMs = media.currentTime
+  private func reloadInPlace(adding slave: PlaybackSlave?) {
+    reopen.beginReload(
+      media: store.media,
+      hasReachedPlaying: machine.hasReachedPlaying,
+      isPaused: machine.status == .paused,
+      addedSlaves: addedSlaves
+    )
+    if let slave {
+      addedSlaves.append(slave)
+      reopen.add(slave)
     }
-    pausesOnceStarted = pausesOnceStarted || machine.status == .paused
-    let tracks = tracksBeforeReopen.flatMap { TrackList.isStillLoading(media.tracks, comparedTo: $0) ? $0 : nil } ?? media.tracks
-    tracksBeforeReopen = tracks
-    trackRestore = TrackSelectionRestore(capturing: tracks, slaves: addedSlaves)
-    reopenSlaves = trackRestore.reopenSlaves
+    guard let request = mediaRequest else { return }
+    bufferingGate.reset()
+    loadOnFreshEngine(request, slaves: reopen.slaves)
+    play(entering: machine.beginPlayback())
   }
 
   private func attachSlave(_ slave: PlaybackSlave) {
-    let isMediaOpen = Self.mediaActiveStatuses.contains(machine.status)
-    if isMediaOpen && engine.addSlave(slave) {
+    if machine.isMediaActive && engine.addSlave(slave) {
       return
     }
-    pendingSlaves.append(slave)
+    reopen.add(slave)
   }
 
   func snapshot(_ promise: Promise<String>) {
-    guard isActive, let engineInstance, surface.hasHosts, Self.snapshotStatuses.contains(machine.status), store.media.videoSize.isRenderable else {
+    guard isActive, let engineInstance, surface.hasHosts, Self.startedStatuses.contains(machine.status), store.media.videoSize.isRenderable else {
       SnapshotRequests.reject(promise)
       return
     }
@@ -241,7 +219,7 @@ final class PlaybackController {
 
   func applySettings() {
     guard isActive else { return }
-    if Self.mediaActiveStatuses.contains(machine.status) {
+    if machine.isMediaActive {
       engineInstance?.apply(store.settings)
     }
     session.settingsDidChange()
@@ -266,7 +244,7 @@ final class PlaybackController {
   func shutdown() {
     guard !isShutDown else { return }
     isShutDown = true
-    cancelStallCheck()
+    resumeGuard.reset()
     snapshots.rejectAll()
     retireEngine()
     session.shutdown()
@@ -275,59 +253,47 @@ final class PlaybackController {
   }
 
   private func startOrResume() {
-    pausesOnceStarted = false
+    reopen.pausesOnceStarted = false
     switch machine.playAction() {
     case .none:
       return
     case .start:
-      startPlayback()
+      play(entering: machine.beginPlayback())
     case .resume:
-      audioSession.activate()
-      reconnectIfIdleTooLong()
-      engine.play()
-      scheduleStallCheck()
+      resume()
     case .restart:
-      engine.stop()
-      startPlayback()
+      restartPlayback()
     case .reload:
       reloadAndPlay()
     }
   }
 
-  private func reconnectIfIdleTooLong() {
+  private func resume() {
+    audioSession.activate()
     let media = store.media
     let target = ResumeTarget(
       isNetworkSource: currentRequest.map { MediaUri.isNetwork($0.url.absoluteString) } ?? false,
       isLive: media.isLive,
       isSeekable: media.isSeekable
     )
-    guard resumeReconnect.takeReconnect(atMs: Self.nowMs, afterMs: store.settings.reconnectOnResumeAfterMs, target: target) else { return }
-    engine.seek(toMs: media.currentTime)
-  }
-
-  private func scheduleStallCheck() {
-    cancelStallCheck()
-    let delayMs = store.settings.reloadOnStallAfterMs
-    guard delayMs > 0 else { return }
-    stallWatchdog.arm(positionMs: store.media.currentTime)
-    let check = DispatchWorkItem { [weak self] in
-      self?.reloadIfStalled()
+    let plan = resumeGuard.resume(atMs: Self.nowMs, positionMs: media.currentTime, settings: store.settings, target: target)
+    if let reconnectAtMs = plan.reconnectAtMs {
+      engine.seek(toMs: reconnectAtMs)
     }
-    stallCheck = check
-    DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delayMs), execute: check)
+    engine.play()
+    plan.stallCheck.map(scheduleStallCheck)
   }
 
-  private func reloadIfStalled() {
-    stallCheck = nil
-    guard isActive, stallWatchdog.isDue(status: machine.status, positionMs: store.media.currentTime) else { return }
-    stallWatchdog.markFired()
+  private func scheduleStallCheck(_ check: StallCheck) {
+    DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(check.delayMs)) { [weak self] in
+      self?.reloadIfStalled(check.generation)
+    }
+  }
+
+  private func reloadIfStalled(_ generation: Int) {
+    guard isActive,
+          resumeGuard.isStalled(generation: generation, status: machine.status, positionMs: store.media.currentTime) else { return }
     reload(adding: nil)
-  }
-
-  private func cancelStallCheck() {
-    stallCheck?.cancel()
-    stallCheck = nil
-    stallWatchdog.disarm()
   }
 
   private func pauseEngine() {
@@ -341,10 +307,35 @@ final class PlaybackController {
       failInvalidSource()
       return
     }
-    replaceEngine().load(request)
+    loadOnFreshEngine(request, slaves: addedSlaves)
+    play(entering: machine.reloadForRetry())
+  }
+
+  private func restartPlayback() {
+    guard let request = mediaRequest else {
+      failInvalidSource()
+      return
+    }
+    restartOnFreshEngine(request)
+    play(entering: machine.beginPlayback())
+  }
+
+  private func restartOnFreshEngine(_ request: MediaRequest) {
+    reopen.beginRestart(tracks: store.media.tracks, addedSlaves: addedSlaves)
+    loadOnFreshEngine(request, slaves: reopen.slaves)
+  }
+
+  private func play(entering transition: [PlaybackEffect]) {
     audioSession.activate()
-    apply(machine.reloadForRetry())
+    apply(transition)
     engine.play()
+  }
+
+  private func loadOnFreshEngine(_ request: MediaRequest, slaves: [PlaybackSlave]) {
+    let fresh = replaceEngine()
+    fresh.apply(store.settings)
+    fresh.load(request)
+    slaves.forEach { _ = fresh.addSlave($0) }
   }
 
   private func replaceEngine() -> VlcEngine {
@@ -365,30 +356,19 @@ final class PlaybackController {
     apply(machine.failInvalidSource())
   }
 
-  private func startPlayback() {
-    audioSession.activate()
-    apply(machine.beginPlayback())
-    engine.play()
-  }
-
   private func performSeek(_ milliseconds: Int) {
     engine.seek(toMs: milliseconds)
     store.updateMedia { $0.currentTime = milliseconds }
+    resumeGuard.seek(toMs: milliseconds, stallAfterMs: store.settings.reloadOnStallAfterMs).map(scheduleStallCheck)
     throttle.markEmitted(atMs: Self.nowMs)
     store.emit(\.timeUpdate, PlayerPayloads.timeUpdate(store.media))
     session.refresh()
   }
 
   private func resetMediaState() {
-    pendingSeekMs = nil
-    cancelStallCheck()
+    reopen = ReopenState()
+    resumeGuard.reset()
     bufferingGate.reset()
-    pausesOnceStarted = false
-    pendingSlaves.removeAll()
-    reopenSlaves.removeAll()
-    trackRestore = TrackSelectionRestore()
-    isReloadingInPlace = false
-    tracksBeforeReopen = nil
     throttle.reset()
     videoSizeGate.reset()
     surface.container.isHidden = true
@@ -402,19 +382,22 @@ final class PlaybackController {
 
   private func apply(_ effects: [PlaybackEffect]) {
     for effect in effects {
-      if case .error(let failure) = effect {
-        store.updateMedia { $0.error = failure }
+      switch effect {
+      case .status(let status): store.updateMedia { $0.status = status }
+      case .error(let failure): store.updateMedia { $0.error = failure }
+      case .startedPlaying, .loaded, .ended, .restartForLoop: break
       }
     }
     for effect in effects {
       switch effect {
+      case .startedPlaying:
+        didStartPlaying()
       case .status(let status):
-        store.updateMedia { $0.status = status }
-        trackRecovery(for: status)
-        store.emit(\.statusChange, PlayerPayloads.status(status))
+        resumeGuard.statusChanged(status, atMs: Self.nowMs)
         if status == .playing {
-          didEnterPlaying()
+          session.didReachPlaying()
         }
+        store.emit(\.statusChange, PlayerPayloads.status(status))
       case .loaded:
         store.emit(\.loaded, PlayerPayloads.loaded(store.media))
       case .ended:
@@ -422,8 +405,8 @@ final class PlaybackController {
       case .error(let failure):
         store.emit(\.error, PlayerPayloads.error(failure))
       case .restartForLoop:
-        DispatchQueue.main.async { [weak self] in
-          self?.restartForLoop()
+        DispatchQueue.main.async { [weak self, weak endedEngine = engineInstance] in
+          self?.restartForLoop(after: endedEngine)
         }
       }
     }
@@ -431,54 +414,46 @@ final class PlaybackController {
     session.refresh()
   }
 
-  private func trackRecovery(for status: PlayerStatus) {
-    if status == .paused {
-      resumeReconnect.didPause(atMs: Self.nowMs)
-    }
-    if StallWatchdog.ends(at: status) {
-      cancelStallCheck()
-    }
-  }
-
-  private func didEnterPlaying() {
+  private func didStartPlaying() {
     guard let engineInstance else { return }
-    isReloadingInPlace = false
+    reopen.playbackStarted()
     engineInstance.apply(store.settings)
     surface.applyResize(force: true)
     refreshReadout()
-    let slaves = pendingSlaves
-    pendingSlaves.removeAll()
-    slaves.forEach(attachSlave)
-    if pausesOnceStarted && pendingSeekMs == nil {
-      pausesOnceStarted = false
-      engineInstance.pause()
-    }
+    reopen.takeSlavesToAttach().forEach(attachSlave)
+    pauseIfRequestedWhileStarting()
   }
 
   private func applyPendingSeekOnceStarted() {
-    guard let pendingSeekMs, machine.status == .playing, store.media.isSeekable else { return }
-    self.pendingSeekMs = nil
-    performSeek(pendingSeekMs)
-    if pausesOnceStarted {
-      pausesOnceStarted = false
-      engineInstance?.pause()
-    }
+    guard let target = reopen.pendingSeekMs, machine.status == .playing, store.media.isSeekable else { return }
+    reopen.pendingSeekMs = nil
+    performSeek(target)
+    pauseIfRequestedWhileStarting()
   }
 
-  private func restartForLoop() {
-    guard isActive else { return }
-    engineInstance?.restartFromBeginning()
+  private func pauseIfRequestedWhileStarting() {
+    guard reopen.pausesOnceStarted, reopen.pendingSeekMs == nil else { return }
+    reopen.pausesOnceStarted = false
+    engineInstance?.pause()
+  }
+
+  private func restartForLoop(after endedEngine: VlcEngine?) {
+    guard isActive, machine.isRestartingForLoop, let endedEngine, endedEngine === engineInstance,
+          let request = mediaRequest else { return }
+    restartOnFreshEngine(request)
     store.updateMedia { $0.currentTime = 0 }
+    engine.play()
     session.refresh()
   }
 
   private func refreshReadout() {
-    guard let engineInstance, Self.mediaActiveStatuses.contains(machine.status), !machine.isRestartingForLoop else { return }
+    guard let engineInstance, machine.isMediaActive, !machine.isRestartingForLoop else { return }
     let readout = engineInstance.readout
     let hasReachedPlaying = machine.hasReachedPlaying
+    let acceptsLengthAndSeekable = hasReachedPlaying && engineInstance.hasPlayed && Self.startedStatuses.contains(machine.status)
     store.updateMedia { media in
       media.currentTime = max(readout.timeMs, 0)
-      if hasReachedPlaying {
+      if acceptsLengthAndSeekable {
         media.duration = VlcContract.duration(fromEngineLength: readout.lengthMs)
         media.isSeekable = readout.isSeekable
       }
@@ -501,15 +476,12 @@ final class PlaybackController {
   }
 
   private func restoreTrackSelection(_ tracks: TracksSnapshot) {
-    if let before = tracksBeforeReopen, !TrackList.isStillLoading(tracks, comparedTo: before) {
-      tracksBeforeReopen = nil
+    let restored = reopen.tracksArrived(tracks, isPlaying: machine.status == .playing)
+    if let audio = restored.audio {
+      engineInstance?.selectAudioTrack(audio)
     }
-    guard let engineInstance, machine.status == .playing else { return }
-    if let id = trackRestore.takeAudioTrack(from: tracks.audioTracks), id != tracks.selectedAudioTrack {
-      engineInstance.selectAudioTrack(id)
-    }
-    if let id = trackRestore.takeSubtitleTrack(from: tracks.subtitleTracks), id != tracks.selectedSubtitleTrack {
-      engineInstance.selectSubtitleTrack(id)
+    if let subtitle = restored.subtitle {
+      engineInstance?.selectSubtitleTrack(subtitle)
     }
   }
 
@@ -547,7 +519,7 @@ extension PlaybackController: VlcEngineDelegate {
   }
 
   func engineDidReportBuffering(percent: Float) {
-    guard isActive, Self.mediaActiveStatuses.contains(machine.status),
+    guard isActive, machine.isMediaActive,
           let rounded = VlcContract.bufferingPercent(fromEngineCache: percent),
           bufferingGate.shouldEmit(rounded) else { return }
     store.emit(\.buffering, PlayerPayloads.buffering(rounded))
@@ -560,7 +532,7 @@ extension PlaybackController: MediaSessionControl {
     if machine.canPause {
       pauseEngine()
     } else if machine.status == .opening {
-      pausesOnceStarted = true
+      reopen.pausesOnceStarted = true
     }
   }
 

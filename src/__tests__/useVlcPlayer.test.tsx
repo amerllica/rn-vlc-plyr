@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { StrictMode } from 'react';
 import { renderHook } from '@testing-library/react-native';
 import { useVlcPlayer } from '../useVlcPlayer';
 import { createdPlayers } from '../__mocks__/react-native-nitro-modules';
@@ -13,6 +14,9 @@ const lastPlayer = (): FakePlayer => {
   }
   return player;
 };
+
+const sourceAssignments = (): string[] =>
+  lastPlayer().calls.filter((call) => call.startsWith('source:'));
 
 describe('useVlcPlayer', () => {
   beforeEach(() => {
@@ -54,10 +58,15 @@ describe('useVlcPlayer', () => {
     );
     await rerender({});
 
-    const sourceAssignments = lastPlayer().calls.filter((call) =>
-      call.startsWith('source:')
+    expect(sourceAssignments()).toHaveLength(1);
+  });
+
+  it('does not reassign a source whose keys are in another order', async () => {
+    await renderHook(() =>
+      useVlcPlayer({ title: 'Episode', uri: 'https://example.com/a.mp4' })
     );
-    expect(sourceAssignments).toHaveLength(1);
+
+    expect(sourceAssignments()).toHaveLength(1);
   });
 
   it('clears the source when it becomes null', async () => {
@@ -69,6 +78,18 @@ describe('useVlcPlayer', () => {
     await rerender({ uri: null });
 
     expect(result.current.source).toBeUndefined();
+  });
+
+  it('replaces the player that StrictMode released', async () => {
+    const { result } = await renderHook(
+      () => useVlcPlayer('https://example.com/a.mp4'),
+      { wrapper: StrictMode }
+    );
+
+    const player = result.current as FakePlayer;
+    expect(player.released).toBe(false);
+    expect(player.source).toEqual({ uri: 'https://example.com/a.mp4' });
+    expect(createdPlayers.some((created) => created.released)).toBe(true);
   });
 
   it('releases the player on unmount', async () => {

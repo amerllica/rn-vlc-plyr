@@ -14,6 +14,7 @@ import type {
   VlcVideoSize,
   VlcVolumeInfo,
 } from '../specs/VlcPlayer.nitro';
+import { SOURCE_FIELDS } from '../sourceFields';
 
 type Listener<T> = (value: T) => void;
 
@@ -83,7 +84,12 @@ export class FakePlayer implements VlcPlayer {
 
   set source(value: VlcSource | undefined) {
     this.calls.push(`source:${value?.uri ?? 'none'}`);
-    this.currentSource = value;
+    this.currentSource =
+      value &&
+      SOURCE_FIELDS.reduce<VlcSource>(
+        (inSpecOrder, field) => ({ ...inSpecOrder, [field]: value[field] }),
+        { uri: value.uri }
+      );
   }
 
   setStatus(status: VlcStatus) {

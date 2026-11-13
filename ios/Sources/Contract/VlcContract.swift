@@ -7,6 +7,8 @@ enum VlcContract {
   static let delayRange = -60_000...60_000
   static let skipIntervalRange = 1000...60_000
   static let microsecondsPerMillisecond = 1000
+  static let millisecondsPerSecond = 1000.0
+  private static let seekLimitWithoutDuration = Double(Int.max / 2)
 
   static func clampVolume(_ value: Double) -> Int? {
     roundedClamp(value, to: volumeRange)
@@ -55,8 +57,12 @@ enum VlcContract {
 
   static func clampSeekTarget(_ value: Double, duration: Int) -> Int? {
     guard !value.isNaN else { return nil }
-    let upperBound = duration > 0 ? Double(duration) : Double(Int.max / 2)
+    let upperBound = duration > 0 ? Double(duration) : seekLimitWithoutDuration
     return Int(min(max(jsRound(value), 0), upperBound))
+  }
+
+  static func trackId(_ value: Double) -> Int? {
+    Int(exactly: value.rounded(.towardZero))
   }
 
   static func duration(fromEngineLength length: Int) -> Int {

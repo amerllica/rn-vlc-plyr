@@ -4,10 +4,10 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
+import com.margelo.nitro.rnvlcplyr.LOG_TAG
 
 object PlaybackServiceSetup {
   const val SERVICE_CLASS_NAME = "com.margelo.nitro.rnvlcplyr.VlcPlaybackService"
-  private const val TAG = "RnVlcPlyr"
   private const val MISSING_SETUP_WARNING =
     "rn-vlc-plyr: staysActiveInBackground needs the $SERVICE_CLASS_NAME service declared in AndroidManifest.xml " +
       "with android:foregroundServiceType=\"mediaPlayback\". " +
@@ -29,7 +29,7 @@ object PlaybackServiceSetup {
       hasWarned = true
       first
     }
-    if (isFirstWarning) Log.w(TAG, MISSING_SETUP_WARNING)
+    if (isFirstWarning) Log.w(LOG_TAG, MISSING_SETUP_WARNING)
   }
 
   private fun queryDeclared(context: Context): Boolean = try {

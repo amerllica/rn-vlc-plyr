@@ -80,6 +80,19 @@ final class TrackSelectionRestoreTests: XCTestCase {
     XCTAssertEqual(restore.takeSubtitleTrack(from: before.subtitleTracks), 3)
   }
 
+  func testForgettingTheSubtitleSelectionKeepsTheAudioSelection() {
+    let before = TracksSnapshot(
+      audioTracks: [TrackInfo(id: 1, name: "en"), TrackInfo(id: 2, name: "fr")],
+      subtitleTracks: [TrackInfo(id: 3, name: "en")],
+      selectedAudioTrack: 2,
+      selectedSubtitleTrack: 3
+    )
+    var restore = TrackSelectionRestore(capturing: before, slaves: [])
+    restore.forgetSubtitleSelection()
+    XCTAssertNil(restore.takeSubtitleTrack(from: before.subtitleTracks))
+    XCTAssertEqual(restore.takeAudioTrack(from: before.audioTracks), 2)
+  }
+
   func testReopenSlavesSelectOnlyTheSelectedExternalOfEachKind() {
     let before = TracksSnapshot(
       audioTracks: [TrackInfo(id: 1, name: "en"), TrackInfo(id: 2, name: "a.m4a"), TrackInfo(id: 3, name: "b.m4a")],

@@ -1,5 +1,10 @@
 package com.margelo.nitro.rnvlcplyr.contract
 
+data class ResumeTarget(val isNetworkSource: Boolean, val isLive: Boolean, val isSeekable: Boolean) {
+  val canReconnect: Boolean
+    get() = isNetworkSource && !isLive && isSeekable
+}
+
 class ResumeReconnect {
   private var pausedAtMs: Long? = null
 
@@ -11,8 +16,8 @@ class ResumeReconnect {
     pausedAtMs = null
   }
 
-  fun shouldReconnect(nowMs: Long, limitMs: Long, isNetworkSource: Boolean, isLive: Boolean, isSeekable: Boolean): Boolean {
+  fun shouldReconnect(nowMs: Long, limitMs: Long, target: ResumeTarget): Boolean {
     val pausedAt = pausedAtMs ?: return false
-    return limitMs > 0L && isNetworkSource && !isLive && isSeekable && nowMs - pausedAt >= limitMs
+    return limitMs > 0L && target.canReconnect && nowMs - pausedAt >= limitMs
   }
 }

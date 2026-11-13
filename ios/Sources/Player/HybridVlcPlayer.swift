@@ -146,11 +146,13 @@ final class HybridVlcPlayer: HybridVlcPlayerSpec {
   }
 
   func setAudioTrack(id: Double) throws {
-    onMain { $0.selectAudioTrack(Int(id)) }
+    guard let trackId = VlcContract.trackId(id) else { return }
+    onMain { $0.selectAudioTrack(trackId) }
   }
 
   func setSubtitleTrack(id: Double) throws {
-    onMain { $0.selectSubtitleTrack(Int(id)) }
+    guard let trackId = VlcContract.trackId(id) else { return }
+    onMain { $0.selectSubtitleTrack(trackId) }
   }
 
   func addAudio(uri: String, select: Bool) throws {
@@ -272,10 +274,8 @@ final class HybridVlcPlayer: HybridVlcPlayerSpec {
     if change.before.volumeState != change.after.volumeState {
       store.emit(\.volumeChange, PlayerPayloads.volume(change.after.volumeState))
     }
-    if change.before.subtitleStyle != change.after.subtitleStyle {
-      onMain { $0.subtitleStyleDidChange() }
-    } else if change.before.libvlcOptions != change.after.libvlcOptions {
-      onMain { $0.libvlcOptionsDidChange() }
+    if change.before.subtitleStyle != change.after.subtitleStyle || change.before.libvlcOptions != change.after.libvlcOptions {
+      onMain { $0.instanceOptionsDidChange() }
     }
     onMain { $0.applySettings() }
   }

@@ -8,12 +8,13 @@ import android.os.SystemClock
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import com.margelo.nitro.rnvlcplyr.LOG_TAG
 import com.margelo.nitro.rnvlcplyr.R
 import com.margelo.nitro.rnvlcplyr.contract.MediaSessionPlayback
 import com.margelo.nitro.rnvlcplyr.contract.RemoteCommand
 
 class MediaSessionBridge(context: Context, private val dispatch: RemoteCommandSink) {
-  private val session = MediaSessionCompat(context, SESSION_TAG)
+  private val session = MediaSessionCompat(context, LOG_TAG)
 
   val token: MediaSessionCompat.Token
     get() = session.sessionToken
@@ -106,9 +107,8 @@ class MediaSessionBridge(context: Context, private val dispatch: RemoteCommandSi
     const val SKIP_BACKWARD_ACTION = "rn-vlc-plyr.skipBackward"
     const val SKIP_FORWARD_ACTION = "rn-vlc-plyr.skipForward"
     const val NO_POSITION = 0L
-    private const val SESSION_TAG = "RnVlcPlyr"
-    private const val SKIP_BACKWARD_LABEL = "Skip back"
-    private const val SKIP_FORWARD_LABEL = "Skip forward"
+    const val SKIP_BACKWARD_LABEL = "Skip back"
+    const val SKIP_FORWARD_LABEL = "Skip forward"
     private const val NO_ACTION = 0L
   }
 }

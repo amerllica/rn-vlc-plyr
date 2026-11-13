@@ -2,7 +2,6 @@ package com.margelo.nitro.rnvlcplyr.session
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.media.AudioManager
 import com.margelo.nitro.rnvlcplyr.VlcNowPlaying
 import com.margelo.nitro.rnvlcplyr.VlcStatus
 import com.margelo.nitro.rnvlcplyr.contract.BackgroundEffect
@@ -33,7 +32,9 @@ class MediaSessionCoordinator(context: Context, private val host: SessionHost) {
   fun refresh() = onMain { publish() }
 
   fun onStatusChanged() = onMain {
-    focus.listenForNoisy(host.sessionSnapshot().status.isActive)
+    val snapshot = host.sessionSnapshot()
+    focus.listenForNoisy(snapshot.status.isActive)
+    if (snapshot.status == VlcStatus.PLAYING && snapshot.sessionState.isActive) MediaSessionOwner.claim(this)
     publish()
   }
 
@@ -93,10 +94,8 @@ class MediaSessionCoordinator(context: Context, private val host: SessionHost) {
     val nowPlaying = snapshot.nowPlaying
     resetArtworkIfNowPlayingChanged(nowPlaying)
     if (!state.isActive || nowPlaying == null) return giveUp()
-    if (!MediaSessionOwner.isOwner(this)) {
-      if (snapshot.status != VlcStatus.PLAYING) return
-      MediaSessionOwner.claim(this)
-    }
+    if (snapshot.status == VlcStatus.PLAYING) MediaSessionOwner.claimIfFree(this)
+    if (!MediaSessionOwner.isOwner(this)) return
     val content = SessionContent(
       state = state,
       nowPlaying = nowPlaying,
@@ -125,13 +124,7 @@ class MediaSessionCoordinator(context: Context, private val host: SessionHost) {
   }
 
   private fun onFocusChange(change: Int) = onMain {
-    val effect = when (change) {
-      AudioManager.AUDIOFOCUS_LOSS -> interruption.lostPermanently(isPlayerActive())
-      AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> interruption.began(isPlayerActive())
-      AudioManager.AUDIOFOCUS_GAIN -> interruption.ended(shouldResume = true)
-      else -> null
-    }
-    applyInterruption(effect)
+    applyInterruption(focusChangeOf(change)?.let { interruption.focusChanged(it, isPlayerActive()) })
   }
 
   private fun onBecomingNoisy() = onMain { applyInterruption(interruption.becameNoisy(isPlayerActive())) }

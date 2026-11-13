@@ -136,6 +136,84 @@ class PlaybackStateMachineTest {
   }
 
   @Test
+  fun playAfterStoppingAnInvalidSourceReloadsIt() {
+    playThrough()
+    machine.rejectInvalidSource()
+    machine.stop()
+    assertEquals(VlcStatus.STOPPED, machine.status)
+    assertEquals(PlayAction.RELOAD, machine.resolvePlay())
+  }
+
+  @Test
+  fun invalidSourceWhileInErrorEmitsNothing() {
+    machine.rejectInvalidSource()
+    assertEquals(emptyList<PlaybackEffect>(), machine.rejectInvalidSource())
+    assertEquals(VlcStatus.ERROR, machine.status)
+  }
+
+  @Test
+  fun reopenGoesBackToOpeningAndKeepsTheLoadedFlag() {
+    playThrough()
+    assertEquals(listOf(status(VlcStatus.OPENING)), machine.reopen())
+    assertTrue(machine.hasReachedPlaying)
+    assertEquals(listOf(status(VlcStatus.PLAYING)), machine.onEngineEvent(EngineEvent.PLAYING, true))
+  }
+
+  @Test
+  fun reopenEndsALoopRestart() {
+    looping = true
+    playThrough()
+    machine.onEngineEvent(EngineEvent.END_REACHED, false)
+    machine.reopen()
+    assertEquals(listOf(status(VlcStatus.BUFFERING)), machine.onEngineEvent(EngineEvent.BUFFERING, false))
+  }
+
+  @Test
+  fun stopWorksFromEndedAndFromError() {
+    playThrough()
+    machine.onEngineEvent(EngineEvent.END_REACHED, false)
+    assertEquals(listOf(status(VlcStatus.STOPPED)), machine.stop())
+    machine.onEngineEvent(EngineEvent.ERROR, false)
+    assertEquals(VlcStatus.ERROR, machine.status)
+    assertEquals(listOf(status(VlcStatus.STOPPED)), machine.stop())
+  }
+
+  @Test
+  fun anErrorDuringALoopRestartFailsAndEndsTheRestart() {
+    looping = true
+    playThrough()
+    machine.onEngineEvent(EngineEvent.END_REACHED, false)
+    assertEquals(
+      listOf(status(VlcStatus.ERROR), PlaybackEffect.Failed(VlcContract.MEDIA_ERROR)),
+      machine.onEngineEvent(EngineEvent.ERROR, false)
+    )
+    assertFalse(machine.acceptsMediaInfo())
+  }
+
+  @Test
+  fun theLoadedFlagNeedsTheFirstPlaying() {
+    machine.begin(URI, autoPlay = false)
+    assertFalse(machine.hasReachedPlaying)
+    machine.onEngineEvent(EngineEvent.PLAYING, true)
+    assertTrue(machine.hasReachedPlaying)
+  }
+
+  @Test
+  fun reloadModeFollowsTheSubtitleStyleReloadRules() {
+    assertEquals(ReloadMode.NONE, machine.reloadMode())
+    machine.begin(URI, autoPlay = false)
+    assertEquals(ReloadMode.WITHOUT_PLAYING, machine.reloadMode())
+    playThrough()
+    assertEquals(ReloadMode.IN_PLACE, machine.reloadMode())
+    machine.onEngineEvent(EngineEvent.PAUSED, false)
+    assertEquals(ReloadMode.IN_PLACE, machine.reloadMode())
+    machine.stop()
+    assertEquals(ReloadMode.WITHOUT_PLAYING, machine.reloadMode())
+    machine.onEngineEvent(EngineEvent.ERROR, false)
+    assertEquals(ReloadMode.NONE, machine.reloadMode())
+  }
+
+  @Test
   fun clearReturnsToIdleAndIgnoresLateEngineEvents() {
     playThrough()
     assertEquals(listOf(status(VlcStatus.IDLE)), machine.clear())

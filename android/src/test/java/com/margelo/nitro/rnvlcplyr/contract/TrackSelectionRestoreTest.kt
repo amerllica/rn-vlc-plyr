@@ -78,6 +78,15 @@ class TrackSelectionRestoreTest {
   }
 
   @Test
+  fun forgettingTheSubtitleSelectionKeepsTheAudioSelection() {
+    val before = VlcTracksInfo(arrayOf(track(1, "en"), track(2, "fr")), arrayOf(track(3, "en")), 2.0, 3.0)
+    val restore = TrackSelectionRestore.capture(before, emptyList())
+    restore.forgetSubtitleSelection()
+    assertNull(restore.takeSubtitleTrack(before.subtitleTracks))
+    assertEquals(2, restore.takeAudioTrack(before.audioTracks))
+  }
+
+  @Test
   fun reopenSlavesSelectOnlyTheSelectedExternalOfEachKind() {
     val before = VlcTracksInfo(
       arrayOf(track(1, "en"), track(2, "a.m4a"), track(3, "b.m4a")),

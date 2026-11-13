@@ -59,6 +59,10 @@ class HybridVlcPlayerView(private val context: ThemedReactContext) : HybridVlcPl
     videoLayout = createVideoLayout()
   }
 
+  override fun onPlayerReleased() {
+    detachFromPlayer()
+  }
+
   private fun syncPlayer() {
     val target = player as? HybridVlcPlayer
     if (target === attachedPlayer) {

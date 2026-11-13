@@ -44,7 +44,7 @@ Native clamps every input. The getter returns the clamped value immediately afte
 | `timeUpdateInterval` | round, clamp 50–5000 ms |
 | `subtitleDelay`, `audioDelay` | round, clamp −60000–60000 ms. Engine takes microseconds: multiply by 1000 |
 | `remoteSkipInterval` | round, clamp 1000–60000 ms |
-| `reconnectOnResumeAfterMs`, `reloadOnStallAfterMs` | round; `NaN` and negative become 0. `0` turns the feature off |
+| `reconnectOnResumeAfterMs`, `reloadOnStallAfterMs` | round; `NaN`, infinite and negative values become 0. Capped at 2147483647. `0` turns the feature off |
 | `libvlcOptions` | each entry trimmed, empty entries dropped, order kept |
 | `subtitleStyle.fontScale` | round, clamp 25–400 %. Engine size: `--freetype-rel-fontsize=round(1600 / fontScale)` |
 | `subtitleStyle.shadowDistance` | clamp 0–1 |
@@ -70,9 +70,11 @@ re-applied to the engine each time a new media reaches `playing`.
   selections to defaults, and emits `statusChange('opening')` when playback starts.
 - `uri` that is empty or has no scheme and is not an absolute path → `status 'error'`,
   `error { code: 'invalidSource', message: 'Invalid source uri' }`. An absolute path is treated as
-  `file://`.
+  `file://` and percent-encoded, so a path may hold spaces, `#` and `%`. Characters outside ASCII
+  stay as they are.
 - `userAgent` → `:http-user-agent=…`, `referrer` → `:http-referrer=…`, `vlcOptions` are passed as
-  media options verbatim, in that order.
+  media options verbatim, in that order. Carriage returns and line feeds are removed from
+  `userAgent` and `referrer`.
 - `autoPlay true` → playback starts at once. `autoPlay false` → media is prepared, status stays
   `'idle'` until `play()`.
 - `source = undefined` → engine stops, media is released, all media state resets to defaults,
@@ -86,7 +88,9 @@ Status values: `idle`, `opening`, `buffering`, `playing`, `paused`, `stopped`, `
 - Engine "opening" → `opening`.
 - Engine "buffering" → `buffering` only when the engine is not playing and the status is not
   `paused`. Otherwise buffering signals are ignored. This removes the VLC 3 buffering flicker and
-  keeps a paused player paused while it seeks.
+  keeps a paused player paused while it seeks. iOS also ignores a buffering signal while the status
+  is `playing`, so on iOS the status leaves `playing` only through `paused`, `ended`, `stopped`,
+  `error` or a reload.
 - Engine "playing" → `playing`.
 - Engine "paused" → `paused`.
 - The engine "stopped" signal is ignored. VLC sends it after the end of media and on source
@@ -99,14 +103,14 @@ Status values: `idle`, `opening`, `buffering`, `playing`, `paused`, `stopped`, `
 
 | Command | Rule |
 |---|---|
-| `play()` | no source → no-op. `ended` or `stopped` → restart from 0. `error` → reload the source and play. Otherwise resume |
+| `play()` | no source → no-op. An invalid source → `error` with `invalidSource` again, from every status. `ended` or `stopped` → restart from 0. `error` → reload the source and play; audio and subtitles added with `addAudio` and `addSubtitle` are added again. Otherwise resume |
 | `pause()` | only when `playing` or `buffering`; otherwise no-op |
 | `stop()` | engine stop, `currentTime` 0, status `stopped`. Works from every status except `idle`, including `ended` and `error` |
 | `seek(ms)` | no-op unless `isSeekable`. In `ended` or `stopped`: restart playback, then seek. Emits one `timeUpdate` right after the seek with the target time |
-| `setAudioTrack(id)` / `setSubtitleTrack(id)` | `-1` disables. Unknown id → no-op. A real change emits `tracksChange` |
-| `addAudio(uri, select)` | no source → throws `Error('addAudio requires a source')` (Nitro prefixes synchronous errors with `VlcPlayer.addAudio(...): `). Otherwise adds an audio slave; the new track arrives through `tracksChange` after the embedded audio tracks. `select` true selects it once it appears. The file should hold one audio track and be as long as the media. The first added audio file reloads the media in place, as a subtitle style change does: status goes through `opening`, `loaded` is not emitted again, and the position, pause state and track choices are kept. From then on the media opens with `:demux=avformat`, so it keeps playing while an added track is selected and the video track is off (background audio, `:no-video`, an audio-only source, an Android video layout change). On Android, a fresh player (`loop`, `play()` after `stop()` or the end) keeps the track in the list but VLC selects the first audio track again |
+| `setAudioTrack(id)` / `setSubtitleTrack(id)` | `-1` disables. Unknown id → no-op. `NaN` or an infinite id → no-op. A fraction is cut off. A real change emits `tracksChange` |
+| `addAudio(uri, select)` | no source → throws `Error('addAudio requires a source')` (Nitro prefixes synchronous errors with `VlcPlayer.addAudio(...): `). Otherwise adds an audio slave; the new track arrives through `tracksChange` after the embedded audio tracks. `select` true selects it once it appears. The file should hold one audio track and be as long as the media. The first added audio file reloads the media in place, as a subtitle style change does: status goes through `opening`, `loaded` is not emitted again, and the position, pause state and track choices are kept. From then on the media opens with `:demux=avformat`, so it keeps playing while an added track is selected and the video track is off (background audio, `:no-video`, an audio-only source, an Android video layout change). A fresh player (`loop`, `play()` after `stop()` or the end) keeps the track in the list. iOS keeps it selected; on Android VLC selects the first audio track again |
 | `addSubtitle(uri, select)` | no source → throws `Error('addSubtitle requires a source')` (Nitro prefixes synchronous errors with `VlcPlayer.addSubtitle(...): `). Otherwise adds a subtitle slave; the new track arrives through `tracksChange`. `select` true selects it once it appears. On Android, a fresh player (`loop`, `play()` after `stop()` or the end) adds the file again and selects it, also when the app chose another subtitle track or added it with `select` false |
-| `snapshot()` | resolves with a `file://` URI of a PNG of the current frame at video resolution. Rejects with `Error('No video frame available')` when no view is attached or nothing has rendered |
+| `snapshot()` | resolves with a `file://` URI of a PNG of the current frame at video resolution. Rejects with `Error('No video frame available')` when no view is attached, nothing has rendered or the player is released before the capture starts. The app owns the file of a resolved snapshot. iOS deletes the file of a rejected one |
 | `release()` | idempotent. Stops, detaches all views, frees the engine. Afterwards every command is a no-op, getters return defaults, no event fires. `dispose()` calls `release()` |
 
 ## Events
@@ -115,7 +119,7 @@ Status values: `idle`, `opening`, `buffering`, `playing`, `paused`, `stopped`, `
 |---|---|---|
 | `statusChange` | every status transition | new status |
 | `timeUpdate` | while `playing`, at most every `timeUpdateInterval` ms; once after each seek; once with 0 on `stop()` | `{ currentTime, duration }` |
-| `loaded` | once per source, right after the first `statusChange('playing')` of that source | `{ duration, isSeekable, isLive, videoSize, audioTracks, subtitleTracks }` |
+| `loaded` | once per source, right after the first `statusChange('playing')` of that source. The first `tracksChange` and `videoSizeChange` of the source come before that `statusChange` | `{ duration, isSeekable, isLive, videoSize, audioTracks, subtitleTracks }` |
 | `ended` | media ended and `loop` is false, right after `statusChange('ended')` | none |
 | `error` | right after `statusChange('error')` | `{ code, message }` |
 | `volumeChange` | when `volume` or `muted` actually changes | `{ volume, muted }` |
@@ -174,6 +178,10 @@ Messages are fixed strings so they match across OSes: `Invalid source uri`,
 - No options → the player uses the shared libVLC instance. Any option → the player owns a private
   instance, created when the options change and released with the player or the next change.
 - A change to a different list follows the subtitle style reload rules below.
+- When libVLC rejects the options, for example an unknown `libvlcOptions` entry, the player uses
+  the shared instance and native logs
+  `rn-vlc-plyr: libVLC rejected the instance options, so the player uses the shared instance`. The
+  `libvlcOptions` getter still returns the list. It never throws.
 
 ## Resume and stalls
 
@@ -189,7 +197,9 @@ Messages are fixed strings so they match across OSes: `Invalid source uri`,
   has not moved past the position at the resume. VLC can report `playing` while it still waits on
   the network. A stall reloads the media in place once, with the subtitle style reload rules below.
   `idle`, `opening`, `paused`, `stopped`, `ended`, `error`, a new source, `stop()` and `release()`
-  cancel the check.
+  cancel the check. A seek while the check waits starts the wait again from the seek target, so a
+  seek backwards is not taken for a stall. VLC can need more than one second to continue after a
+  seek, so a value below about 3000 ms can reload a healthy stream after a seek.
 
 ## Subtitle style
 
@@ -219,6 +229,8 @@ The style becomes libVLC instance options. Order and format are identical on bot
     restored by position in the track list. Added tracks are taken to be the last ones in their
     list, so a selected embedded track is restored once the embedded tracks are back, and a
     selected added track once the added tracks are back too. `loaded` is not emitted again.
+    A `seek`, `setAudioTrack` or `setSubtitleTrack` made during the reload wins over the restored
+    position or track.
   - `idle`, `stopped` or `ended`: the engine is rebuilt without playing, so the next `play()` uses
     the style.
   - `error` or no source: nothing happens until the next load.
@@ -233,6 +245,10 @@ The style becomes libVLC instance options. Order and format are identical on bot
   `stretch` fills and distorts, `original` shows native pixels centred without scaling.
 - `surfaceType` (Android only, default `texture`): `texture` composes like a normal view (clipping,
   rounded corners, transforms); `surface` uses a SurfaceView. iOS ignores it.
+- `keepScreenOn` (default `true`): the view keeps the screen on while its player is `opening`,
+  `buffering` or `playing`. `false` lets the screen sleep.
+- `release()` on the player detaches every attached view, so no view keeps the screen on for a
+  released player.
 - Background is black.
 
 ## Audio session (iOS)
@@ -295,8 +311,10 @@ not block playback.
 - The session is active while `nowPlaying` is set **and** a source is set. `source.title` does not
   create a session. `nowPlaying = undefined`, `source = undefined` and `release()` clear it.
 - The OS has one Now Playing slot. A player becomes the owner when it reaches `playing` with an
-  active session. When the owner's session becomes inactive, the system entry is cleared. Remote
-  commands go to the owner only.
+  active session, or when its session becomes active while it plays and no player owns the slot.
+  A seek, a loop or a rate change of another playing player does not take the slot back. When the
+  owner's session becomes inactive, the system entry is cleared. Remote commands go to the owner
+  only.
 
 | Status | Session playback state |
 |---|---|
@@ -323,11 +341,14 @@ not block playback.
   `http://` works only when the app allows cleartext traffic (an iOS App Transport Security
   exception, Android `usesCleartextTraffic`).
 - Artwork loads off the main thread. A load succeeds only with an HTTP 2xx reply, after redirects,
-  whose body decodes as an image. It is downscaled to 512 px on the long side. Connect and read each
+  whose body decodes as an image. Redirects are followed for up to five hops, also from `http` to
+  `https`. A redirect from `https` to `http`, or to any other scheme, fails. A file or a reply over 10 MB (10 × 1024 × 1024
+  bytes) fails with the reason `too large`. iOS does not keep the reply in the shared URL cache. It is downscaled to 512 px on the long side. Connect and read each
   time out after 10 s.
 - A failed load is retried after 1 s, 3 s and 9 s, four attempts in all. After the last failure the
   URI is marked failed and native logs one warning:
-  `rn-vlc-plyr: artwork could not be loaded from <uri>: <reason>`. Changing `nowPlaying` to a different
+  `rn-vlc-plyr: artwork could not be loaded from <uri>: <reason>`. `<uri>` is the artwork uri cut
+  before the first `?` or `#` and without `user:password@`. Changing `nowPlaying` to a different
   value starts a new set of attempts. To retry the same value, set `nowPlaying` to `undefined`, then
   back.
 - The last loaded image is cached per process, keyed by URI. Until the image arrives, the system entry

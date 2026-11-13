@@ -16,6 +16,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.media.app.NotificationCompat.MediaStyle
+import com.margelo.nitro.rnvlcplyr.LOG_TAG
 import com.margelo.nitro.rnvlcplyr.R
 import com.margelo.nitro.rnvlcplyr.VlcAndroidNotification
 import com.margelo.nitro.rnvlcplyr.contract.RemoteCommand
@@ -58,7 +59,7 @@ class PlaybackNotification(private val context: Context, private val dispatch: R
     try {
       manager.notify(NOTIFICATION_ID, notification)
     } catch (denied: SecurityException) {
-      Log.w(TAG, "rn-vlc-plyr: the playback notification could not be posted", denied)
+      Log.w(LOG_TAG, "rn-vlc-plyr: the playback notification could not be posted", denied)
     }
   }
 
@@ -71,10 +72,10 @@ class PlaybackNotification(private val context: Context, private val dispatch: R
     val commands = content.state.commands
     return listOfNotNull(
       if (RemoteCommand.PREVIOUS in commands) legacyAction(RemoteCommand.PREVIOUS, R.drawable.rn_vlc_plyr_previous, "Previous") else null,
-      if (RemoteCommand.SKIP_BACKWARD in commands) legacyAction(RemoteCommand.SKIP_BACKWARD, R.drawable.rn_vlc_plyr_skip_backward, "Skip back") else null,
+      if (RemoteCommand.SKIP_BACKWARD in commands) legacyAction(RemoteCommand.SKIP_BACKWARD, R.drawable.rn_vlc_plyr_skip_backward, MediaSessionBridge.SKIP_BACKWARD_LABEL) else null,
       if (content.isPlaying) legacyAction(RemoteCommand.TOGGLE_PLAY_PAUSE, R.drawable.rn_vlc_plyr_pause, "Pause")
       else legacyAction(RemoteCommand.TOGGLE_PLAY_PAUSE, R.drawable.rn_vlc_plyr_play, "Play"),
-      if (RemoteCommand.SKIP_FORWARD in commands) legacyAction(RemoteCommand.SKIP_FORWARD, R.drawable.rn_vlc_plyr_skip_forward, "Skip forward") else null,
+      if (RemoteCommand.SKIP_FORWARD in commands) legacyAction(RemoteCommand.SKIP_FORWARD, R.drawable.rn_vlc_plyr_skip_forward, MediaSessionBridge.SKIP_FORWARD_LABEL) else null,
       if (RemoteCommand.NEXT in commands) legacyAction(RemoteCommand.NEXT, R.drawable.rn_vlc_plyr_next, "Next") else null
     )
   }
@@ -100,7 +101,6 @@ class PlaybackNotification(private val context: Context, private val dispatch: R
     const val NOTIFICATION_ID = 0x564C43
     const val CHANNEL_ID = "rn_vlc_plyr_playback"
     private const val CHANNEL_NAME = "Playback"
-    private const val TAG = "RnVlcPlyr"
     private const val ACTION_REMOTE_COMMAND = "com.margelo.nitro.rnvlcplyr.REMOTE_COMMAND"
     private const val EXTRA_COMMAND = "command"
     private const val CONTENT_REQUEST_CODE = 0
