@@ -141,7 +141,7 @@ final class ArtworkLoader {
   private func giveUp(_ load: Load, _ failure: ArtworkFailure) {
     current = nil
     failed.insert(load.uri)
-    log("rn-vlc-plyr: artwork could not be loaded from \(load.uri): \(failure.reason)")
+    log("rn-vlc-plyr: artwork could not be loaded from \(MediaUri.redacted(load.uri)): \(failure.reason)")
     onLoad()
   }
 

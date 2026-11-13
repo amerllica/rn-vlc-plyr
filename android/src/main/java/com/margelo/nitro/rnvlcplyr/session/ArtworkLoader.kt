@@ -7,6 +7,8 @@ import android.net.Uri
 import android.util.Log
 import com.margelo.nitro.rnvlcplyr.contract.ArtworkRedirect
 import com.margelo.nitro.rnvlcplyr.contract.ArtworkRetrySchedule
+import com.margelo.nitro.rnvlcplyr.contract.VlcContract
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileNotFoundException
 import java.net.HttpURLConnection
@@ -81,7 +83,7 @@ class ArtworkLoader(private val schedule: ArtworkScheduler = defaultScheduler())
       failed += uri
       cycles.remove(uri)?.waiters.orEmpty()
     }
-    Log.w(TAG, "$TAG: artwork could not be loaded from $uri: $reason")
+    Log.w(TAG, "rn-vlc-plyr: artwork could not be loaded from ${VlcContract.redactUri(uri)}: $reason")
     waiters.forEach { it() }
   }
 
@@ -146,7 +148,7 @@ class ArtworkLoader(private val schedule: ArtworkScheduler = defaultScheduler())
   }
 
   companion object {
-    private const val TAG = "rn-vlc-plyr"
+    private const val TAG = "RnVlcPlyr"
     private const val MAX_SIDE_PX = 512
     private const val TIMEOUT_MS = 10_000
     private const val THREAD_NAME = "rn-vlc-plyr-artwork"
