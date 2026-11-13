@@ -4,6 +4,7 @@ const {
   PLAYBACK_SERVICE,
   withBackgroundAudioMode,
   withPlaybackManifest,
+  withRnVlcPlyr,
 } = require('../mutators');
 
 const names = (entries) => entries.map((entry) => entry.$['android:name']);
@@ -84,6 +85,33 @@ describe('withPlaybackManifest', () => {
       PLAYBACK_PERMISSIONS
     );
     expect(names(twice.manifest.application[0].service)).toEqual([
+      PLAYBACK_SERVICE,
+    ]);
+  });
+});
+
+describe('withRnVlcPlyr', () => {
+  const runOn = (modResults) => (config, mutate) => ({
+    ...config,
+    mods: [...(config.mods ?? []), mutate({ modResults }).modResults],
+  });
+
+  it('applies the plist change, then the manifest change', () => {
+    const result = withRnVlcPlyr(
+      { name: 'app' },
+      {
+        withInfoPlist: runOn({}),
+        withAndroidManifest: runOn(emptyManifest()),
+      }
+    );
+
+    const [plist, manifest] = result.mods;
+    expect(result.name).toBe('app');
+    expect(plist).toEqual({ UIBackgroundModes: ['audio'] });
+    expect(names(manifest.manifest['uses-permission'])).toEqual(
+      PLAYBACK_PERMISSIONS
+    );
+    expect(names(manifest.manifest.application[0].service)).toEqual([
       PLAYBACK_SERVICE,
     ]);
   });

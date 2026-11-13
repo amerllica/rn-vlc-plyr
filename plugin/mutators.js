@@ -51,10 +51,21 @@ const withPlaybackManifest = (androidManifest) => {
   };
 };
 
+const withRnVlcPlyr = (config, { withAndroidManifest, withInfoPlist }) => {
+  const withIos = withInfoPlist(config, (mod) => {
+    mod.modResults = withBackgroundAudioMode(mod.modResults);
+    return mod;
+  });
+  return withAndroidManifest(withIos, (mod) => {
+    mod.modResults = withPlaybackManifest(mod.modResults);
+    return mod;
+  });
+};
+
 module.exports = {
-  BACKGROUND_AUDIO_MODE,
   PLAYBACK_PERMISSIONS,
   PLAYBACK_SERVICE,
   withBackgroundAudioMode,
   withPlaybackManifest,
+  withRnVlcPlyr,
 };
