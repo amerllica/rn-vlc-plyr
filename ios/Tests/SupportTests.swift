@@ -57,8 +57,6 @@ final class SurfaceStackTests: XCTestCase {
 }
 
 final class ListenerRegistryTests: XCTestCase {
-  private static let playerEventCount = 11
-
   func testEmitsInOrderAndRemoveIsIdempotent() throws {
     let player = HybridVlcPlayer()
     defer { try? player.release() }
@@ -101,17 +99,15 @@ final class ListenerRegistryTests: XCTestCase {
     XCTAssertEqual(presence, [false])
   }
 
-  func testPlayerEventsRemoveAllEmptiesEveryRegistry() {
+  func testPlayerEventsRemoveAllEmptiesTheRegistries() {
     let events = PlayerEvents()
     _ = events.statusChange.add { _ in }
     _ = events.buffering.add { _ in }
     _ = events.videoSizeChange.add { _ in }
-    XCTAssertEqual(events.registries.count, Self.playerEventCount)
-    XCTAssertEqual(events.registries.map(\.count).reduce(0, +), 3)
 
     events.removeAll()
 
-    XCTAssertEqual(events.registries.map(\.count).reduce(0, +), 0)
+    XCTAssertEqual([events.statusChange.count, events.buffering.count, events.videoSizeChange.count], [0, 0, 0])
   }
 
   func testListenerMayRemoveItselfWhileEmitting() throws {

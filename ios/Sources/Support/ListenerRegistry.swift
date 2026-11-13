@@ -1,12 +1,6 @@
 import Foundation
 
-protocol AnyListenerRegistry: AnyObject {
-  var count: Int { get }
-
-  func removeAll()
-}
-
-final class ListenerRegistry<Payload>: AnyListenerRegistry {
+final class ListenerRegistry<Payload> {
   typealias Listener = (Payload) -> Void
   typealias PresenceHandler = (Bool) -> Void
 
