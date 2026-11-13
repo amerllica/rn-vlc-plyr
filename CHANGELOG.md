@@ -6,6 +6,8 @@ All notable changes to rn-vlc-plyr. The format follows
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-13
+
 ### Highlights
 
 A bug-fix and hardening release. A review of the whole library found two crashes, a set of playback
@@ -301,7 +303,8 @@ same on iOS and Android.
 - Releases are published only by GitHub Actions on a version tag, with npm trusted publishing and
   provenance. See [ADR 0012](docs/adr/0012-release-pipeline.md).
 
-[Unreleased]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/amerllica/rn-vlc-plyr/compare/v1.1.0...v1.2.0
