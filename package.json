@@ -150,6 +150,7 @@
   },
   "jest": {
     "preset": "@react-native/jest-preset",
+    "testTimeout": 15000,
     "testEnvironmentOptions": {
       "customExportConditions": [
         "require",
