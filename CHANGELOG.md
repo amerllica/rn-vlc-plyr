@@ -6,6 +6,13 @@ All notable changes to rn-vlc-plyr. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- iOS: `setAudioTrack` and `setSubtitleTrack` no longer crash the app on `NaN` or an infinite id.
+  Both platforms ignore such an id.
+- A `libvlcOptions` entry that libVLC rejects no longer crashes the app. The player logs a warning
+  and uses the shared libVLC instance.
+
 ## [1.4.0] - 2026-11-09
 
 ### Added

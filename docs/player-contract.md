@@ -103,7 +103,7 @@ Status values: `idle`, `opening`, `buffering`, `playing`, `paused`, `stopped`, `
 | `pause()` | only when `playing` or `buffering`; otherwise no-op |
 | `stop()` | engine stop, `currentTime` 0, status `stopped`. Works from every status except `idle`, including `ended` and `error` |
 | `seek(ms)` | no-op unless `isSeekable`. In `ended` or `stopped`: restart playback, then seek. Emits one `timeUpdate` right after the seek with the target time |
-| `setAudioTrack(id)` / `setSubtitleTrack(id)` | `-1` disables. Unknown id → no-op. A real change emits `tracksChange` |
+| `setAudioTrack(id)` / `setSubtitleTrack(id)` | `-1` disables. Unknown id → no-op. `NaN` or an infinite id → no-op. A fraction is cut off. A real change emits `tracksChange` |
 | `addAudio(uri, select)` | no source → throws `Error('addAudio requires a source')` (Nitro prefixes synchronous errors with `VlcPlayer.addAudio(...): `). Otherwise adds an audio slave; the new track arrives through `tracksChange` after the embedded audio tracks. `select` true selects it once it appears. The file should hold one audio track and be as long as the media. The first added audio file reloads the media in place, as a subtitle style change does: status goes through `opening`, `loaded` is not emitted again, and the position, pause state and track choices are kept. From then on the media opens with `:demux=avformat`, so it keeps playing while an added track is selected and the video track is off (background audio, `:no-video`, an audio-only source, an Android video layout change). On Android, a fresh player (`loop`, `play()` after `stop()` or the end) keeps the track in the list but VLC selects the first audio track again |
 | `addSubtitle(uri, select)` | no source → throws `Error('addSubtitle requires a source')` (Nitro prefixes synchronous errors with `VlcPlayer.addSubtitle(...): `). Otherwise adds a subtitle slave; the new track arrives through `tracksChange`. `select` true selects it once it appears. On Android, a fresh player (`loop`, `play()` after `stop()` or the end) adds the file again and selects it, also when the app chose another subtitle track or added it with `select` false |
 | `snapshot()` | resolves with a `file://` URI of a PNG of the current frame at video resolution. Rejects with `Error('No video frame available')` when no view is attached or nothing has rendered |
@@ -174,6 +174,10 @@ Messages are fixed strings so they match across OSes: `Invalid source uri`,
 - No options → the player uses the shared libVLC instance. Any option → the player owns a private
   instance, created when the options change and released with the player or the next change.
 - A change to a different list follows the subtitle style reload rules below.
+- When libVLC rejects the options, for example an unknown `libvlcOptions` entry, the player uses
+  the shared instance and native logs
+  `rn-vlc-plyr: libVLC rejected the instance options, so the player uses the shared instance`. The
+  `libvlcOptions` getter still returns the list. It never throws.
 
 ## Resume and stalls
 
