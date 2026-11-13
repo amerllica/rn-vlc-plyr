@@ -23,7 +23,7 @@ final class SnapshotRequests {
 
   func engineDidFinishRequest(path: String, succeeded: Bool) {
     guard succeeded || Self.isWritten(path) else {
-      pending.removeValue(forKey: path).map(Self.reject)
+      pending.removeValue(forKey: path).map { fail($0, path: path) }
       return
     }
     if Self.isWritten(path) {
@@ -36,9 +36,9 @@ final class SnapshotRequests {
   }
 
   func rejectAll() {
-    let promises = pending.values
+    let failed = pending
     pending.removeAll()
-    promises.forEach(Self.reject)
+    failed.forEach { path, promise in fail(promise, path: path) }
   }
 
   private func finish(path: String) {
@@ -46,8 +46,13 @@ final class SnapshotRequests {
     if Self.isWritten(path) {
       promise.resolve(withResult: URL(fileURLWithPath: path).absoluteString)
     } else {
-      Self.reject(promise)
+      fail(promise, path: path)
     }
+  }
+
+  private func fail(_ promise: Promise<String>, path: String) {
+    try? FileManager.default.removeItem(atPath: path)
+    Self.reject(promise)
   }
 
   private static func isWritten(_ path: String) -> Bool {
