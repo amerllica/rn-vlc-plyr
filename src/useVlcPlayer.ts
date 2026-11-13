@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { NitroModules } from 'react-native-nitro-modules';
+import { sourceValues } from './sourceFields';
 import type { VlcPlayer, VlcSource } from './specs/VlcPlayer.nitro';
 
 export type VlcSourceInput = VlcSource | string | null | undefined;
@@ -14,15 +15,7 @@ const toSource = (input: VlcSourceInput): VlcSource | undefined => {
 };
 
 const sourceKey = (source: VlcSource | undefined): string =>
-  source === undefined
-    ? ''
-    : JSON.stringify([
-        source.uri,
-        source.userAgent,
-        source.referrer,
-        source.vlcOptions,
-        source.title,
-      ]);
+  source === undefined ? '' : JSON.stringify(sourceValues(source));
 
 export function createVlcPlayer(
   source?: VlcSourceInput,
