@@ -12,7 +12,7 @@ final class ExternalAudioTests: PlayerTestCase {
     try waitUntilExternalAudioIsSelected("external audio selected")
   }
 
-  func testAddedAudioStaysInTheTrackListAfterStopAndPlay() throws {
+  func testAddedAudioStaysListedAndSelectedAfterStopAndPlay() throws {
     try playVideoWithAudio()
     try player.addAudio(uri: audioFixtureUri, select: true)
     try waitUntilExternalAudioIsSelected("external audio selected")
@@ -25,9 +25,10 @@ final class ExternalAudioTests: PlayerTestCase {
     try waitForStatus(.playing)
 
     try waitForExternalAudioInTheTrackList("external audio listed after stop and play")
+    try waitUntilExternalAudioIsSelected("external audio selected again after stop and play")
   }
 
-  func testAddedAudioStaysInTheTrackListAfterALoop() throws {
+  func testAddedAudioStaysListedAndSelectedAfterALoop() throws {
     player.loop = true
     try playVideoWithAudio()
     try player.addAudio(uri: audioFixtureUri, select: true)
@@ -45,6 +46,7 @@ final class ExternalAudioTests: PlayerTestCase {
     try waitForTimeUpdates(Self.settledTimeUpdates)
 
     try waitForExternalAudioInTheTrackList("external audio listed after the loop")
+    try waitUntilExternalAudioIsSelected("external audio selected again after the loop")
   }
 
   func testSubtitleStyleChangeWhilePlayingKeepsExternalAudioSelected() throws {

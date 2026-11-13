@@ -13,6 +13,7 @@ final class PlaybackController {
   private var audioSession = PlaybackAudioSession()
   private let snapshots = SnapshotRequests()
   private var engineInstance: VlcEngine?
+  private var vlcInstance: VlcInstance?
   private var currentRequest: MediaRequest?
   private var pendingSeekMs: Int?
   private var pendingSlaves: [PlaybackSlave] = []
@@ -41,14 +42,19 @@ final class PlaybackController {
 
   private var engine: VlcEngine {
     if let engineInstance { return engineInstance }
-    let settings = store.settings
-    let created = VlcEngine(
-      drawable: surface.container,
-      libraryOptions: VlcContract.instanceOptions(libvlcOptions: settings.libvlcOptions, subtitleStyle: settings.subtitleStyle)
-    )
+    let created = VlcEngine(drawable: surface.container, instance: currentVlcInstance())
     created.delegate = self
     engineInstance = created
     surface.engine = created
+    return created
+  }
+
+  private func currentVlcInstance() -> VlcInstance {
+    let settings = store.settings
+    let options = VlcContract.instanceOptions(libvlcOptions: settings.libvlcOptions, subtitleStyle: settings.subtitleStyle)
+    if let vlcInstance, vlcInstance.options == options { return vlcInstance }
+    let created = VlcInstance(options: options)
+    vlcInstance = created
     return created
   }
 
@@ -347,13 +353,19 @@ final class PlaybackController {
       failInvalidSource()
       return
     }
-    loadOnFreshEngine(request, slaves: addedSlaves)
-    pendingSlaves.removeAll()
+    restartOnFreshEngine(request)
     startPlayback()
+  }
+
+  private func restartOnFreshEngine(_ request: MediaRequest) {
+    trackRestore = TrackSelectionRestore(capturing: store.media.tracks, slaves: addedSlaves)
+    loadOnFreshEngine(request, slaves: trackRestore.reopenSlaves)
+    pendingSlaves.removeAll()
   }
 
   private func loadOnFreshEngine(_ request: MediaRequest, slaves: [PlaybackSlave]) {
     let fresh = replaceEngine()
+    fresh.apply(store.settings)
     fresh.load(request)
     slaves.forEach { _ = fresh.addSlave($0) }
   }
@@ -484,7 +496,7 @@ final class PlaybackController {
   private func restartForLoop(after endedEngine: VlcEngine?) {
     guard isActive, machine.isRestartingForLoop, let endedEngine, endedEngine === engineInstance,
           let request = mediaRequest else { return }
-    loadOnFreshEngine(request, slaves: addedSlaves)
+    restartOnFreshEngine(request)
     store.updateMedia { $0.currentTime = 0 }
     engine.play()
     session.refresh()
