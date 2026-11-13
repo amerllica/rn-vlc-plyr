@@ -14,7 +14,15 @@ const toSource = (input: VlcSourceInput): VlcSource | undefined => {
 };
 
 const sourceKey = (source: VlcSource | undefined): string =>
-  source === undefined ? '' : JSON.stringify(source);
+  source === undefined
+    ? ''
+    : JSON.stringify([
+        source.uri,
+        source.userAgent,
+        source.referrer,
+        source.vlcOptions,
+        source.title,
+      ]);
 
 export function createVlcPlayer(
   source?: VlcSourceInput,

@@ -83,7 +83,13 @@ export class FakePlayer implements VlcPlayer {
 
   set source(value: VlcSource | undefined) {
     this.calls.push(`source:${value?.uri ?? 'none'}`);
-    this.currentSource = value;
+    this.currentSource = value && {
+      uri: value.uri,
+      userAgent: value.userAgent,
+      referrer: value.referrer,
+      vlcOptions: value.vlcOptions,
+      title: value.title,
+    };
   }
 
   setStatus(status: VlcStatus) {

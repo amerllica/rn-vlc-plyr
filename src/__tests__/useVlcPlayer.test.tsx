@@ -14,6 +14,9 @@ const lastPlayer = (): FakePlayer => {
   return player;
 };
 
+const sourceAssignments = (): string[] =>
+  lastPlayer().calls.filter((call) => call.startsWith('source:'));
+
 describe('useVlcPlayer', () => {
   beforeEach(() => {
     createdPlayers.length = 0;
@@ -54,10 +57,15 @@ describe('useVlcPlayer', () => {
     );
     await rerender({});
 
-    const sourceAssignments = lastPlayer().calls.filter((call) =>
-      call.startsWith('source:')
+    expect(sourceAssignments()).toHaveLength(1);
+  });
+
+  it('does not reassign a source whose keys are in another order', async () => {
+    await renderHook(() =>
+      useVlcPlayer({ title: 'Episode', uri: 'https://example.com/a.mp4' })
     );
-    expect(sourceAssignments).toHaveLength(1);
+
+    expect(sourceAssignments()).toHaveLength(1);
   });
 
   it('clears the source when it becomes null', async () => {
