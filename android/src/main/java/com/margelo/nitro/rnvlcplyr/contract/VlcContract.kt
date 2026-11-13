@@ -33,7 +33,7 @@ object VlcContract {
   private const val FILE_SCHEME = "file"
   private const val NO_AUTHORITY = ""
   private const val KEEP_SCHEME = "$1"
-  private val USER_INFO = Regex("^([A-Za-z][A-Za-z0-9+.-]*://)[^/@]*@")
+  private val USER_INFO = Regex("^([A-Za-z][A-Za-z0-9+.-]*://)[^/]*@")
   private const val USER_AGENT_OPTION = ":http-user-agent="
   private const val REFERRER_OPTION = ":http-referrer="
 
@@ -86,7 +86,7 @@ object VlcContract {
   fun durationFromEngine(lengthMs: Long): Long = if (lengthMs <= 0) 0L else lengthMs
 
   fun resolveMediaUri(uri: String): String? = when {
-    uri.startsWith("/") -> URI(FILE_SCHEME, NO_AUTHORITY, uri, null).toASCIIString()
+    uri.startsWith("/") -> URI(FILE_SCHEME, NO_AUTHORITY, uri, null).toString()
     schemeOf(uri) != null -> uri
     else -> null
   }
@@ -100,7 +100,7 @@ object VlcContract {
   }
 
   fun redactUri(uri: String): String =
-    uri.substringBefore('?').substringBefore('#').replace(USER_INFO, KEEP_SCHEME)
+    uri.replace(USER_INFO, KEEP_SCHEME).substringBefore('?').substringBefore('#')
 
   private fun withoutLineBreaks(value: String): String = value.filterNot { it == '\r' || it == '\n' }
 

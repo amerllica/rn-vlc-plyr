@@ -90,6 +90,11 @@ class VlcContractTest {
   }
 
   @Test
+  fun absolutePathKeepsNonAsciiCharactersAsTheyAre() {
+    assertEquals("file:///sdcard/cafe\u0301 \uD55C.mp4".replace(" ", "%20"), VlcContract.resolveMediaUri("/sdcard/cafe\u0301 \uD55C.mp4"))
+  }
+
+  @Test
   fun emptyOrSchemelessRelativeUriIsInvalid() {
     assertNull(VlcContract.resolveMediaUri(""))
     assertNull(VlcContract.resolveMediaUri("video.mp4"))
@@ -122,6 +127,8 @@ class VlcContractTest {
     assertEquals("file:///covers/a.png", VlcContract.redactUri("file:///covers/a.png"))
     assertEquals("content://media/external/images/1", VlcContract.redactUri("content://media/external/images/1"))
     assertEquals("not a uri", VlcContract.redactUri("not a uri?x=1"))
+    assertEquals("https://host/a.jpg", VlcContract.redactUri("https://user:p@ss@host/a.jpg"))
+    assertEquals("https://host/a.jpg", VlcContract.redactUri("https://user:p?s#s@host/a.jpg?token=1"))
   }
 
   @Test

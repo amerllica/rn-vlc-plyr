@@ -33,7 +33,7 @@ enum MediaUri {
   static let networkSchemes: Set<String> = ["http", "https", "rtsp", "rtmp", "rtp", "udp", "mms", "ftp", "smb"]
 
   private static let uriCharacters = CharacterSet.urlQueryAllowed.union(CharacterSet(charactersIn: "#%[]"))
-  private static let userInfoPattern = "^([A-Za-z][A-Za-z0-9+.-]*://)[^/@]*@"
+  private static let userInfoPattern = "^([A-Za-z][A-Za-z0-9+.-]*://)[^/]*@"
   private static let schemePattern = try? NSRegularExpression(pattern: "^[A-Za-z][A-Za-z0-9+.-]*:")
 
   static func resolve(_ uri: String) -> URL? {
@@ -45,8 +45,10 @@ enum MediaUri {
   }
 
   static func redacted(_ uri: String) -> String {
-    String(uri.prefix { $0 != "?" && $0 != "#" })
-      .replacingOccurrences(of: userInfoPattern, with: "$1", options: .regularExpression)
+    String(
+      uri.replacingOccurrences(of: userInfoPattern, with: "$1", options: .regularExpression)
+        .prefix { $0 != "?" && $0 != "#" }
+    )
   }
 
   static func scheme(of uri: String) -> String? {

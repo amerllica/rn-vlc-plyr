@@ -42,6 +42,8 @@ final class MediaRequestTests: XCTestCase {
     XCTAssertEqual(MediaUri.redacted("https://user:secret@host:8080/art/cover.png?token=abc#top"), "https://host:8080/art/cover.png")
     XCTAssertEqual(MediaUri.redacted("file:///covers/a.png"), "file:///covers/a.png")
     XCTAssertEqual(MediaUri.redacted("not a uri?x=1"), "not a uri")
+    XCTAssertEqual(MediaUri.redacted("https://user:p@ss@host/a.jpg"), "https://host/a.jpg")
+    XCTAssertEqual(MediaUri.redacted("https://user:p?s#s@host/a.jpg?token=1"), "https://host/a.jpg")
   }
 
   func testAddedAudioAppendsTheReaderOptionOnce() {
