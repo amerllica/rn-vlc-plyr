@@ -14,17 +14,17 @@
         "ORG_GRADLE_PROJECT_newArchEnabled"
       ],
       "inputs": [
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/nitro.json",
+        "$TURBO_ROOT$/android/**",
+        "!$TURBO_ROOT$/android/build/**",
+        "$TURBO_ROOT$/src/**/*.ts",
+        "$TURBO_ROOT$/src/**/*.tsx",
         "package.json",
-        "nitro.json",
-        "android",
-        "!android/build",
-        "src/**/*.ts",
-        "src/**/*.tsx",
-        "example/package.json",
-        "example/android",
-        "!example/android/.gradle",
-        "!example/android/build",
-        "!example/android/app/build"
+        "android/**",
+        "!android/.gradle/**",
+        "!android/build/**",
+        "!android/app/build/**"
       ],
       "outputs": []
     },
@@ -36,16 +36,16 @@
         "RCT_USE_PREBUILT_RNCORE"
       ],
       "inputs": [
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/nitro.json",
+        "$TURBO_ROOT$/*.podspec",
+        "$TURBO_ROOT$/ios/**",
+        "$TURBO_ROOT$/src/**/*.ts",
+        "$TURBO_ROOT$/src/**/*.tsx",
         "package.json",
-        "nitro.json",
-        "*.podspec",
-        "ios",
-        "src/**/*.ts",
-        "src/**/*.tsx",
-        "example/package.json",
-        "example/ios",
-        "!example/ios/build",
-        "!example/ios/Pods"
+        "ios/**",
+        "!ios/build/**",
+        "!ios/Pods/**"
       ],
       "outputs": []
     }
