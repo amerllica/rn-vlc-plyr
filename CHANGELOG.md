@@ -31,6 +31,13 @@ All notable changes to rn-vlc-plyr. The format follows
 - Android: `snapshot()` rejects when `release()` runs first. The promise never settled.
 - Android: `play()` after an error keeps the audio and subtitles added with `addAudio` and
   `addSubtitle`.
+- With two players that both play, a seek, a loop or a rate change of the first no longer takes the
+  lock screen and the remote commands back from the second.
+- Android: artwork loads through a redirect from `http` to `https`.
+- Android: a player whose shutdown hangs on a bad network no longer blocks the shutdown of later
+  players, so an old stream cannot keep playing under a new one.
+- iOS 16: a `uri` with a space, for example `https://host/my clip.mp4`, plays. It failed with
+  `invalidSource`.
 - `useVlcPlayerStatus` keeps one native listener. It no longer adds and removes one on every render.
 
 ## [1.4.0] - 2026-11-09

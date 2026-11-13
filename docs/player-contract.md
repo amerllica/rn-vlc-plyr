@@ -306,8 +306,10 @@ not block playback.
 - The session is active while `nowPlaying` is set **and** a source is set. `source.title` does not
   create a session. `nowPlaying = undefined`, `source = undefined` and `release()` clear it.
 - The OS has one Now Playing slot. A player becomes the owner when it reaches `playing` with an
-  active session. When the owner's session becomes inactive, the system entry is cleared. Remote
-  commands go to the owner only.
+  active session, or when its session becomes active while it plays and no player owns the slot.
+  A seek, a loop or a rate change of another playing player does not take the slot back. When the
+  owner's session becomes inactive, the system entry is cleared. Remote commands go to the owner
+  only.
 
 | Status | Session playback state |
 |---|---|
@@ -334,7 +336,8 @@ not block playback.
   `http://` works only when the app allows cleartext traffic (an iOS App Transport Security
   exception, Android `usesCleartextTraffic`).
 - Artwork loads off the main thread. A load succeeds only with an HTTP 2xx reply, after redirects,
-  whose body decodes as an image. It is downscaled to 512 px on the long side. Connect and read each
+  whose body decodes as an image. Redirects are followed for up to five hops, also from `http` to
+  `https`. A redirect to any other scheme fails. It is downscaled to 512 px on the long side. Connect and read each
   time out after 10 s.
 - A failed load is retried after 1 s, 3 s and 9 s, four attempts in all. After the last failure the
   URI is marked failed and native logs one warning:
