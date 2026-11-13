@@ -350,7 +350,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     media = MediaState()
     pendingSeekMs = null
     pendingSessionPause = false
-    reopenSlaves = emptyList()
+    reopenSlaves = addedSlaves.toList()
     reopenSlavesAtMs = null
     trackRestore = TrackSelectionRestore.none()
     reloadingInPlace = false
@@ -372,7 +372,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
         media = media.copy(error = VlcContract.INVALID_SOURCE_ERROR)
       }
       else -> {
-        val options = VlcContract.mediaOptions(value, hasAddedAudio = false)
+        val options = VlcContract.mediaOptions(value, hasAddedAudio)
         add { engine.load(resolvedUri, options) }
         applyEffects(machine.begin(resolvedUri, playNow))
         if (playNow) add { engine.play() }
