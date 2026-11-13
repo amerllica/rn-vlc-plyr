@@ -354,6 +354,14 @@ class PlayerControllerTest {
     assertEquals(1, loaded.size)
   }
 
+  @Test
+  fun rejectedLibvlcOptionKeepsThePlayerUsable() {
+    controller.setLibvlcOptions(listOf(REJECTED_INSTANCE_OPTION))
+    controller.setSource(localSource())
+    awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
+    assertTrue(errors.isEmpty())
+  }
+
   private fun subtitleStyle(
     fontScale: Double? = null,
     color: String? = null,
@@ -396,6 +404,7 @@ class PlayerControllerTest {
     const val RELEASE_OBSERVATION_MS = 1000L
     const val SEEK_TARGET_MS = 1000L
     const val POSITION_TOLERANCE_MS = 300L
+    const val REJECTED_INSTANCE_OPTION = "--no-such-libvlc-option"
     val YELLOW_SUBTITLES = VlcSubtitleStyle(
       fontFamily = null,
       fontScale = 150.0,

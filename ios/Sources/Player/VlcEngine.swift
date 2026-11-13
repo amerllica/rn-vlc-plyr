@@ -20,6 +20,7 @@ final class VlcEngine: NSObject, VLCMediaPlayerDelegate {
   private static let retirementQueue = DispatchQueue(label: "rn-vlc-plyr.engine-retirement")
   private static let retirementGracePeriod: TimeInterval = 1
   private static let noTrack: Int32 = -1
+  private static let rejectedOptionsWarning = "rn-vlc-plyr: libVLC rejected the instance options, so the player uses the shared instance"
 
   weak var delegate: VlcEngineDelegate?
   private let player: VLCMediaPlayer
@@ -27,7 +28,7 @@ final class VlcEngine: NSObject, VLCMediaPlayerDelegate {
   private var bufferingObserver: VlcBufferingObserver?
 
   init(drawable: UIView, libraryOptions: [String]) {
-    player = libraryOptions.isEmpty ? VLCMediaPlayer() : VLCMediaPlayer(options: libraryOptions)
+    player = Self.makePlayer(libraryOptions: libraryOptions)
     super.init()
     player.delegate = self
     player.drawable = drawable
@@ -38,6 +39,16 @@ final class VlcEngine: NSObject, VLCMediaPlayerDelegate {
 
   deinit {
     bufferingObserver?.stop()
+  }
+
+  private static func makePlayer(libraryOptions: [String]) -> VLCMediaPlayer {
+    guard !libraryOptions.isEmpty else { return VLCMediaPlayer() }
+    let library = VLCLibrary(options: libraryOptions)
+    guard library.instance != nil else {
+      NSLog("%@", rejectedOptionsWarning)
+      return VLCMediaPlayer()
+    }
+    return VLCMediaPlayer(library: library)
   }
 
   func load(_ request: MediaRequest) {
