@@ -43,6 +43,8 @@ final class PlayerIntegrationTests: XCTestCase {
   private static let backgroundPlaySeconds: TimeInterval = 3
   private static let nowPlayingTitle = "Two seconds"
 
+  private static let trackIdBeyondIntRange = 1e300
+  private static let rejectedInstanceOption = "--no-such-libvlc-option"
   private static let lateSeekMs = 1500.0
   private static let restyleSeekMs = 1000.0
   private static let restylePositionTolerance = 300.0
@@ -373,6 +375,31 @@ final class PlayerIntegrationTests: XCTestCase {
     XCTAssertEqual(player.remoteSkipInterval, 15_001)
     player.remoteSkipInterval = .nan
     XCTAssertEqual(player.remoteSkipInterval, 15_001)
+  }
+
+  func testTrackIdsOutsideTheIntegerRangeAreIgnored() throws {
+    try player.setAudioTrack(id: .nan)
+    try player.setAudioTrack(id: .infinity)
+    try player.setSubtitleTrack(id: -.infinity)
+    try player.setSubtitleTrack(id: Self.trackIdBeyondIntRange)
+    let drained = expectation(description: "main queue drained")
+    DispatchQueue.main.async { drained.fulfill() }
+    wait(for: [drained], timeout: Self.engineTimeout)
+
+    XCTAssertEqual(player.status, .idle)
+  }
+
+  func testRejectedLibvlcOptionKeepsThePlayerUsable() throws {
+    let playing = expectation(description: "playing")
+    playing.assertForOverFulfill = false
+    subscriptions.append(try player.addOnStatusChangeListener { status in
+      if status == .playing { playing.fulfill() }
+    })
+    player.libvlcOptions = [Self.rejectedInstanceOption]
+    player.source = fixtureSource
+    wait(for: [playing], timeout: Self.engineTimeout)
+
+    XCTAssertNil(player.error)
   }
 
   func testAndroidNotificationIsStoredAndReturned() {
