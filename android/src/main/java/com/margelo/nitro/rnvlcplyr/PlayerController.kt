@@ -288,15 +288,12 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     }
   }
 
-  fun captureSnapshot(onResult: (Result<String>) -> Unit) {
-    if (locked { released }) return onResult(Result.failure(VlcPlayerError(NO_FRAME_MESSAGE)))
-    onMain {
-      val output = outputs.top
-      val size = locked { media.videoSize }
-      if (output == null || !MediaState.isRenderableSize(size.width.toInt(), size.height.toInt())) {
-        onResult(Result.failure(VlcPlayerError(NO_FRAME_MESSAGE)))
-        return@onMain
-      }
+  fun captureSnapshot(onResult: (Result<String>) -> Unit) = MainThread.run {
+    val output = outputs.top
+    val size = locked { media.videoSize }
+    if (isReleased || output == null || !MediaState.isRenderableSize(size.width.toInt(), size.height.toInt())) {
+      onResult(Result.failure(VlcPlayerError(NO_FRAME_MESSAGE)))
+    } else {
       SnapshotCapture.capture(context, output, size, onResult)
     }
   }
