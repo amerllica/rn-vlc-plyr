@@ -16,7 +16,6 @@ Pod::Spec.new do |s|
   s.source_files = [
     "ios/Sources/**/*.{swift}",
     "ios/Sources/**/*.{m,mm}",
-    "cpp/**/*.{hpp,cpp}",
     "ios/Sources/**/*.h",
   ]
   s.public_header_files = ["ios/Sources/ObjC/*.h"]
