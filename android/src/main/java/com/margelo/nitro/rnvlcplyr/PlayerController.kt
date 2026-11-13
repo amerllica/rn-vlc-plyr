@@ -439,25 +439,17 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     throttle.markEmitted(SystemClock.elapsedRealtime())
     val update = media.timeUpdate
     if (requiresRestart) {
-      if (reloadingInPlace || pendingSeekMs != null) pendingSeekMs = target
       pendingSeekMs = target
       add { engine.restart() }
     } else {
+      if (reloadingInPlace || pendingSeekMs != null) pendingSeekMs = target
       add { engine.setTime(target) }
     }
+    restartStallCheck(target)
     add { events.timeUpdate.emit(update) }
     add(session::refresh)
   }
 
-  private fun onEngineEvent(event: MediaPlayer.Event) {
-    when (event.type) {
-      MediaPlayer.Event.Opening -> onStatusEvent(EngineEvent.OPENING)
-      MediaPlayer.Event.Buffering -> onBuffering(event.buffering)
-    restartStallCheck(target)
-      MediaPlayer.Event.Playing -> onPlaying()
-      MediaPlayer.Event.Paused -> onStatusEvent(EngineEvent.PAUSED)
-      MediaPlayer.Event.Stopped -> onStatusEvent(EngineEvent.STOPPED)
-      MediaPlayer.Event.EndReached -> onStatusEvent(EngineEvent.END_REACHED)
   private fun Outbox.restartStallCheck(positionMs: Long) {
     if (!watchdog.isArmed) return
     val delayMs = settings.reloadOnStallAfterMs
@@ -466,6 +458,14 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     add { MainThread.postDelayed(delayMs) { onMain { checkStall(generation) } } }
   }
 
+  private fun onEngineEvent(event: MediaPlayer.Event) {
+    when (event.type) {
+      MediaPlayer.Event.Opening -> onStatusEvent(EngineEvent.OPENING)
+      MediaPlayer.Event.Buffering -> onBuffering(event.buffering)
+      MediaPlayer.Event.Playing -> onPlaying()
+      MediaPlayer.Event.Paused -> onStatusEvent(EngineEvent.PAUSED)
+      MediaPlayer.Event.Stopped -> onStatusEvent(EngineEvent.STOPPED)
+      MediaPlayer.Event.EndReached -> onStatusEvent(EngineEvent.END_REACHED)
       MediaPlayer.Event.EncounteredError -> onStatusEvent(EngineEvent.ERROR)
       MediaPlayer.Event.TimeChanged -> onTimeChanged(event.timeChanged)
       MediaPlayer.Event.LengthChanged -> onLengthChanged(event.lengthChanged)
@@ -556,12 +556,14 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   }
 
   private fun onLengthChanged(lengthMs: Long) = mutate {
-    if (media.hasReachedPlaying && machine.isPlaybackActive()) media = media.copy(durationMs = VlcContract.durationFromEngine(lengthMs))
+    if (acceptsLengthAndSeekable()) media = media.copy(durationMs = VlcContract.durationFromEngine(lengthMs))
   }
 
   private fun onSeekableChanged(seekable: Boolean) = mutate {
-    if (media.hasReachedPlaying && machine.isPlaybackActive()) media = media.copy(isSeekable = seekable)
+    if (acceptsLengthAndSeekable()) media = media.copy(isSeekable = seekable)
   }
+
+  private fun acceptsLengthAndSeekable(): Boolean = media.hasReachedPlaying && machine.status in TIME_TRACKING_STATUSES
 
   private fun refreshMediaInfo() {
     val info = engine.readMediaInfo() ?: return

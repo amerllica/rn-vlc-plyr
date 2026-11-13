@@ -3,7 +3,7 @@ import UIKit
 
 final class PlaybackController {
   private static let snapshotQueue = DispatchQueue(label: "rn-vlc-plyr.snapshot")
-  private static let snapshotStatuses: Set<PlayerStatus> = [.buffering, .playing, .paused]
+  private static let startedStatuses: Set<PlayerStatus> = [.buffering, .playing, .paused]
   private static let mediaActiveStatuses: Set<PlayerStatus> = [.opening, .buffering, .playing, .paused]
 
   private let store: PlayerStore
@@ -27,6 +27,7 @@ final class PlaybackController {
   private var stallWatchdog = StallWatchdog()
   private var stallCheck: DispatchWorkItem?
   private var bufferingGate = ChangeGate<Int>()
+  private var engineHasPlayed = false
   private var isShutDown = false
   private lazy var surface = VideoSurface()
   private lazy var session = MediaSessionCoordinator(store: store, control: self)
@@ -229,7 +230,7 @@ final class PlaybackController {
   }
 
   func snapshot(_ promise: Promise<String>) {
-    guard isActive, let engineInstance, surface.hasHosts, Self.snapshotStatuses.contains(machine.status), store.media.videoSize.isRenderable else {
+    guard isActive, let engineInstance, surface.hasHosts, Self.startedStatuses.contains(machine.status), store.media.videoSize.isRenderable else {
       SnapshotRequests.reject(promise)
       return
     }
@@ -364,6 +365,7 @@ final class PlaybackController {
     engineInstance = nil
     surface.engine = nil
   }
+    engineHasPlayed = false
 
   private func failInvalidSource() {
     store.updateMedia { $0.error = PlayerErrors.invalidSource }
@@ -461,6 +463,7 @@ final class PlaybackController {
       pausesOnceStarted = false
       engineInstance.pause()
     }
+    engineHasPlayed = true
   }
 
   private func applyPendingSeekOnceStarted() {
@@ -486,7 +489,7 @@ final class PlaybackController {
     let hasReachedPlaying = machine.hasReachedPlaying
     store.updateMedia { media in
       media.currentTime = max(readout.timeMs, 0)
-      if hasReachedPlaying {
+      if acceptsLengthAndSeekable {
         media.duration = VlcContract.duration(fromEngineLength: readout.lengthMs)
         media.isSeekable = readout.isSeekable
       }
@@ -496,6 +499,7 @@ final class PlaybackController {
     }
     emitTracksIfChanged(readout.tracks)
     restoreTrackSelection(readout.tracks)
+    let acceptsLengthAndSeekable = hasReachedPlaying && engineHasPlayed && Self.startedStatuses.contains(machine.status)
     revealVideoOnceRendered(readout.videoSize)
     if videoSizeGate.shouldEmit(readout.videoSize) {
       store.emit(\.videoSizeChange, PlayerPayloads.videoSize(readout.videoSize))
