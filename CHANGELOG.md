@@ -6,6 +6,12 @@ All notable changes to rn-vlc-plyr. The format follows
 
 ## [Unreleased]
 
+### Highlights
+
+A bug-fix and hardening release. A review of the whole library found two crashes, a set of playback
+bugs around reloads, seeks and two players, and a few gaps in how the library treats values from
+outside. The fixes come with tests, and both platforms follow the player contract more closely.
+
 ### Fixed
 
 - iOS: `setAudioTrack` and `setSubtitleTrack` no longer crash the app on `NaN` or an infinite id.
@@ -38,6 +44,8 @@ All notable changes to rn-vlc-plyr. The format follows
   players, so an old stream cannot keep playing under a new one.
 - iOS 16: a `uri` with a space, for example `https://host/my clip.mp4`, plays. It failed with
   `invalidSource`.
+- iOS: `loaded` now comes right after the first `statusChange('playing')`. `tracksChange` and
+  `videoSizeChange` fired between the two.
 - `useVlcPlayerStatus` keeps one native listener. It no longer adds and removes one on every render.
 
 ### Changed
@@ -49,6 +57,23 @@ All notable changes to rn-vlc-plyr. The format follows
 - `userAgent` and `referrer` lose their line breaks, so a value cannot add an HTTP header.
 - iOS: artwork replies are no longer kept in the shared URL cache on disk.
 - iOS: the file of a rejected `snapshot()` is deleted.
+
+- The `react-native` peer range is `>=0.79`. It was `*`, but older versions never built.
+
+### Docs
+
+- README has a new [Security](README.md#security) section.
+- The [player contract](docs/player-contract.md) now covers `keepScreenOn`, an invalid source on
+  `play()`, a seek during a reload, the session owner rule, artwork redirects and limits, rejected
+  `libvlcOptions` and the iOS buffering rule.
+
+### Internal
+
+- About 100 new native tests and 8 new Jest tests. The mixed test files are split by subject.
+- CI fails when the npm package holds example or test files. The package had about 150 example type
+  files; they are gone.
+- The turbo cache for the example builds now sees changes in the library sources.
+- The podspec tag matches the `v` release tags.
 
 ## [1.4.0] - 2026-11-09
 

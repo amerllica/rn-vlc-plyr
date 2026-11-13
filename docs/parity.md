@@ -13,12 +13,13 @@ Results of the cross-platform checklist against [the player contract](player-con
 
 | Suite | iOS | Android |
 |---|---|---|
-| Pure contract rules | XCTest, pass | JUnit on the JVM, 116 pass |
-| Real playback | XCTest with bundled MP4 and M4A files, pass | Instrumented tests on the emulator with bundled MP4, M4A, MKV and SRT files, 45 pass |
-| Total | 168 pass | 161 pass |
+| Pure contract rules | XCTest, pass | JUnit on the JVM, 159 pass |
+| Real playback | XCTest with bundled MP4 and M4A files, pass | Instrumented tests on the emulator with bundled MP4, M4A, MKV and SRT files, 60 pass |
+| Total | 213 pass | 219 pass |
 
-Counts from 2026-10-27 for 1.3, on the iPhone 18 Pro simulator (iOS 27) and the Pixel_10a emulator
-(API 37). The background and media session contract rules have the same 33 test names on both OSes.
+Counts from 2026-11-13 for 1.5, on the iPhone 18 Pro simulator (iOS 27) and the Api35_GoogleApis
+emulator (API 35). The background and media session contract rules share 33 test names on both
+OSes. Android has 3 more for audio focus changes.
 The 9 Android subtitle drawing tests are described in
 [Android subtitle drawing](#android-subtitle-drawing).
 
@@ -37,7 +38,7 @@ cd example/android && ./gradlew :rn-vlc-plyr:testDebugUnitTest :rn-vlc-plyr:conn
 | `autoPlay = false` | PASS | PASS | Status stays `idle` until `play()` |
 | Clear source | PASS | PASS | Status `idle`, tracks cleared, audio output released |
 | Status deduplication | PASS | PASS | |
-| Buffering rule | PASS | PASS | VLC 3 buffering during playback and while paused is ignored |
+| Buffering rule | PASS | PASS | VLC 3 buffering during playback and while paused is ignored. iOS also ignores it while the status is `playing` |
 | `ended` and `loop` | PASS | PASS | With loop on there is no `ended` status or event |
 | `play()` from ended, stopped, error | PASS | PASS | Restart from 0, or reload after an error |
 | `pause()` | PASS | PASS | |
@@ -50,6 +51,9 @@ cd example/android && ./gradlew :rn-vlc-plyr:testDebugUnitTest :rn-vlc-plyr:conn
 | `snapshot()` | PASS | PASS | `file://` PNG at video resolution. Rejects with `No video frame available` |
 | Resize modes | PASS | PASS | iOS `cover` and `stretch` verified by unit tests only, because the test media match the view's aspect ratio. Android verified visually with 4:3 media |
 | Several views, fullscreen hand-back | PASS | PASS | The inline view gets the video back without reloading |
+| `keepScreenOn` | PASS | PASS | The view keeps the screen on while its player is `opening`, `buffering` or `playing`. `release()` detaches the views, so the screen can sleep. The view code itself has no automated test; the release notice to the views has one on each OS |
+| Two players and the media session | PASS | PASS | The player that reaches `playing` last owns the Now Playing slot. A seek of the other player does not take it back |
+| Rejected `libvlcOptions` | PASS | PASS | The player uses the shared libVLC instance and logs one warning |
 | Error codes | PASS | PASS | Broken URL gives `network`. Bad URI gives `invalidSource` |
 | Mount and unmount 20 times, switch sources 20 times | PASS | PASS | No crash. Memory and view count stayed flat |
 | HLS on demand | PASS | PASS | Apple `bipbop_4x3` stream |

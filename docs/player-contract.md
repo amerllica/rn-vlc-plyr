@@ -87,7 +87,9 @@ Status values: `idle`, `opening`, `buffering`, `playing`, `paused`, `stopped`, `
 - Engine "opening" → `opening`.
 - Engine "buffering" → `buffering` only when the engine is not playing and the status is not
   `paused`. Otherwise buffering signals are ignored. This removes the VLC 3 buffering flicker and
-  keeps a paused player paused while it seeks.
+  keeps a paused player paused while it seeks. iOS also ignores a buffering signal while the status
+  is `playing`, so on iOS the status leaves `playing` only through `paused`, `ended`, `stopped`,
+  `error` or a reload.
 - Engine "playing" → `playing`.
 - Engine "paused" → `paused`.
 - The engine "stopped" signal is ignored. VLC sends it after the end of media and on source
@@ -116,7 +118,7 @@ Status values: `idle`, `opening`, `buffering`, `playing`, `paused`, `stopped`, `
 |---|---|---|
 | `statusChange` | every status transition | new status |
 | `timeUpdate` | while `playing`, at most every `timeUpdateInterval` ms; once after each seek; once with 0 on `stop()` | `{ currentTime, duration }` |
-| `loaded` | once per source, right after the first `statusChange('playing')` of that source | `{ duration, isSeekable, isLive, videoSize, audioTracks, subtitleTracks }` |
+| `loaded` | once per source, right after the first `statusChange('playing')` of that source. The first `tracksChange` and `videoSizeChange` of the source come before that `statusChange` | `{ duration, isSeekable, isLive, videoSize, audioTracks, subtitleTracks }` |
 | `ended` | media ended and `loop` is false, right after `statusChange('ended')` | none |
 | `error` | right after `statusChange('error')` | `{ code, message }` |
 | `volumeChange` | when `volume` or `muted` actually changes | `{ volume, muted }` |
