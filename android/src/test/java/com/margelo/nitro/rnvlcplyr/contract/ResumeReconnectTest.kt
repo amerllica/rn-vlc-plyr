@@ -13,7 +13,7 @@ class ResumeReconnectTest {
     isNetworkSource: Boolean = true,
     isLive: Boolean = false,
     isSeekable: Boolean = true
-  ) = reconnect.shouldReconnect(nowMs, limitMs, isNetworkSource, isLive, isSeekable)
+  ) = reconnect.shouldReconnect(nowMs, limitMs, ResumeTarget(isNetworkSource, isLive, isSeekable))
 
   @Test
   fun reconnectsANetworkSourceOncePausedForTheLimit() {

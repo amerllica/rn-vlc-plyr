@@ -2,8 +2,6 @@ package com.margelo.nitro.rnvlcplyr.contract
 
 import com.margelo.nitro.rnvlcplyr.VlcStatus
 
-data class ResumeTarget(val isNetworkSource: Boolean, val isLive: Boolean, val isSeekable: Boolean)
-
 data class StallCheck(val generation: Int, val delayMs: Long)
 
 data class ResumePlan(val reconnectAtMs: Long?, val stallCheck: StallCheck?)
@@ -13,13 +11,7 @@ class ResumeGuard {
   private val watchdog = StallWatchdog()
 
   fun resume(nowMs: Long, fromPause: Boolean, positionMs: Long, settings: PlayerSettings, target: ResumeTarget): ResumePlan {
-    val reconnects = fromPause && reconnect.shouldReconnect(
-      nowMs,
-      settings.reconnectOnResumeAfterMs,
-      target.isNetworkSource,
-      target.isLive,
-      target.isSeekable
-    )
+    val reconnects = fromPause && reconnect.shouldReconnect(nowMs, settings.reconnectOnResumeAfterMs, target)
     reconnect.clear()
     return ResumePlan(
       reconnectAtMs = positionMs.takeIf { reconnects },
