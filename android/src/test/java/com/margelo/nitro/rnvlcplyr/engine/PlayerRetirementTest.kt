@@ -10,9 +10,9 @@ class PlayerRetirementTest {
   fun aHungShutdownDoesNotBlockTheNextOne() {
     val hungShutdownMayEnd = CountDownLatch(1)
     val nextShutdownRan = CountDownLatch(1)
-    PlayerRetirement.run { hungShutdownMayEnd.await() }
+    PlayerRetirement.retire { hungShutdownMayEnd.await() }
 
-    PlayerRetirement.run { nextShutdownRan.countDown() }
+    PlayerRetirement.retire { nextShutdownRan.countDown() }
 
     try {
       assertTrue(nextShutdownRan.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))

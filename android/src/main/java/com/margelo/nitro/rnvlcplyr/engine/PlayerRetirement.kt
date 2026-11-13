@@ -11,12 +11,12 @@ object PlayerRetirement {
     Thread(task, THREAD_NAME).apply { isDaemon = true }
   }
 
-  fun retire(player: MediaPlayer) = run {
+  fun retire(player: MediaPlayer) = retire {
     player.stop()
     player.release()
   }
 
-  fun run(shutdown: () -> Unit) {
+  fun retire(shutdown: () -> Unit) {
     executor.execute(shutdown)
   }
 }
