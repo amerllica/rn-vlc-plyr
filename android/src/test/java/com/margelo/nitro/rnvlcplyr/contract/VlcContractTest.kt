@@ -82,6 +82,14 @@ class VlcContractTest {
   }
 
   @Test
+  fun absolutePathIsPercentEncoded() {
+    assertEquals(
+      "file:///sdcard/episode%20%231%20100%25.mp4",
+      VlcContract.resolveMediaUri("/sdcard/episode #1 100%.mp4")
+    )
+  }
+
+  @Test
   fun emptyOrSchemelessRelativeUriIsInvalid() {
     assertNull(VlcContract.resolveMediaUri(""))
     assertNull(VlcContract.resolveMediaUri("video.mp4"))

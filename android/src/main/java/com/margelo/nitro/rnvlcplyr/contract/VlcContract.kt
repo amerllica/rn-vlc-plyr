@@ -4,6 +4,7 @@ import com.margelo.nitro.rnvlcplyr.VlcError
 import com.margelo.nitro.rnvlcplyr.VlcErrorCode
 import com.margelo.nitro.rnvlcplyr.VlcSource
 import com.margelo.nitro.rnvlcplyr.VlcSubtitleStyle
+import java.net.URI
 import kotlin.math.floor
 
 object VlcContract {
@@ -28,7 +29,9 @@ object VlcContract {
   private const val MIN_BUFFERING_PERCENT = 0L
   private const val MAX_BUFFERING_PERCENT = 100L
   private const val MICROS_PER_MILLI = 1000L
-  private const val FILE_SCHEME_PREFIX = "file://"
+  private const val MAX_RECOVERY_DELAY_MS = Int.MAX_VALUE.toLong()
+  private const val FILE_SCHEME = "file"
+  private const val NO_AUTHORITY = ""
   private const val USER_AGENT_OPTION = ":http-user-agent="
   private const val REFERRER_OPTION = ":http-referrer="
 
@@ -80,7 +83,7 @@ object VlcContract {
   fun durationFromEngine(lengthMs: Long): Long = if (lengthMs <= 0) 0L else lengthMs
 
   fun resolveMediaUri(uri: String): String? = when {
-    uri.startsWith("/") -> FILE_SCHEME_PREFIX + uri
+    uri.startsWith("/") -> URI(FILE_SCHEME, NO_AUTHORITY, uri, null).toASCIIString()
     schemeOf(uri) != null -> uri
     else -> null
   }
