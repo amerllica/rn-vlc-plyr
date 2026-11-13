@@ -29,6 +29,24 @@ final class PlaybackLifecycleTests: PlayerTestCase {
     XCTAssertFalse(player.isLive)
   }
 
+  func testLoadedComesRightAfterTheFirstPlaying() throws {
+    var events: [String] = []
+    let loaded = expectation(description: "loaded")
+    subscriptions.append(try player.addOnStatusChangeListener { events.append("status:\($0.stringValue)") })
+    subscriptions.append(try player.addOnTracksChangeListener { _ in events.append("tracks") })
+    subscriptions.append(try player.addOnVideoSizeChangeListener { _ in events.append("videoSize") })
+    subscriptions.append(try player.addOnLoadedListener { _ in
+      events.append("loaded")
+      loaded.fulfill()
+    })
+
+    player.source = videoWithAudioSource
+    wait(for: [loaded], timeout: Self.engineTimeout)
+
+    let playing = try XCTUnwrap(events.firstIndex(of: "status:playing"))
+    XCTAssertEqual(events[playing + 1], "loaded", "events=\(events)")
+  }
+
   func testLocalFileEndsWithEndedEvent() throws {
     let ended = expectation(description: "ended")
     var statuses: [VlcStatus] = []

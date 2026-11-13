@@ -118,6 +118,20 @@ class PlayerControllerTest {
   }
 
   @Test
+  fun loadedComesRightAfterTheFirstPlaying() {
+    val order = CopyOnWriteArrayList<String>()
+    controller.events.statusChange.add { order.add("status:$it") }
+    controller.events.tracksChange.add { order.add("tracks") }
+    controller.events.videoSizeChange.add { order.add("videoSize") }
+    controller.events.loaded.add { order.add("loaded") }
+
+    controller.setSource(tenSecondSource())
+    awaitCondition("loaded") { order.contains("loaded") }
+
+    assertEquals("order=$order", "loaded", order[order.indexOf("status:${VlcStatus.PLAYING}") + 1])
+  }
+
+  @Test
   fun seekEmitsATimeUpdateWithTheTargetTime() {
     controller.setLoop(true)
     controller.setSource(localSource())

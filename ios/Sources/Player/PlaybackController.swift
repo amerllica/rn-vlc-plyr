@@ -426,10 +426,10 @@ final class PlaybackController {
       case .status(let status):
         store.updateMedia { $0.status = status }
         trackRecovery(for: status)
-        store.emit(\.statusChange, PlayerPayloads.status(status))
         if status == .playing {
           didEnterPlaying()
         }
+        store.emit(\.statusChange, PlayerPayloads.status(status))
       case .loaded:
         store.emit(\.loaded, PlayerPayloads.loaded(store.media))
       case .ended:
