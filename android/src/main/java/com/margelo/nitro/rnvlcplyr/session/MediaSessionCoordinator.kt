@@ -32,8 +32,10 @@ class MediaSessionCoordinator(context: Context, private val host: SessionHost) {
   fun refresh() = onMain { publish() }
 
   fun onStatusChanged() = onMain {
-    focus.listenForNoisy(host.sessionSnapshot().status.isActive)
-    publish(statusChanged = true)
+    val snapshot = host.sessionSnapshot()
+    focus.listenForNoisy(snapshot.status.isActive)
+    if (snapshot.status == VlcStatus.PLAYING && snapshot.sessionState.isActive) MediaSessionOwner.claim(this)
+    publish()
   }
 
   fun onSourceChanged(cleared: Boolean) = onMain {
@@ -86,18 +88,14 @@ class MediaSessionCoordinator(context: Context, private val host: SessionHost) {
     giveUp()
   }
 
-  private fun publish(statusChanged: Boolean = false) {
+  private fun publish() {
     val snapshot = host.sessionSnapshot()
     val state = snapshot.sessionState
     val nowPlaying = snapshot.nowPlaying
     resetArtworkIfNowPlayingChanged(nowPlaying)
     if (!state.isActive || nowPlaying == null) return giveUp()
-    if (!MediaSessionOwner.isOwner(this)) {
-      val reachedPlaying = statusChanged && snapshot.status == VlcStatus.PLAYING
-      val playsWithoutOwner = snapshot.status == VlcStatus.PLAYING && MediaSessionOwner.current() == null
-      if (!reachedPlaying && !playsWithoutOwner) return
-      MediaSessionOwner.claim(this)
-    }
+    if (snapshot.status == VlcStatus.PLAYING) MediaSessionOwner.claimIfFree(this)
+    if (!MediaSessionOwner.isOwner(this)) return
     val content = SessionContent(
       state = state,
       nowPlaying = nowPlaying,

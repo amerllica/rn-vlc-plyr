@@ -17,6 +17,11 @@ object MediaSessionOwner {
   }
 
   @Synchronized
+  fun claimIfFree(coordinator: MediaSessionCoordinator) {
+    if (owner?.get() == null) owner = WeakReference(coordinator)
+  }
+
+  @Synchronized
   fun relinquish(coordinator: MediaSessionCoordinator): Boolean {
     if (owner?.get() !== coordinator) return false
     owner = null
