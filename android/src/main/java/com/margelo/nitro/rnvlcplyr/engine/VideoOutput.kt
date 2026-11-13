@@ -9,4 +9,6 @@ interface VideoOutput {
   val scaleType: MediaPlayer.ScaleType
 
   fun renewVideoLayout()
+
+  fun onPlayerReleased()
 }

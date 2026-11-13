@@ -22,7 +22,5 @@ class AttachmentStack<T : Any> {
     return previousTop !== top
   }
 
-  fun clear() {
-    items.clear()
-  }
+  fun clear(): List<T> = items.toList().also { items.clear() }
 }

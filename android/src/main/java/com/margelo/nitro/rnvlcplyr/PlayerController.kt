@@ -315,7 +315,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     session.release()
     events.clear()
     MainThread.run {
-      outputs.clear()
+      outputs.clear().forEach(VideoOutput::onPlayerReleased)
       engine.release()
       privateLibVLC?.release()
       privateLibVLC = null

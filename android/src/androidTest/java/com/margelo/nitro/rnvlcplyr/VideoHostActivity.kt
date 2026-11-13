@@ -52,6 +52,13 @@ class HostVideoOutput(
 
   override val scaleType: MediaPlayer.ScaleType = MediaPlayer.ScaleType.SURFACE_BEST_FIT
 
+  var playerReleased = false
+    private set
+
+  override fun onPlayerReleased() {
+    playerReleased = true
+  }
+
   fun useSurfaceType(usesTextureView: Boolean) {
     this.usesTextureView = usesTextureView
   }
