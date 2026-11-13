@@ -12,6 +12,9 @@ All notable changes to rn-vlc-plyr. The format follows
   Both platforms ignore such an id.
 - A `libvlcOptions` entry that libVLC rejects no longer crashes the app. The player logs a warning
   and uses the shared libVLC instance.
+- `useVlcPlayer` no longer loads the media twice when the source object lists its keys in another
+  order than `uri`, `userAgent`, `referrer`, `vlcOptions`, `title`.
+- `useVlcPlayerStatus` keeps one native listener. It no longer adds and removes one on every render.
 
 ## [1.4.0] - 2026-11-09
 
