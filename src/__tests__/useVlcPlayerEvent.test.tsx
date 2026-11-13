@@ -23,6 +23,27 @@ describe('useVlcPlayerEvent', () => {
     expect(player.channels.statusChange.listeners.size).toBe(1);
   });
 
+  it('moves the native listener when the player changes', async () => {
+    const first = new FakePlayer();
+    const second = new FakePlayer();
+    const received: string[] = [];
+    const { rerender } = await renderHook(
+      ({ player }: { player: FakePlayer }) =>
+        useVlcPlayerEvent(player, 'statusChange', (status) =>
+          received.push(status)
+        ),
+      { initialProps: { player: first } }
+    );
+
+    await rerender({ player: second });
+    await act(() => first.setStatus('paused'));
+    await act(() => second.setStatus('playing'));
+
+    expect(received).toEqual(['playing']);
+    expect(first.channels.statusChange.listeners.size).toBe(0);
+    expect(second.channels.statusChange.listeners.size).toBe(1);
+  });
+
   it('removes the native listener on unmount', async () => {
     const player = new FakePlayer();
     const { unmount } = await renderHook(() =>
