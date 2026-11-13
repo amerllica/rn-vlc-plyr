@@ -122,6 +122,25 @@ class MediaSessionTest {
     assertEquals(VlcStatus.PLAYING, controller.read { status })
   }
 
+  @Test
+  fun aSeekOnTheFirstPlayerDoesNotTakeTheSessionBackFromTheSecond() {
+    val session = startPlaying()
+    val second = PlayerController(TestMedia.targetContext)
+    try {
+      second.setLoop(true)
+      second.updateSessionSettings { nowPlaying = SECOND_NOW_PLAYING }
+      second.setSource(fixtureSource())
+      awaitCondition("second owns the session") { session.publishedTitle() == SECOND_NOW_PLAYING.title }
+
+      controller.seek(0.0)
+      onMainSync { }
+
+      assertEquals(SECOND_NOW_PLAYING.title, session.publishedTitle())
+    } finally {
+      second.release()
+    }
+  }
+
   private fun fixtureSource() =
     VlcSource(TestMedia.copyToCache(TestMedia.VIDEO_ASSET).absolutePath, null, null, null, null)
 
@@ -134,6 +153,8 @@ class MediaSessionTest {
   }
 
   private fun MediaControllerCompat.publishedPosition(): Long = playbackState?.position ?: -1L
+
+  private fun MediaControllerCompat.publishedTitle(): String? = metadata?.getString(MediaMetadataCompat.METADATA_KEY_TITLE)
 
   private fun MediaControllerCompat.hasAction(action: Long): Boolean =
     (playbackState?.actions ?: 0L) and action != 0L
@@ -159,5 +180,6 @@ class MediaSessionTest {
     const val FOCUS_SETTLE_MS = 500L
     const val LATE_SEEK_MS = 1500.0
     val NOW_PLAYING = VlcNowPlaying("Two seconds", "rn-vlc-plyr", "Fixtures", null)
+    val SECOND_NOW_PLAYING = VlcNowPlaying("Second player", "rn-vlc-plyr", "Fixtures", null)
   }
 }

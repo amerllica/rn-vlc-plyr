@@ -42,6 +42,7 @@ final class PlayerIntegrationTests: XCTestCase {
   private static let engineTimeout: TimeInterval = 30
   private static let backgroundPlaySeconds: TimeInterval = 3
   private static let nowPlayingTitle = "Two seconds"
+  private static let secondNowPlayingTitle = "Second player"
 
   private static let trackIdBeyondIntRange = 1e300
   private static let lateReloadSeekMs = 6000.0
@@ -598,6 +599,29 @@ final class PlayerIntegrationTests: XCTestCase {
     try player.release()
 
     XCTAssertNil(publishedTitle)
+  }
+
+  func testASeekOnTheFirstPlayerDoesNotTakeTheSessionBackFromTheSecond() throws {
+    player.loop = true
+    try playWithNowPlaying()
+    let second = HybridVlcPlayer()
+    defer { try? second.release() }
+    let secondPlaying = expectation(description: "second playing")
+    secondPlaying.assertForOverFulfill = false
+    subscriptions.append(try second.addOnStatusChangeListener { status in
+      if status == .playing { secondPlaying.fulfill() }
+    })
+    second.loop = true
+    second.nowPlaying = VlcNowPlaying(title: Self.secondNowPlayingTitle, artist: nil, album: nil, artworkUri: nil)
+    second.source = fixtureSource
+    wait(for: [secondPlaying], timeout: Self.engineTimeout)
+    drainMainQueue()
+    XCTAssertEqual(publishedTitle, Self.secondNowPlayingTitle)
+
+    try player.seek(timeMs: 0)
+    drainMainQueue()
+
+    XCTAssertEqual(publishedTitle, Self.secondNowPlayingTitle)
   }
 
   func testRemotePauseRoutedToOwnerPausesPlayback() throws {

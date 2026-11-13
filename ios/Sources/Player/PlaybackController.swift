@@ -448,7 +448,7 @@ final class PlaybackController {
       }
     }
     guard !effects.isEmpty else { return }
-    session.refresh()
+    session.refresh(reachedPlaying: effects.contains(.status(.playing)))
   }
 
   private func trackRecovery(for status: PlayerStatus) {
