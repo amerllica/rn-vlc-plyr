@@ -4,6 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.margelo.nitro.rnvlcplyr.contract.VlcContract
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
@@ -477,6 +478,36 @@ class PlayerControllerTest {
   }
 
   @Test
+  fun aSubtitleAddedRightAfterTheSourceIsAttachedOnce() {
+    controller.setSource(tenSecondSource())
+    controller.addSubtitle(TestMedia.copyToCache(TestMedia.SUBTITLE_ASSET).absolutePath, true)
+    awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
+    val start = controller.read { media.currentTimeMs }
+
+    awaitCondition("playback past the slave reattach delay") { controller.read { media.currentTimeMs } >= start + PAST_THE_REATTACH_MS }
+
+    assertEquals(1, controller.read { media.tracks.subtitleTracks.size })
+  }
+
+  @Test
+  fun aSubtitleTurnedOffDuringAStyleReloadStaysOff() {
+    controller.setSource(tenSecondSource())
+    awaitCondition("playing") { statuses.contains(VlcStatus.PLAYING) }
+    controller.addSubtitle(TestMedia.copyToCache(TestMedia.SUBTITLE_ASSET).absolutePath, true)
+    awaitCondition("subtitle selected") { controller.read { media.tracks.selectedSubtitleTrack >= 0 } }
+    statuses.clear()
+    controller.setSubtitleStyle(YELLOW_SUBTITLES)
+    awaitCondition("reopening") { statuses.contains(VlcStatus.OPENING) }
+
+    controller.setSubtitleTrack(VlcContract.NO_TRACK_ID.toDouble())
+    awaitCondition("playing again") { statuses.contains(VlcStatus.PLAYING) }
+    val start = controller.read { media.currentTimeMs }
+    awaitCondition("playback past the slave reattach delay") { controller.read { media.currentTimeMs } >= start + PAST_THE_REATTACH_MS }
+
+    assertEquals(VlcContract.NO_TRACK_ID.toDouble(), controller.read { media.tracks.selectedSubtitleTrack }, 0.0)
+  }
+
+  @Test
   fun playAfterAnErrorKeepsAnAddedSubtitle() {
     val missing = TestMedia.copyToCache(TestMedia.VIDEO_ASSET, RETRY_FOLDER)
     missing.delete()
@@ -536,6 +567,7 @@ class PlayerControllerTest {
     const val PAST_THE_STALL_CHECK_MS = EARLY_SEEK_MS + 2 * STALL_CHECK_MS
     const val FILE_NAME_WITH_URI_CHARACTERS = "episode #1 100%.mp4"
     const val RETRY_FOLDER = "retry"
+    const val PAST_THE_REATTACH_MS = 2 * VlcContract.SLAVE_REATTACH_DELAY_MS
     val YELLOW_SUBTITLES = VlcSubtitleStyle(
       fontFamily = null,
       fontScale = 150.0,

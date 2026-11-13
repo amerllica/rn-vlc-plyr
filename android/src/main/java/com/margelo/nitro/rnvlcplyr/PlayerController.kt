@@ -217,30 +217,35 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     if (!deltaMs.isNaN()) onMain { performSeek(locked { media.currentTimeMs } + deltaMs) }
   }
 
-  fun setAudioTrack(id: Double) =
-    selectTrack(id, { audioTracks }, TrackSelectionRestore::forgetAudioSelection, engine::selectAudioTrack)
+  fun setAudioTrack(id: Double) = selectTrack(PlaybackSlave.Kind.AUDIO, id)
 
-  fun setSubtitleTrack(id: Double) =
-    selectTrack(id, { subtitleTracks }, TrackSelectionRestore::forgetSubtitleSelection, engine::selectSubtitleTrack)
+  fun setSubtitleTrack(id: Double) = selectTrack(PlaybackSlave.Kind.SUBTITLE, id)
 
-  private fun selectTrack(
-    id: Double,
-    tracksOf: VlcTracksInfo.() -> Array<VlcTrack>,
-    forgetPendingRestore: TrackSelectionRestore.() -> Unit,
-    select: (Int) -> Unit
-  ) = onMain {
+  private fun selectTrack(kind: PlaybackSlave.Kind, id: Double) = onMain {
     val trackId = VlcContract.trackId(id) ?: return@onMain
     val selectable = locked {
-      TrackList.canSelect(media.tracks.tracksOf(), trackId).also { known ->
-        if (known) {
-          tracksBeforeReopen = null
-          trackRestore.forgetPendingRestore()
-        }
-      }
+      TrackList.canSelect(media.tracks.of(kind), trackId).also { known -> if (known) forgetPendingSelection(kind) }
     }
     if (!selectable) return@onMain
-    select(trackId)
+    when (kind) {
+      PlaybackSlave.Kind.AUDIO -> engine.selectAudioTrack(trackId)
+      PlaybackSlave.Kind.SUBTITLE -> engine.selectSubtitleTrack(trackId)
+    }
     refreshMediaInfo()
+  }
+
+  private fun VlcTracksInfo.of(kind: PlaybackSlave.Kind): Array<VlcTrack> = when (kind) {
+    PlaybackSlave.Kind.AUDIO -> audioTracks
+    PlaybackSlave.Kind.SUBTITLE -> subtitleTracks
+  }
+
+  private fun forgetPendingSelection(kind: PlaybackSlave.Kind) {
+    tracksBeforeReopen = null
+    when (kind) {
+      PlaybackSlave.Kind.AUDIO -> trackRestore.forgetAudioSelection()
+      PlaybackSlave.Kind.SUBTITLE -> trackRestore.forgetSubtitleSelection()
+    }
+    reopenSlaves = reopenSlaves.map { slave -> if (slave.kind == kind) slave.copy(select = false) else slave }
   }
 
   fun addAudio(uri: String, select: Boolean) =
@@ -338,14 +343,14 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     val resolvedUri = value?.let { VlcContract.resolveMediaUri(it.uri) }
     val wantsPlay = resolvedUri != null && (forcePlay || locked { settings.autoPlay })
     if (wantsPlay) session.requestFocus()
-    mutate { applySource(value, resolvedUri, wantsPlay) }
+    mutate { applySource(value, resolvedUri, wantsPlay, addsTracksAgain = forcePlay) }
   }
 
-  private fun Outbox.applySource(value: VlcSource?, resolvedUri: String?, playNow: Boolean) {
+  private fun Outbox.applySource(value: VlcSource?, resolvedUri: String?, playNow: Boolean, addsTracksAgain: Boolean) {
     media = MediaState()
     pendingSeekMs = null
     pendingSessionPause = false
-    reopenSlaves = addedSlaves.toList()
+    reopenSlaves = if (addsTracksAgain) addedSlaves.toList() else emptyList()
     reopenSlavesAtMs = null
     trackRestore = TrackSelectionRestore.none()
     reloadingInPlace = false
