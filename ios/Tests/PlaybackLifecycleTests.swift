@@ -168,15 +168,18 @@ final class PlaybackLifecycleTests: PlayerTestCase {
     try waitForStatus(.playing)
     subscriptions.forEach { $0.remove() }
     subscriptions.removeAll()
-    let reopened = expectation(description: "reloaded as a stall")
-    reopened.isInverted = true
-    subscriptions.append(try player.addOnStatusChangeListener { status in
-      if status == .opening { reopened.fulfill() }
+    var statuses: [VlcStatus] = []
+    let playedPastTheStallCheck = expectation(description: "playback past the stall check")
+    playedPastTheStallCheck.assertForOverFulfill = false
+    subscriptions.append(try player.addOnStatusChangeListener { statuses.append($0) })
+    subscriptions.append(try player.addOnTimeUpdateListener { event in
+      if (Self.pastTheStallCheckMs..<Self.lateReloadSeekMs).contains(event.currentTime) { playedPastTheStallCheck.fulfill() }
     })
 
     try player.seek(timeMs: Self.earlyReloadSeekMs)
+    wait(for: [playedPastTheStallCheck], timeout: Self.engineTimeout)
 
-    wait(for: [reopened], timeout: Self.stallObservationSeconds)
+    XCTAssertFalse(statuses.contains(.opening), "reloaded as a stall; statuses=\(statuses.map(\.stringValue))")
   }
 
   func testStopEmitsStoppedThenATimeUpdateAtZero() throws {

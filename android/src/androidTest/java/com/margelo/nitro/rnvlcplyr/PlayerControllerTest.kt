@@ -563,8 +563,8 @@ class PlayerControllerTest {
     const val EARLY_SEEK_MS = 1000L
     const val SEEK_MIDPOINT_MS = 3500L
     const val SETTLED_TIME_UPDATES = 3
-    const val STALL_CHECK_MS = 1000L
-    const val PAST_THE_STALL_CHECK_MS = EARLY_SEEK_MS + 2 * STALL_CHECK_MS
+    const val STALL_CHECK_MS = 3000L
+    const val PAST_THE_STALL_CHECK_MS = EARLY_SEEK_MS + STALL_CHECK_MS + 500L
     const val FILE_NAME_WITH_URI_CHARACTERS = "episode #1 100%.mp4"
     const val RETRY_FOLDER = "retry"
     const val PAST_THE_REATTACH_MS = 2 * VlcContract.SLAVE_REATTACH_DELAY_MS

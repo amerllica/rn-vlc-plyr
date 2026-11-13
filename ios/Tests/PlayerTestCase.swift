@@ -49,8 +49,8 @@ class PlayerTestCase: XCTestCase {
   static let earlyReloadSeekMs = 1000.0
   static let reloadSeekMidpointMs = 3500.0
   static let settledTimeUpdates = 3
-  static let stallCheckMs = 1000.0
-  static let stallObservationSeconds: TimeInterval = 2
+  static let stallCheckMs = 3000.0
+  static let pastTheStallCheckMs = earlyReloadSeekMs + stallCheckMs + 500
   static let nearEndSeekMs = 9000.0
   static let rejectedInstanceOption = "--no-such-libvlc-option"
   static let lateSeekMs = 1500.0
