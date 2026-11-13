@@ -235,7 +235,7 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
   ) = onMain {
     val trackId = VlcContract.trackId(id) ?: return@onMain
     val selectable = locked {
-      isSelectable(media.tracks.tracksOf(), trackId).also { known ->
+      TrackList.canSelect(media.tracks.tracksOf(), trackId).also { known ->
         if (known) {
           tracksBeforeReopen = null
           trackRestore.forgetPendingRestore()
@@ -649,9 +649,6 @@ class PlayerController(private val context: Context = VlcEngine.applicationConte
     subtitleDelayMicros = VlcContract.delayToMicros(settings.subtitleDelayMs),
     audioDelayMicros = VlcContract.delayToMicros(settings.audioDelayMs)
   )
-
-  private fun isSelectable(tracks: Array<VlcTrack>, id: Int): Boolean =
-    id == VlcContract.NO_TRACK_ID || TrackList.contains(tracks, id)
 
   private fun onMain(block: () -> Unit) {
     MainThread.run { if (!isReleased) block() }
