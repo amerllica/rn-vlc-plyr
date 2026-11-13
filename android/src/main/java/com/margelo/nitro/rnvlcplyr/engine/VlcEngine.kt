@@ -3,10 +3,10 @@ package com.margelo.nitro.rnvlcplyr.engine
 import android.content.Context
 import android.util.Log
 import com.margelo.nitro.NitroModules
+import com.margelo.nitro.rnvlcplyr.LOG_TAG
 import org.videolan.libvlc.LibVLC
 
 object VlcEngine {
-  private const val TAG = "RnVlcPlyr"
   private const val REJECTED_OPTIONS_WARNING = "rn-vlc-plyr: libVLC rejected the instance options, so the player uses the shared instance"
 
   @Volatile
@@ -18,7 +18,7 @@ object VlcEngine {
 
   fun create(context: Context, options: List<String>): LibVLC? =
     runCatching { LibVLC(context.applicationContext, ArrayList(options)) }
-      .onFailure { Log.w(TAG, REJECTED_OPTIONS_WARNING, it) }
+      .onFailure { Log.w(LOG_TAG, REJECTED_OPTIONS_WARNING, it) }
       .getOrNull()
 
   fun libVLC(context: Context = applicationContext()): LibVLC =

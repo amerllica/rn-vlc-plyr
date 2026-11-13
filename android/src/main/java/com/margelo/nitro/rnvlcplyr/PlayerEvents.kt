@@ -36,10 +36,9 @@ class PlayerEvents(private val onRemoteListenerPresenceChange: () -> Unit = {}) 
     }
 
   private fun reportListenerFailure(failure: Throwable) {
-    Log.e(TAG, "A VlcPlayer listener threw", failure)
+    Log.e(LOG_TAG, "A VlcPlayer listener threw", failure)
   }
 
   private companion object {
-    const val TAG = "RnVlcPlyr"
   }
 }

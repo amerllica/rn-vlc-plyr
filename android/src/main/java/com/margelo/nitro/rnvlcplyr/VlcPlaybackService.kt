@@ -47,12 +47,11 @@ class VlcPlaybackService : Service() {
     ServiceCompat.startForeground(this, PlaybackNotification.NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
     true
   } catch (failure: RuntimeException) {
-    Log.w(TAG, "rn-vlc-plyr: the playback service could not enter the foreground", failure)
+    Log.w(LOG_TAG, "rn-vlc-plyr: the playback service could not enter the foreground", failure)
     false
   }
 
   companion object {
-    private const val TAG = "RnVlcPlyr"
 
     @Volatile
     private var running: VlcPlaybackService? = null
@@ -61,7 +60,7 @@ class VlcPlaybackService : Service() {
       ContextCompat.startForegroundService(context, Intent(context, VlcPlaybackService::class.java))
       true
     } catch (notAllowed: IllegalStateException) {
-      Log.w(TAG, "rn-vlc-plyr: the playback service could not start", notAllowed)
+      Log.w(LOG_TAG, "rn-vlc-plyr: the playback service could not start", notAllowed)
       false
     }
 

@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
+import com.margelo.nitro.rnvlcplyr.LOG_TAG
 import com.margelo.nitro.rnvlcplyr.contract.ArtworkRedirect
 import com.margelo.nitro.rnvlcplyr.contract.ArtworkRetrySchedule
 import com.margelo.nitro.rnvlcplyr.contract.VlcContract
@@ -84,7 +85,7 @@ class ArtworkLoader(private val schedule: ArtworkScheduler = defaultScheduler())
       failed += uri
       cycles.remove(uri)?.waiters.orEmpty()
     }
-    Log.w(TAG, "rn-vlc-plyr: artwork could not be loaded from ${VlcContract.redactUri(uri)}: $reason")
+    Log.w(LOG_TAG, "rn-vlc-plyr: artwork could not be loaded from ${VlcContract.redactUri(uri)}: $reason")
     waiters.forEach { it() }
   }
 
@@ -160,7 +161,6 @@ class ArtworkLoader(private val schedule: ArtworkScheduler = defaultScheduler())
   }
 
   companion object {
-    private const val TAG = "RnVlcPlyr"
     private const val MAX_SIDE_PX = 512
     private const val TIMEOUT_MS = 10_000
     private const val THREAD_NAME = "rn-vlc-plyr-artwork"
